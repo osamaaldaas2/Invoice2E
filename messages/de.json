@@ -1,0 +1,48 @@
+{
+    "common": {
+        "app_name": "Invoice2E",
+        "login": "Anmelden",
+        "signup": "Registrieren",
+        "logout": "Abmelden",
+        "email": "E-Mail",
+        "password": "Passwort",
+        "loading": "Wird geladen...",
+        "error": "Fehler",
+        "success": "Erfolg",
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "delete": "Löschen",
+        "edit": "Bearbeiten",
+        "back": "Zurück",
+        "next": "Weiter",
+        "submit": "Absenden"
+    },
+    "home": {
+        "title": "Willkommen bei Invoice2E",
+        "description": "Konvertieren Sie Rechnungen in XRechnung-konforme E-Rechnungen",
+        "cta_login": "Anmelden",
+        "cta_signup": "Jetzt starten"
+    },
+    "auth": {
+        "login_title": "Bei Ihrem Konto anmelden",
+        "signup_title": "Konto erstellen",
+        "forgot_password": "Passwort vergessen?",
+        "no_account": "Noch kein Konto?",
+        "have_account": "Bereits ein Konto?",
+        "first_name": "Vorname",
+        "last_name": "Nachname"
+    },
+    "errors": {
+        "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+        "invalid_credentials": "Ungültige E-Mail oder Passwort",
+        "email_required": "E-Mail ist erforderlich",
+        "password_required": "Passwort ist erforderlich",
+        "network_error": "Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung."
+    },
+    "footer": {
+        "copyright": "© 2024 Invoice2E. Alle Rechte vorbehalten.",
+        "privacy": "Datenschutz",
+        "terms": "Nutzungsbedingungen",
+        "contact": "Kontakt"
+    }
+}

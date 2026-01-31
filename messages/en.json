@@ -1,0 +1,48 @@
+{
+    "common": {
+        "app_name": "Invoice2E",
+        "login": "Login",
+        "signup": "Sign Up",
+        "logout": "Logout",
+        "email": "Email",
+        "password": "Password",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "back": "Back",
+        "next": "Next",
+        "submit": "Submit"
+    },
+    "home": {
+        "title": "Welcome to Invoice2E",
+        "description": "Convert invoices to XRechnung compliant e-invoices",
+        "cta_login": "Login",
+        "cta_signup": "Get Started"
+    },
+    "auth": {
+        "login_title": "Login to your account",
+        "signup_title": "Create your account",
+        "forgot_password": "Forgot password?",
+        "no_account": "Don't have an account?",
+        "have_account": "Already have an account?",
+        "first_name": "First Name",
+        "last_name": "Last Name"
+    },
+    "errors": {
+        "generic": "An error occurred. Please try again.",
+        "invalid_credentials": "Invalid email or password",
+        "email_required": "Email is required",
+        "password_required": "Password is required",
+        "network_error": "Network error. Please check your connection."
+    },
+    "footer": {
+        "copyright": "© 2024 Invoice2E. All rights reserved.",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service",
+        "contact": "Contact"
+    }
+}
