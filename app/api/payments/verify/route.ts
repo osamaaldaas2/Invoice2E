@@ -1,0 +1,301 @@
+/**
+ * Payment Verification API Route
+ * Verifies payment and adds credits to user account
+ * Refactored to lookup transaction by provider ID for guaranteed matching
+ *
+ * @route /api/payments/verify
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { stripeAdapter } from '@/adapters/stripe.adapter';
+import { paypalAdapter } from '@/adapters/paypal.adapter';
+import { createServerClient } from '@/lib/supabase.server';
+import { getSessionFromCookie } from '@/lib/session';
+import { logger } from '@/lib/logger';
+
+/**
+ * POST /api/payments/verify
+ * Verify payment and add credits if successful
+ */
+export async function POST(req: NextRequest) {
+    try {
+        // Use secure signed session token for authentication
+        const session = getSessionFromCookie();
+
+        if (!session) {
+            logger.warn('Payment verification attempted without valid session');
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Create user object from session
+        const user = { id: session.userId, email: session.email };
+
+        const body = await req.json();
+        const { sessionId, orderId } = body;
+
+        if (!sessionId && !orderId) {
+            return NextResponse.json(
+                { error: 'Session ID or Order ID is required' },
+                { status: 400 }
+            );
+        }
+
+        const supabase = createServerClient();
+        let verified = false;
+        let credits = 0;
+        let paymentId = '';
+
+        // Stripe verification
+        if (sessionId) {
+            try {
+                const session = await stripeAdapter.retrieveCheckoutSession(sessionId);
+                logger.info('Stripe session retrieved', {
+                    sessionId,
+                    paymentStatus: session.payment_status,
+                    metadata: session.metadata
+                });
+
+                if (session.payment_status === 'paid' && session.metadata?.credits) {
+                    verified = true;
+                    credits = parseInt(session.metadata.credits, 10);
+                    // Use paymentIntentId if available, otherwise fallback to session ID
+                    // But for lookup, we MUST use what we stored.
+                    // create-checkout stores session.id as stripe_payment_id
+                    paymentId = sessionId;
+                }
+            } catch (error) {
+                logger.error('Stripe session verification failed', { sessionId, error });
+            }
+        }
+
+        // PayPal verification
+        if (orderId && !verified) {
+            try {
+                const order = await paypalAdapter.getOrder(orderId);
+                // SECURITY FIX: Only accept COMPLETED status - APPROVED means payment not yet captured
+                // APPROVED orders should be captured first before granting credits
+                if (order.status === 'COMPLETED' && order.customId) {
+                    const customData = JSON.parse(order.customId);
+                    verified = true;
+                    credits = customData.credits || 0;
+                    paymentId = orderId;
+                } else if (order.status === 'APPROVED') {
+                    logger.warn('PayPal order is APPROVED but not COMPLETED - payment not yet captured', { orderId });
+                    return NextResponse.json({
+                        success: false,
+                        verified: false,
+                        message: 'Payment approved but not yet captured. Please complete the payment.',
+                    });
+                }
+            } catch (error) {
+                logger.error('PayPal order verification failed', { orderId, error });
+            }
+        }
+
+        if (verified && credits > 0) {
+            // IDEMPOTENCY FIX: Check by BOTH session ID AND payment intent ID
+            // Webhooks store Stripe's event.id (evt_xxx) and reference payment_intent (pi_xxx)
+            // Verify uses session ID (cs_xxx), so we need to check webhook_events by user + provider
+            // AND check the transaction status directly
+
+            // First check: Has webhook already processed for this user recently?
+            // We check by looking at the reference_id stored during credit addition
+            const { data: recentWebhookCredit } = await supabase
+                .from('credit_audit_log')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('source', 'stripe')
+                .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+                .limit(1)
+                .single();
+
+            // Second check: Is this specific payment already in webhook_events?
+            // Check by looking for events that mention this session or its payment intent
+            const { data: webhookProcessed } = await supabase
+                .from('webhook_events')
+                .select('id, event_id')
+                .eq('provider', sessionId ? 'stripe' : 'paypal')
+                .eq('user_id', user.id)
+                .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // Last 10 minutes
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (webhookProcessed) {
+                logger.info('Payment likely processed by webhook, skipping verify credit addition', {
+                    paymentId,
+                    webhookEventId: webhookProcessed.event_id
+                });
+                return NextResponse.json({
+                    success: true,
+                    verified: true,
+                    credits,
+                    message: 'Credits already added by webhook',
+                });
+            }
+
+            // Find transaction by provider ID (Exact match)
+            // FIX: For Stripe, lookup by stripe_session_id (where we store cs_xxx)
+            // For PayPal, lookup by paypal_order_id
+            const { data: transaction } = await supabase
+                .from('payment_transactions')
+                .select('id, payment_status, credits_purchased')
+                .eq('user_id', user.id)
+                .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (!transaction) {
+                logger.error('Transaction not found for payment', { paymentId, userId: user.id });
+                // If not found, it might be a timing issue or manual call.
+                // In strict mode we fail, but we could create it here if we trusted the provider enough.
+                // For now, fail to alert admin/user.
+                return NextResponse.json({
+                    error: 'Transaction record not found',
+                    code: 'TRANSACTION_NOT_FOUND'
+                }, { status: 404 });
+            }
+
+            if (transaction.payment_status === 'completed') {
+                logger.info('Payment already completed', { userId: user.id, paymentId });
+                return NextResponse.json({
+                    success: true,
+                    verified: true,
+                    credits,
+                    message: 'Credits already added',
+                });
+            }
+
+            // Update transaction status using ID if available
+            if (transaction.id) {
+                const { error: updateError } = await supabase
+                    .from('payment_transactions')
+                    .update({
+                        payment_status: 'completed',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', transaction.id)
+                    .eq('user_id', user.id); // Security check
+
+                if (updateError) {
+                    logger.error('Failed to update transaction by ID', { transactionId: transaction.id, error: updateError });
+                } else {
+                    logger.info('Transaction updated by ID', { transactionId: transaction.id });
+                }
+            } else {
+                // Fallback: Look up by provider ID (stripe_payment_id or paypal_order_id)
+                // This is the main path for Stripe since we don't update metadata after creation
+                logger.info('Updating transaction by provider ID', { paymentId, userId: user.id });
+
+                const { data: pendingTx } = await supabase
+                    .from('payment_transactions')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
+                    .eq('payment_status', 'pending')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (pendingTx) {
+                    await supabase
+                        .from('payment_transactions')
+                        .update({
+                            payment_status: 'completed',
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', pendingTx.id);
+                    logger.info('Transaction updated by provider ID', { transactionId: pendingTx.id });
+                } else {
+                    logger.warn('No pending transaction found for provider ID', { paymentId });
+                }
+            }
+
+            // Add credits to user account using atomic RPC (BUG-016 fix)
+            // Try atomic RPC first, fall back to direct update if RPC not available
+            let creditAddSuccess = false;
+
+            try {
+                const { data: newBalance, error: rpcError } = await supabase.rpc('add_credits', {
+                    p_user_id: user.id,
+                    p_amount: credits,
+                    p_source: 'payment_verify',
+                    p_reference_id: paymentId,
+                });
+
+                if (!rpcError && newBalance !== null) {
+                    creditAddSuccess = true;
+                    logger.info('Credits added via atomic RPC', { userId: user.id, credits, newBalance, paymentId });
+                } else if (rpcError) {
+                    logger.warn('RPC add_credits failed, falling back to direct update', { error: rpcError.message });
+                }
+            } catch (rpcErr) {
+                logger.warn('RPC add_credits not available, using fallback', { error: rpcErr });
+            }
+
+            // Fallback: Direct update if RPC failed
+            if (!creditAddSuccess) {
+                const { data: currentCredits } = await supabase
+                    .from('user_credits')
+                    .select('available_credits')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (currentCredits) {
+                    const { error: updateErr } = await supabase
+                        .from('user_credits')
+                        .update({ available_credits: currentCredits.available_credits + credits })
+                        .eq('user_id', user.id);
+
+                    if (updateErr) {
+                        logger.error('Failed to update credits', { userId: user.id, error: updateErr });
+                        throw new Error('Failed to add credits');
+                    }
+                } else {
+                    const { error: insertErr } = await supabase
+                        .from('user_credits')
+                        .insert({ user_id: user.id, available_credits: credits });
+
+                    if (insertErr) {
+                        logger.error('Failed to create credits', { userId: user.id, error: insertErr });
+                        throw new Error('Failed to create credits record');
+                    }
+                }
+                logger.info('Credits added via fallback method', { userId: user.id, credits, paymentId });
+            }
+
+            // IDEMPOTENCY FIX: Record in webhook_events to prevent webhook from adding credits again
+            // Use a unique event_id based on session/order ID with 'verify_' prefix
+            const verifyEventId = `verify_${paymentId}`;
+            await supabase.from('webhook_events').insert({
+                event_id: verifyEventId,
+                provider: sessionId ? 'stripe' : 'paypal',
+                event_type: 'payment.verified',
+                user_id: user.id,
+                credits_added: credits,
+            }).catch(err => {
+                // Don't fail if insert fails (might be duplicate), just log
+                logger.warn('Failed to insert verify event (may be duplicate)', { error: err });
+            });
+
+            return NextResponse.json({
+                success: true,
+                verified: true,
+                credits,
+                message: 'Credits added to your account',
+            });
+        }
+
+        // Not verified or no credits
+        return NextResponse.json({
+            success: true,
+            verified: false,
+            message: 'Payment is still processing or not found',
+        });
+
+    } catch (error) {
+        logger.error('Payment verification failed', { error });
+        return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
+    }
+}

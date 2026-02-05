@@ -1,0 +1,340 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { xrechnungService } from '@/services/xrechnung.service';
+import { ublService } from '@/services/ubl.service';
+import { invoiceDbService } from '@/services/invoice.db.service';
+import { creditsDbService } from '@/services/credits.db.service';
+import { logger } from '@/lib/logger';
+import { AppError, ValidationError } from '@/lib/errors';
+import { getAuthenticatedUser } from '@/lib/auth';
+
+export type ConversionFormat = 'CII' | 'UBL';
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    try {
+        logger.info('Convert request received');
+
+        // SECURITY FIX (BUG-003): Authenticate user from session, not request body
+        const user = await getAuthenticatedUser(request);
+        if (!user) {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
+
+        const userId = user.id; // SECURE: From authenticated session only
+
+        const body = await request.json();
+        const { conversionId, invoiceData, format = 'CII' } = body;
+        // REMOVED: userId from body destructuring - Security vulnerability
+        const outputFormat = (format as ConversionFormat) || 'CII';
+
+        logger.info('Parsing request body', {
+            hasConversionId: !!conversionId,
+            userId, // From authenticated session
+            hasInvoiceData: !!invoiceData,
+        });
+
+        if (!conversionId || !invoiceData) {
+            logger.warn('Missing required fields', {
+                conversionId: !!conversionId,
+                invoiceData: !!invoiceData,
+            });
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Missing required fields: conversionId or invoiceData',
+                },
+                { status: 400 }
+            );
+        }
+
+        // Check if user has enough credits BEFORE conversion
+        try {
+            const userCredits = await creditsDbService.getUserCredits(userId);
+            logger.info('User credits check', { userId, availableCredits: userCredits.availableCredits });
+
+            if (userCredits.availableCredits < 1) {
+                logger.warn('Insufficient credits for conversion', { userId, availableCredits: userCredits.availableCredits });
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: 'Insufficient credits. Please purchase more credits to continue.',
+                        errorCode: 'INSUFFICIENT_CREDITS',
+                    },
+                    { status: 402 } // 402 Payment Required
+                );
+            }
+        } catch (creditError) {
+            logger.error('Failed to check user credits', { userId, error: creditError });
+            return NextResponse.json(
+                { success: false, error: 'Failed to verify credits. Please try again.' },
+                { status: 500 }
+            );
+        }
+
+        logger.info('Starting XRechnung conversion', {
+            conversionId,
+            invoiceNumber: invoiceData?.invoiceNumber,
+            userId,
+        });
+
+        // Validate invoice data structure
+        if (!invoiceData.invoiceNumber) {
+            logger.error('Invoice data missing invoiceNumber', { invoiceData });
+            return NextResponse.json(
+                { success: false, error: 'Invoice number is required' },
+                { status: 400 }
+            );
+        }
+
+        if (!invoiceData.buyerName || !invoiceData.sellerName) {
+            logger.error('Invoice data missing buyer or seller', { invoiceData });
+            return NextResponse.json(
+                { success: false, error: 'Buyer and seller names are required' },
+                { status: 400 }
+            );
+        }
+
+        if (!invoiceData.lineItems || !Array.isArray(invoiceData.lineItems) || invoiceData.lineItems.length === 0) {
+            logger.error('Invoice data has no line items', { invoiceData });
+            return NextResponse.json(
+                { success: false, error: 'At least one line item is required' },
+                { status: 400 }
+            );
+        }
+
+
+        // Generate XML based on format
+        // Need to map ReviewedInvoiceData (from review form) to ExtractedInvoiceData (for service)
+        const serviceData = {
+            ...invoiceData,
+            supplierName: invoiceData.sellerName,
+            supplierEmail: invoiceData.sellerEmail,
+            supplierAddress: invoiceData.sellerAddress,
+            supplierTaxId: invoiceData.sellerTaxId,
+            items: invoiceData.lineItems, // Service uses 'items', form uses 'lineItems'
+        };
+
+        let result: {
+            xmlContent: string;
+            fileName: string;
+            fileSize: number;
+            validationStatus: string;
+            validationErrors: string[];
+            validationWarnings?: string[];
+        };
+
+        try {
+            if (outputFormat === 'UBL') {
+                logger.info('Generating UBL 2.1 invoice', {
+                    invoiceNumber: serviceData.invoiceNumber,
+                });
+
+                const xml = await ublService.generate({
+                    invoiceNumber: serviceData.invoiceNumber || '',
+                    invoiceDate: serviceData.invoiceDate || new Date().toISOString().split('T')[0],
+                    dueDate: serviceData.dueDate,
+                    currency: serviceData.currency || 'EUR',
+                    sellerName: serviceData.sellerName || serviceData.supplierName || '',
+                    sellerEmail: serviceData.sellerEmail || '',
+                    sellerPhone: serviceData.sellerPhone,
+                    sellerTaxId: serviceData.sellerTaxId || '',
+                    sellerAddress: serviceData.sellerAddress,
+                    sellerCity: serviceData.sellerCity,
+                    sellerPostalCode: serviceData.sellerPostalCode,
+                    sellerCountryCode: serviceData.sellerCountryCode || 'DE',
+                    buyerName: serviceData.buyerName || '',
+                    buyerEmail: serviceData.buyerEmail,
+                    buyerAddress: serviceData.buyerAddress,
+                    buyerCity: serviceData.buyerCity,
+                    buyerPostalCode: serviceData.buyerPostalCode,
+                    buyerCountryCode: serviceData.buyerCountryCode || 'DE',
+                    buyerReference: serviceData.buyerReference,
+                    lineItems: (serviceData.lineItems || []).map((item: Record<string, unknown>) => ({
+                        description: (item.description as string) || '',
+                        quantity: Number(item.quantity) || 1,
+                        unitPrice: Number(item.unitPrice) || 0,
+                        totalPrice: Number(item.totalPrice) || Number(item.lineTotal) || 0,
+                        unitCode: item.unitCode as string | undefined,
+                        taxPercent: item.taxRate as number | undefined,
+                    })),
+                    subtotal: Number(serviceData.subtotal) || 0,
+                    taxAmount: Number(serviceData.taxAmount) || 0,
+                    totalAmount: Number(serviceData.totalAmount) || 0,
+                    notes: serviceData.notes,
+                    paymentTerms: serviceData.paymentTerms,
+                });
+
+                const validation = await ublService.validate(xml);
+
+                result = {
+                    xmlContent: xml,
+                    fileName: `${serviceData.invoiceNumber || 'invoice'}_ubl.xml`,
+                    fileSize: new TextEncoder().encode(xml).length,
+                    validationStatus: validation.valid ? 'valid' : 'invalid',
+                    validationErrors: validation.errors,
+                    validationWarnings: [],
+                };
+
+                logger.info('UBL invoice generated successfully', {
+                    xmlSize: result.xmlContent.length,
+                    fileName: result.fileName,
+                });
+            } else {
+                // Default: CII/XRechnung format
+                logger.info('Generating XRechnung (CII) invoice', {
+                    invoiceNumber: serviceData.invoiceNumber,
+                });
+
+                result = xrechnungService.generateXRechnung(serviceData);
+
+                logger.info('XRechnung generated successfully', {
+                    xmlSize: result.xmlContent?.length,
+                    fileName: result.fileName,
+                });
+            }
+        } catch (generationError) {
+            logger.error('XML generation failed', {
+                format: outputFormat,
+                errorType: generationError instanceof Error ? generationError.constructor.name : typeof generationError,
+                errorMessage: generationError instanceof Error ? generationError.message : String(generationError),
+                errorStack: generationError instanceof Error ? generationError.stack : undefined,
+                invoiceData: serviceData,
+            });
+
+            if (generationError instanceof ValidationError) {
+                return NextResponse.json(
+                    { success: false, error: `Validation failed: ${generationError.message}` },
+                    { status: 400 }
+                );
+            }
+
+            if (generationError instanceof AppError) {
+                return NextResponse.json(
+                    { success: false, error: generationError.message },
+                    { status: generationError.statusCode }
+                );
+            }
+
+            throw generationError;
+        }
+
+        if (!result || !result.xmlContent) {
+            logger.error('XRechnung result is invalid', { result });
+            return NextResponse.json(
+                { success: false, error: 'Failed to generate XRechnung XML' },
+                { status: 500 }
+            );
+        }
+
+        // Update conversion and deduct credits transactionally
+        try {
+            // conversionId from frontend is actually extractionId, resolve to actual conversion ID
+            const conversion = await invoiceDbService.getConversionByExtractionId(conversionId);
+
+            if (!conversion) {
+                logger.error('Conversion not found for extraction', { extractionId: conversionId, userId });
+                return NextResponse.json(
+                    { success: false, error: 'Conversion record not found. Please review the invoice again.' },
+                    { status: 404 }
+                );
+            }
+
+            const actualConversionId = conversion.id;
+            logger.info('Processing conversion transaction', {
+                extractionId: conversionId,
+                conversionId: actualConversionId,
+                userId
+            });
+
+            // First, update validation status (without marking as completed)
+            await invoiceDbService.updateConversion(actualConversionId, {
+                validationStatus: result.validationStatus,
+                validationErrors: result.validationErrors.length > 0
+                    ? { errors: result.validationErrors } as Record<string, unknown>
+                    : undefined,
+            });
+
+            // Then execute transaction
+            const txResult = await invoiceDbService.processConversionTransaction(userId, actualConversionId);
+
+            if (!txResult.success) {
+                logger.error('Transaction failed', { error: txResult.error });
+                return NextResponse.json(
+                    { success: false, error: txResult.error || 'Transaction failed' },
+                    { status: 500 }
+                );
+            }
+
+            logger.info('Conversion transaction successful', { remainingCredits: txResult.remainingCredits });
+        } catch (txError) {
+            // FIX (BUG-050): Removed console.error debug logging - use structured logger only
+            logger.error('Transaction error', {
+                userId,
+                conversionId,
+                errorMessage: txError instanceof Error ? txError.message : String(txError),
+                errorStack: txError instanceof Error ? txError.stack : undefined,
+                errorType: txError instanceof Error ? txError.constructor.name : typeof txError
+            });
+            return NextResponse.json(
+                { success: false, error: 'Payment transaction failed. Please try again.' },
+                { status: 500 }
+            );
+        }
+
+        logger.info('XRechnung conversion completed successfully', {
+            conversionId,
+            fileName: result.fileName,
+            validationStatus: result.validationStatus,
+        });
+
+        return NextResponse.json(
+            {
+                success: true,
+                data: {
+                    xmlContent: result.xmlContent,
+                    fileName: result.fileName,
+                    fileSize: result.fileSize,
+                    validationStatus: result.validationStatus,
+                    validationErrors: result.validationErrors,
+                    validationWarnings: result.validationWarnings,
+                },
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        logger.error('Convert route error', {
+            errorType: error instanceof Error ? error.constructor.name : typeof error,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : undefined,
+        });
+
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                { success: false, error: `Validation error: ${error.message}` },
+                { status: error.statusCode }
+            );
+        }
+
+        if (error instanceof AppError) {
+            return NextResponse.json(
+                { success: false, error: error.message },
+                { status: error.statusCode }
+            );
+        }
+
+        // FIX (BUG-052): Removed internal reference to server logs
+        return NextResponse.json(
+            {
+                success: false,
+                error: 'Internal server error during conversion. Please try again or contact support.',
+            },
+            { status: 500 }
+        );
+    }
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+    return NextResponse.json({}, { status: 200 });
+}

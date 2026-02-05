@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { invoiceDbService } from '@/services/invoice.db.service';
+import { reviewService } from '@/services/review.service';
+import { logger } from '@/lib/logger';
+import { AppError, ValidationError } from '@/lib/errors';
+import { getAuthenticatedUser } from '@/lib/auth';
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    try {
+        // SECURITY FIX (BUG-002): Authenticate user from session, not request body
+        const user = await getAuthenticatedUser(request);
+        if (!user) {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
+
+        const userId = user.id; // SECURE: From authenticated session only
+
+        const body = await request.json();
+        const { extractionId, reviewedData } = body;
+        // REMOVED: userId from body destructuring - Security vulnerability
+
+        if (!extractionId || !reviewedData) {
+            return NextResponse.json(
+                { success: false, error: 'Missing required fields' },
+                { status: 400 }
+            );
+        }
+
+        // Get original extraction
+        const extraction = await invoiceDbService.getExtractionById(extractionId);
+
+        // SECURITY FIX: Verify ownership using authenticated session user ID
+        if (extraction.userId !== userId) {
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 403 }
+            );
+        }
+
+        // Validate reviewed data
+        reviewService.validateReviewedData(reviewedData);
+
+        // Track changes and calculate accuracy
+        const extractionData = extraction.extractionData as Record<string, unknown>;
+        const changes = reviewService.trackChanges(extractionData, reviewedData);
+        const accuracy = reviewService.calculateAccuracy(extractionData, reviewedData);
+
+        // Create conversion record
+        const conversion = await invoiceDbService.createConversion({
+            userId,
+            extractionId,
+            invoiceNumber: reviewedData.invoiceNumber,
+            buyerName: reviewedData.buyerName,
+            conversionFormat: 'xrechnung',
+        });
+
+        logger.info('Invoice review completed', {
+            extractionId,
+            conversionId: conversion.id,
+            changesCount: changes.length,
+            accuracy,
+        });
+
+        return NextResponse.json(
+            {
+                success: true,
+                data: {
+                    conversionId: conversion.id,
+                    changes,
+                    accuracy,
+                    message: 'Invoice review saved successfully',
+                },
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        logger.error('Review error', error);
+
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                { success: false, error: error.message },
+                { status: error.statusCode }
+            );
+        }
+
+        if (error instanceof AppError) {
+            return NextResponse.json(
+                { success: false, error: error.message },
+                { status: error.statusCode }
+            );
+        }
+
+        return NextResponse.json(
+            { success: false, error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+    return NextResponse.json({}, { status: 200 });
+}

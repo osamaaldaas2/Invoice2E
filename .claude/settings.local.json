@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(find:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"if \\(Test-Path ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''\\) { Remove-Item -Force ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''; Write-Host ''File deleted'' } else { Write-Host ''File not found'' }\")"
+    ]
+  }
+}

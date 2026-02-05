@@ -2,14 +2,32 @@
 export const APP_NAME = 'Invoice2E';
 export const APP_VERSION = '1.0.0';
 
-// File handling constraints
-export const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
-export const ALLOWED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
+// API Timeouts (in milliseconds)
+// CONSTITUTION RULE: All external API calls must have explicit timeout
+export const API_TIMEOUTS = {
+    GEMINI_EXTRACTION: 60000,    // 60 seconds (AI processing)
+    DEEPSEEK_EXTRACTION: 60000,  // 60 seconds (AI processing)
+    STRIPE_API: 30000,           // 30 seconds (payment processing)
+    PAYPAL_API: 30000,           // 30 seconds (payment processing)
+    SENDGRID_API: 10000,         // 10 seconds (email sending)
+    DATABASE_QUERY: 10000,       // 10 seconds (database operations)
+    DEFAULT: 30000,              // 30 seconds (fallback)
+} as const;
 
-// API timeouts (in milliseconds)
-export const API_TIMEOUT = 30000; // 30 seconds
-export const DB_QUERY_TIMEOUT = 10000; // 10 seconds
-export const GEMINI_TIMEOUT = 60000; // 60 seconds for AI extraction
+// File Handling Constraints
+// CONSTITUTION RULE: All configuration must be centralized
+export const FILE_LIMITS = {
+    MAX_FILE_SIZE_BYTES: 25 * 1024 * 1024, // 25MB - SINGLE SOURCE OF TRUTH
+    MAX_FILE_SIZE_MB: 25,
+    ALLOWED_MIME_TYPES: [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+    ] as const,
+    MAX_BULK_FILES: 100,
+    MAX_ZIP_SIZE_BYTES: 500 * 1024 * 1024, // 500MB
+    MAX_ZIP_SIZE_MB: 500,
+} as const;
 
 // Credit system
 export const CREDITS_PER_CONVERSION = 1;
