@@ -5,7 +5,7 @@ import { invoiceDbService } from '@/services/invoice.db.service';
 import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { checkRateLimit, getRequestIdentifier } from '@/lib/rate-limiter';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export type ConversionFormat = 'CII' | 'UBL';
 
@@ -26,11 +26,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // SECURITY: Rate limit convert requests
         const rateLimitId = getRequestIdentifier(request) + ':convert:' + userId;
-        const rateLimit = checkRateLimit(rateLimitId);
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'convert');
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { success: false, error: `Too many requests. Try again in ${rateLimit.blockedForSeconds} seconds.` },
-                { status: 429 }
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
             );
         }
 

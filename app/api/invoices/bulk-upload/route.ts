@@ -11,6 +11,7 @@ import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createSignedDownloadToken } from '@/lib/session';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 /**
  * POST /api/invoices/bulk-upload
@@ -24,6 +25,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = getRequestIdentifier(req) + ':bulk:' + user.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'bulk');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: `Too many bulk uploads. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
             );
         }
 
@@ -118,6 +131,18 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        const rateLimitId = getRequestIdentifier(req) + ':bulk:' + user.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'bulk');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const batchId = searchParams.get('batchId');
         const listAll = searchParams.get('list') === 'true';
@@ -189,6 +214,18 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = getRequestIdentifier(req) + ':bulk:' + user.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'bulk');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
             );
         }
 

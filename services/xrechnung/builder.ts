@@ -171,13 +171,13 @@ export class XRechnungBuilder {
 
         // Log warnings for missing required contact fields (but don't fail - validation handles this)
         if (!contactName) {
-            console.warn('XRechnung: Missing seller contact name');
+            logger.warn('XRechnung: Missing seller contact name');
         }
         if (!phone) {
-            console.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)');
+            logger.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)');
         }
         if (!email) {
-            console.warn('XRechnung: Missing seller email (BR-DE-2 requires this)');
+            logger.warn('XRechnung: Missing seller email (BR-DE-2 requires this)');
         }
 
         return `
@@ -220,7 +220,7 @@ export class XRechnungBuilder {
         const buyerEmail = data.buyerEmail;
 
         if (!buyerEmail) {
-            console.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)');
+            logger.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)');
         }
 
         return `
@@ -260,7 +260,7 @@ export class XRechnungBuilder {
         const bic = data.sellerBic || data.bic || '';
 
         if (!iban) {
-            console.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)');
+            logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)');
             // Return empty payment means - validation should catch this
             return `
             <ram:SpecifiedTradeSettlementPaymentMeans>

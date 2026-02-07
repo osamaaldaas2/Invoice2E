@@ -4,6 +4,7 @@ import { adminAuditService } from '@/services/admin';
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const UpdatePackageSchema = z.object({
     name: z.string().min(1).max(100).optional(),
@@ -27,8 +28,20 @@ export async function GET(
     { params }: RouteParams
 ): Promise<NextResponse> {
     try {
-        await requireAdmin(request);
+        const admin = await requireAdmin(request);
         const { id } = await params;
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         const supabase = createServerClient();
 
@@ -99,6 +112,18 @@ export async function PUT(
     try {
         const admin = await requireAdmin(request);
         const { id } = await params;
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         const body = await request.json();
         const validated = UpdatePackageSchema.parse(body);
@@ -230,6 +255,18 @@ export async function DELETE(
         // Require super admin for deletion
         const admin = await requireSuperAdmin(request);
         const { id } = await params;
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         const supabase = createServerClient();
 

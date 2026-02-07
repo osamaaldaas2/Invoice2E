@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const UpdateVoucherSchema = z.object({
     code: z.string().min(3).max(50),
@@ -67,6 +68,17 @@ export async function PUT(
 ): Promise<NextResponse> {
     try {
         const admin = await requireSuperAdmin(request);
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
         const body = await request.json();
         const validated = UpdateVoucherSchema.parse(body);
         const { id } = await context.params;
@@ -149,6 +161,17 @@ export async function DELETE(
 ): Promise<NextResponse> {
     try {
         const admin = await requireSuperAdmin(request);
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
         const supabase = createServerClient();
         const { id } = await context.params;
 

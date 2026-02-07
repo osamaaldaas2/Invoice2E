@@ -3,6 +3,7 @@ import { fileService } from '@/services/file.service';
 import { logger } from '@/lib/logger';
 import { ValidationError, AppError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 /**
  * FIX (BUG-034): Added authentication requirement for file uploads
@@ -16,6 +17,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 { success: false, error: 'Authentication required' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = getRequestIdentifier(request) + ':upload:' + user.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'upload');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many uploads. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
             );
         }
 

@@ -36,6 +36,21 @@ export const RATE_LIMIT_PRESETS = {
         windowMs: 60 * 1000,            // 1 minute
         blockDurationMs: 2 * 60 * 1000, // 2 minutes
     },
+    extract: {
+        maxAttempts: 10,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 2 * 60 * 1000, // 2 minutes
+    },
+    bulk: {
+        maxAttempts: 5,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 5 * 60 * 1000, // 5 minutes
+    },
+    admin: {
+        maxAttempts: 100,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 60 * 1000,     // 1 minute
+    },
 };
 
 // Check if Redis is configured
@@ -262,13 +277,15 @@ export async function resetRateLimit(identifier: string): Promise<void> {
     // Clear from in-memory
     rateLimitStore.delete(identifier);
 
-    // Clear from Redis if available
-    if (redis) {
+    // Reset in Redis for all presets if available
+    if (redisRateLimiters) {
         try {
-            const keys = await redis.keys(`ratelimit:*:${identifier}`);
-            if (keys.length > 0) {
-                await redis.del(...keys);
-            }
+            const presetNames = Object.keys(RATE_LIMIT_PRESETS);
+            await Promise.all(
+                presetNames.map(preset =>
+                    redisRateLimiters![preset as RateLimitPreset].resetUsedTokens(identifier)
+                )
+            );
         } catch (error) {
             logger.error('Failed to reset Redis rate limit', { error, identifier });
         }

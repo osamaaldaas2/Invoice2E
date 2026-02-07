@@ -9,6 +9,7 @@ import { adminUserService } from '@/services/admin';
 import { logger } from '@/lib/logger';
 import { UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { z } from 'zod';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const ModifyCreditsSchema = z.object({
     amount: z.number().int().refine((n) => n !== 0, 'Amount cannot be zero'),
@@ -25,6 +26,18 @@ export async function POST(
 
         const { id: userId } = await context.params;
         const body = await request.json();
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         // Validate input
         const { amount, reason } = ModifyCreditsSchema.parse(body);

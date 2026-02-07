@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const VoucherSchema = z.object({
     code: z.string().min(3).max(50),
@@ -63,7 +64,18 @@ const parseAllowedUsers = async (raw: string | null | undefined, supabase: Retur
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        await requireSuperAdmin(request);
+        const admin = await requireSuperAdmin(request);
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
         const supabase = createServerClient();
 
         const { data: vouchers, error } = await supabase
@@ -109,6 +121,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const admin = await requireSuperAdmin(request);
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
         const body = await request.json();
         const validated = VoucherSchema.parse(body);
 

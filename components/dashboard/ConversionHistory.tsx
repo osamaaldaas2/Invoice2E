@@ -72,7 +72,6 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                 throw new Error(errorData.error || `Failed to fetch history (${response.status})`);
             }
             const data = await response.json();
-            console.log('History API response:', data); // Debug logging
             const items = data.items || [];
             const filtered = statusFilter === 'draft'
                 ? items.filter((item: Conversion) => item.status === 'draft')

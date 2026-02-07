@@ -4,6 +4,7 @@ import { adminAuditService } from '@/services/admin';
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const CreatePackageSchema = z.object({
     name: z.string().min(1).max(100),
@@ -22,7 +23,19 @@ const CreatePackageSchema = z.object({
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        await requireAdmin(request);
+        const admin = await requireAdmin(request);
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         const supabase = createServerClient();
 
@@ -90,6 +103,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const admin = await requireAdmin(request);
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         const body = await request.json();
         const validated = CreatePackageSchema.parse(body);

@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { FILE_LIMITS } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { checkRateLimit, getRequestIdentifier, RATE_LIMIT_PRESETS } from '@/lib/rate-limiter';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
 export const maxDuration = 60; // Set max duration to 60 seconds for AI processing
@@ -25,12 +25,15 @@ export async function POST(request: NextRequest) {
         const userId = user.id; // SECURE: From authenticated session only
 
         // SECURITY: Rate limit upload requests per user
-        const rateLimitId = getRequestIdentifier(request) + ':' + userId;
-        const rateLimit = checkRateLimit(rateLimitId);
+        const rateLimitId = getRequestIdentifier(request) + ':extract:' + userId;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'extract');
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { success: false, error: `Too many requests. Try again in ${rateLimit.blockedForSeconds} seconds.` },
-                { status: 429 }
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
             );
         }
 

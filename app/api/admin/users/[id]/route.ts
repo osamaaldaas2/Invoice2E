@@ -8,6 +8,7 @@ import { requireAdmin } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
 import { logger } from '@/lib/logger';
 import { UnauthorizedError, ForbiddenError, NotFoundError } from '@/lib/errors';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export async function GET(
     request: NextRequest,
@@ -15,9 +16,21 @@ export async function GET(
 ): Promise<NextResponse> {
     try {
         // Require admin role
-        await requireAdmin(request);
+        const admin = await requireAdmin(request);
 
         const { id: userId } = await context.params;
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         // Get user details
         const user = await adminUserService.getUserById(userId);

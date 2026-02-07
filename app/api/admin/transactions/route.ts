@@ -9,11 +9,24 @@ import { adminTransactionService } from '@/services/admin';
 import { logger } from '@/lib/logger';
 import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { AdminTransactionsFilter } from '@/types/admin';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         // Require admin role
-        await requireAdmin(request);
+        const admin = await requireAdmin(request);
+
+        const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) }
+                }
+            );
+        }
 
         // Parse query parameters
         const { searchParams } = new URL(request.url);
