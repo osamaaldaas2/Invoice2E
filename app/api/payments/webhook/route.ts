@@ -19,7 +19,14 @@ import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
  */
 export async function POST(req: NextRequest) {
     try {
-        const provider = req.nextUrl.searchParams.get('provider') || 'stripe';
+        const providerParam = req.nextUrl.searchParams.get('provider') || 'stripe';
+        const provider = providerParam === 'stripe' || providerParam === 'paypal'
+            ? providerParam
+            : 'stripe';
+        if (providerParam !== provider) {
+            logger.warn('Invalid provider parameter', { provided: providerParam });
+        }
+
         const rateLimitId = `${getRequestIdentifier(req)}:payments-webhook:${provider}`;
         const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
         if (!rateLimit.allowed) {
@@ -49,7 +56,17 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            const event = JSON.parse(body);
+            let event: { type: string; id: string; data: { object: Record<string, unknown> } };
+            try {
+                event = JSON.parse(body) as { type: string; id: string; data: { object: Record<string, unknown> } };
+            } catch (parseError) {
+                logger.error('Invalid webhook JSON payload', { provider, parseError });
+                return NextResponse.json(
+                    { error: 'Invalid JSON payload' },
+                    { status: 400 }
+                );
+            }
+
             const result = await paymentProcessor.handleStripeWebhook(event);
 
             if (!result.success) {
@@ -89,7 +106,17 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            const event = JSON.parse(body);
+            let event: { id?: string; event_type: string; resource: Record<string, unknown> };
+            try {
+                event = JSON.parse(body) as { id?: string; event_type: string; resource: Record<string, unknown> };
+            } catch (parseError) {
+                logger.error('Invalid webhook JSON payload', { provider, parseError });
+                return NextResponse.json(
+                    { error: 'Invalid JSON payload' },
+                    { status: 400 }
+                );
+            }
+
             const result = await paymentProcessor.handlePaypalWebhook(event);
 
             if (!result.success) {

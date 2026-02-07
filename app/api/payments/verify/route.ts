@@ -14,6 +14,7 @@ import { getSessionFromCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { ValidationError } from '@/lib/errors';
 
 /**
  * POST /api/payments/verify
@@ -91,9 +92,29 @@ export async function POST(req: NextRequest) {
                 // SECURITY FIX: Only accept COMPLETED status - APPROVED means payment not yet captured
                 // APPROVED orders should be captured first before granting credits
                 if (order.status === 'COMPLETED' && order.customId) {
-                    const customData = JSON.parse(order.customId);
+                    let customData: { credits?: number | string };
+                    try {
+                        customData = JSON.parse(order.customId) as { credits?: number | string };
+                    } catch (parseError) {
+                        logger.error('Invalid JSON in PayPal order customId', {
+                            orderId: order.id,
+                            customId: order.customId,
+                            parseError,
+                        });
+                        throw new ValidationError('Invalid payment data format');
+                    }
+
+                    const parsedCredits = Number(customData.credits || 0);
+                    if (!Number.isFinite(parsedCredits) || parsedCredits < 0) {
+                        logger.error('Invalid credits in PayPal order customId', {
+                            orderId: order.id,
+                            credits: customData.credits,
+                        });
+                        throw new ValidationError('Invalid payment credits value');
+                    }
+
                     verified = true;
-                    credits = customData.credits || 0;
+                    credits = parsedCredits;
                     paymentId = orderId;
                 } else if (order.status === 'APPROVED') {
                     logger.warn('PayPal order is APPROVED but not COMPLETED - payment not yet captured', { orderId });

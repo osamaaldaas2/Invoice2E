@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 import { stripeService, CREDIT_PACKAGES } from './stripe.service';
 import { paypalService } from './paypal.service';
 import { emailService } from './email.service';
+import { ValidationError } from '@/lib/errors';
 
 export type PaymentMethod = 'stripe' | 'paypal';
 
@@ -61,7 +62,7 @@ export class PaymentProcessor {
 
         const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
         if (!pkg) {
-            throw new Error(`Invalid package: ${packageId}`);
+            throw new ValidationError(`Invalid package: ${packageId}`);
         }
 
         // Create pending transaction record

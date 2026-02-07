@@ -4,7 +4,7 @@ import JSZip from 'jszip';
 import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
 import { batchGenerator } from './batch.generator';
-import { ValidationError } from '@/lib/errors';
+import { AppError, ValidationError } from '@/lib/errors';
 
 type BatchJobRow = {
     id: string;
@@ -128,7 +128,11 @@ export class BatchService {
 
         if (error) {
             logger.error('Failed to create batch job', { error });
-            throw new Error(`Failed to create batch job: ${error.message}`);
+            throw new AppError(
+                'DATABASE_ERROR',
+                `Failed to create batch job: ${error.message}`,
+                500
+            );
         }
 
         // Store files temporarily for processing
@@ -236,7 +240,12 @@ export class BatchService {
             .range(offset, offset + limit - 1);
 
         if (error) {
-            throw new Error(`Failed to list batch jobs: ${error.message}`);
+            logger.error('Failed to list batch jobs', { error, userId, page, limit });
+            throw new AppError(
+                'DATABASE_ERROR',
+                `Failed to list batch jobs: ${error.message}`,
+                500
+            );
         }
 
         const jobs: BatchJob[] = (data || []).map((row: BatchJobRow) => ({
