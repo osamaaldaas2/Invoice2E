@@ -63,8 +63,8 @@ describe('PaymentProcessor', () => {
     let processor: PaymentProcessor;
 
     beforeEach(() => {
-        processor = new PaymentProcessor();
         vi.clearAllMocks();
+        processor = new PaymentProcessor();
     });
 
     it('processPayment throws for invalid package', async () => {

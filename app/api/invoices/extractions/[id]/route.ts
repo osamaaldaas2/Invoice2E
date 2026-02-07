@@ -26,6 +26,13 @@ export async function GET(
         const { id } = await params;
         const extraction = await invoiceDbService.getExtractionById(id);
 
+        if (!extraction) {
+            return NextResponse.json(
+                { success: false, error: 'Extraction not found' },
+                { status: 404 }
+            );
+        }
+
         // SECURITY FIX (BUG-015): Add ownership verification
         if (extraction.userId !== user.id) {
             logger.warn('Unauthorized extraction access attempt', {
@@ -38,7 +45,6 @@ export async function GET(
                 { status: 403 }
             );
         }
-
         logger.info('Extraction retrieved', { extractionId: id, userId: user.id });
 
         return NextResponse.json(
