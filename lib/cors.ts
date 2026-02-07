@@ -58,6 +58,7 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
         'Access-Control-Allow-Methods': CORS_CONFIG.allowedMethods.join(', '),
         'Access-Control-Allow-Headers': CORS_CONFIG.allowedHeaders.join(', '),
         'Access-Control-Max-Age': CORS_CONFIG.maxAge.toString(),
+        'Vary': 'Origin', // Important for caching when origin varies
     };
 
     if (CORS_CONFIG.credentials) {

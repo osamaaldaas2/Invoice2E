@@ -8,7 +8,8 @@ import { JSDOM } from 'jsdom';
 
 // Create a JSDOM window for server-side DOMPurify
 const window = new JSDOM('').window;
-const purify = DOMPurify(window as unknown as Window);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const purify = DOMPurify(window as any);
 
 /**
  * Sanitize HTML content to prevent XSS attacks
@@ -60,7 +61,9 @@ export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'string') {
             result[key] = sanitizeText(value);
-        } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        } else if (Array.isArray(value)) {
+            result[key] = sanitizeArray(value);
+        } else if (value !== null && typeof value === 'object') {
             result[key] = sanitizeObject(value as Record<string, unknown>);
         } else {
             result[key] = value;
@@ -68,4 +71,20 @@ export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
     }
 
     return result as T;
+}
+
+/**
+ * Sanitize array values recursively
+ */
+export function sanitizeArray(arr: unknown[]): unknown[] {
+    return arr.map((item) => {
+        if (typeof item === 'string') {
+            return sanitizeText(item);
+        } else if (Array.isArray(item)) {
+            return sanitizeArray(item);
+        } else if (item !== null && typeof item === 'object') {
+            return sanitizeObject(item as Record<string, unknown>);
+        }
+        return item;
+    });
 }

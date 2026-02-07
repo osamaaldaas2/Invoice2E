@@ -30,8 +30,13 @@ export default function middleware(request: NextRequest) {
             );
         }
 
-        // Continue with the request, CORS headers will be added by API routes
-        return NextResponse.next();
+        // Add CORS headers to actual API responses
+        const response = NextResponse.next();
+        const corsHeaders = getCorsHeaders(origin);
+        for (const [key, value] of Object.entries(corsHeaders)) {
+            response.headers.set(key, value);
+        }
+        return response;
     }
 
     return intlMiddleware(request);
