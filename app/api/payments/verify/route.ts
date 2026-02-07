@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
                     // But for lookup, we MUST use what we stored.
                     // create-checkout stores session.id as stripe_session_id
                     paymentId = sessionId;
-                    stripePaymentIntentId = session.payment_intent as string | undefined;
+                    stripePaymentIntentId = (session.paymentIntentId || session.payment_intent) as string | undefined;
                 }
             } catch (error) {
                 logger.error('Stripe session verification failed', { sessionId, error });
