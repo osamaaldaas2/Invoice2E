@@ -41,7 +41,7 @@ export interface AuthorizationResult {
  * Throws ForbiddenError if not admin
  */
 export async function requireAdmin(request: NextRequest): Promise<AuthorizedUser> {
-    const session = getSessionFromCookie();
+    const session = await getSessionFromCookie();
 
     if (!session) {
         logger.warn('Admin access attempted without authentication', {
@@ -98,38 +98,43 @@ export async function requireSuperAdmin(request: NextRequest): Promise<Authorize
  * Check authorization without throwing
  * Useful for conditional logic
  */
-export function checkAdminAuth(request: NextRequest): AuthorizationResult {
+export async function checkAdminAuth(request: NextRequest): Promise<AuthorizationResult> {
+    void request;
     try {
-        const session = getSessionFromCookie();
-
-        if (!session) {
-            return { authorized: false, user: null, error: 'Not authenticated' };
-        }
-
-        if (!['admin', 'super_admin'].includes(session.role)) {
-            return { authorized: false, user: null, error: 'Not an admin' };
-        }
-
-        return {
-            authorized: true,
-            user: {
-                id: session.userId,
-                email: session.email,
-                firstName: session.firstName,
-                lastName: session.lastName,
-                role: session.role,
-            },
-        };
+        return await checkAdminAuthInternal();
     } catch {
         return { authorized: false, user: null, error: 'Authorization check failed' };
     }
 }
 
+async function checkAdminAuthInternal(): Promise<AuthorizationResult> {
+    const session = await getSessionFromCookie();
+
+    if (!session) {
+        return { authorized: false, user: null, error: 'Not authenticated' };
+    }
+
+    if (!['admin', 'super_admin'].includes(session.role)) {
+        return { authorized: false, user: null, error: 'Not an admin' };
+    }
+
+    return {
+        authorized: true,
+        user: {
+            id: session.userId,
+            email: session.email,
+            firstName: session.firstName,
+            lastName: session.lastName,
+            role: session.role,
+        },
+    };
+}
+
 /**
  * Check if current session has specific role
  */
-export function hasRole(roles: UserRole[]): boolean {
-    const session = getSessionFromCookie();
+export async function hasRole(roles: UserRole[]): Promise<boolean> {
+    const session = await getSessionFromCookie();
     if (!session) return false;
     return roles.includes(session.role);
 }
@@ -137,14 +142,14 @@ export function hasRole(roles: UserRole[]): boolean {
 /**
  * Check if current session is admin or super_admin
  */
-export function isAdmin(): boolean {
+export async function isAdmin(): Promise<boolean> {
     return hasRole(['admin', 'super_admin']);
 }
 
 /**
  * Check if current session is super_admin
  */
-export function isSuperAdmin(): boolean {
+export async function isSuperAdmin(): Promise<boolean> {
     return hasRole(['super_admin']);
 }
 

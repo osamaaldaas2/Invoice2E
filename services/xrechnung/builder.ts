@@ -1,3 +1,6 @@
+import { DEFAULT_VAT_RATE, REDUCED_VAT_RATE } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
 export class XRechnungBuilder {
     private readonly xmlns = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
     private readonly xsi = 'http://www.w3.org/2001/XMLSchema-instance';
@@ -57,15 +60,26 @@ export class XRechnungBuilder {
 
     /**
      * FIX (BUG-025/027): Use actual tax rate per line item, ensure no null values
+     * FIX (QA-BUG-2): Validate required fields, use configurable VAT rate
      */
     private buildLineItems(items: any[]): string {
         return items
             .map(
                 (item, index) => {
-                    const unitPrice = this.safeNumber(item.unitPrice);
-                    const quantity = this.safeNumber(item.quantity) || 1; // Default to 1 if not specified
+                    // FIX (QA-BUG-2): Use safeNumberOrUndefined to detect missing values
+                    const unitPriceRaw = this.safeNumberOrUndefined(item.unitPrice);
+                    const quantityRaw = this.safeNumberOrUndefined(item.quantity);
+
+                    // Validate required fields - unit price is critical
+                    if (unitPriceRaw === undefined) {
+                        logger.warn('XRechnung: Line item missing unit price, using 0', { lineIndex: index });
+                    }
+
+                    const unitPrice = unitPriceRaw ?? 0;
+                    const quantity = quantityRaw ?? 1; // Default to 1 if not specified
                     const totalPrice = this.safeNumber(item.totalPrice || item.lineTotal) || (unitPrice * quantity);
-                    const taxRate = this.safeNumber(item.taxRate || item.vatRate) || 19; // Default 19% for German VAT
+                    // FIX (QA-BUG-4): Use configurable DEFAULT_VAT_RATE instead of hardcoded 19
+                    const taxRate = this.safeNumber(item.taxRate || item.vatRate) || DEFAULT_VAT_RATE;
 
                     return `
         <ram:IncludedSupplyChainTradeLineItem>
@@ -284,7 +298,7 @@ export class XRechnungBuilder {
         const taxAmount = this.safeNumber(data.taxAmount);
         const subtotal = this.safeNumber(data.subtotal);
         const total = this.safeNumber(data.totalAmount);
-        const currency = data.currency || 'EUR';
+        const currency = this.normalizeCurrency(data.currency);
         // FIX: Use actual tax rate from data, calculate from amounts if not provided
         const taxRate = this.safeNumber(data.taxRate || data.vatRate) || this.calculateTaxRate(subtotal, taxAmount);
 
@@ -316,19 +330,19 @@ export class XRechnungBuilder {
 
     /**
      * Calculate tax rate from subtotal and tax amount
-     * Returns 19% as fallback for German invoices if calculation is not possible
+     * FIX (QA-BUG-4): Use configurable DEFAULT_VAT_RATE instead of hardcoded 19%
      */
     private calculateTaxRate(subtotal: number, taxAmount: number): number {
         if (subtotal > 0 && taxAmount >= 0) {
             const calculatedRate = (taxAmount / subtotal) * 100;
             // Round to common tax rates
-            if (Math.abs(calculatedRate - 19) < 0.5) return 19;
-            if (Math.abs(calculatedRate - 7) < 0.5) return 7;
+            if (Math.abs(calculatedRate - DEFAULT_VAT_RATE) < 0.5) return DEFAULT_VAT_RATE;
+            if (Math.abs(calculatedRate - REDUCED_VAT_RATE) < 0.5) return REDUCED_VAT_RATE;
             if (Math.abs(calculatedRate - 0) < 0.5) return 0;
             return Math.round(calculatedRate * 100) / 100; // Round to 2 decimals
         }
-        // Default to 19% for German invoices when calculation not possible
-        return 19;
+        // Default to standard VAT rate for German invoices when calculation not possible
+        return DEFAULT_VAT_RATE;
     }
 
     private buildPaymentTerms(data: any): string {
@@ -369,8 +383,57 @@ export class XRechnungBuilder {
     }
 
     /**
+     * Normalize currency to ISO 4217 alpha-3 code.
+     * Defaults to EUR when missing/invalid to satisfy XRechnung rules.
+     */
+    private normalizeCurrency(value: unknown): string {
+        if (value === null || value === undefined) return 'EUR';
+        const raw = String(value).trim();
+        if (!raw) return 'EUR';
+
+        if (/^[A-Za-z]{3}$/.test(raw)) {
+            return raw.toUpperCase();
+        }
+
+        const upper = raw.toUpperCase();
+        const map: Record<string, string> = {
+            '€': 'EUR',
+            'EUR': 'EUR',
+            'EURO': 'EUR',
+            '$': 'USD',
+            'USD': 'USD',
+            'US$': 'USD',
+            '£': 'GBP',
+            'GBP': 'GBP',
+            'CHF': 'CHF',
+        };
+
+        if (map[raw]) return map[raw];
+        if (map[upper]) return map[upper];
+
+        const match = raw.match(/[A-Za-z]{3}/);
+        if (match) {
+            return match[0].toUpperCase();
+        }
+
+        logger.warn('XRechnung: Invalid currency, defaulting to EUR', { currency: raw });
+        return 'EUR';
+    }
+
+    /**
+     * FIX (QA-BUG-2): Convert value to number or return undefined to detect missing values
+     * Use this for required fields where 0 vs undefined matters
+     */
+    private safeNumberOrUndefined(value: unknown): number | undefined {
+        if (value === null || value === undefined) return undefined;
+        const num = Number(value);
+        return isNaN(num) ? undefined : num;
+    }
+
+    /**
      * FIX (BUG-026): Handle multiple date input formats
-     * Supports: YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY, MM/DD/YYYY
+     * FIX (QA-BUG-3): Reject ambiguous date formats instead of silently assuming
+     * Supports: YYYY-MM-DD (ISO), DD.MM.YYYY (German), YYYYMMDD
      * Output: YYYYMMDD (format 102 required by XRechnung)
      */
     private formatDate(dateString: string): string {
@@ -381,28 +444,33 @@ export class XRechnungBuilder {
             return dateString;
         }
 
-        // ISO format: YYYY-MM-DD
+        // ISO format: YYYY-MM-DD (unambiguous)
         if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
             return dateString.substring(0, 10).replace(/-/g, '');
         }
 
-        // European format: DD/MM/YYYY or DD.MM.YYYY
-        const euMatch = dateString.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
-        if (euMatch) {
-            const [, day, month, year] = euMatch;
+        // German format with dots: DD.MM.YYYY (unambiguous - dots are German)
+        const germanMatch = dateString.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (germanMatch) {
+            const [, day, month, year] = germanMatch;
             return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
         }
 
-        // US format: MM/DD/YYYY (less common in German context but handle it)
-        const usMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (usMatch) {
-            // Assume European format for German invoices, but log warning
-            console.warn(`XRechnung: Ambiguous date format ${dateString}, assuming DD/MM/YYYY`);
-            const [, day, month, year] = usMatch;
-            return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
+        // FIX (QA-BUG-3): Reject ambiguous slash formats like MM/DD/YYYY or DD/MM/YYYY
+        // These are ambiguous and should not be silently interpreted
+        const slashMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (slashMatch) {
+            // Reject ambiguous format - require ISO or German format
+            logger.warn('XRechnung: Ambiguous date format rejected', {
+                date: dateString,
+                suggestion: 'Use ISO format (YYYY-MM-DD) or German format (DD.MM.YYYY)'
+            });
+            throw new Error(
+                `Ambiguous date format "${dateString}". Please use ISO format (YYYY-MM-DD) or German format (DD.MM.YYYY)`
+            );
         }
 
-        // Try parsing as Date object as last resort
+        // Try parsing as Date object as last resort (ISO strings, etc.)
         try {
             const date = new Date(dateString);
             if (!isNaN(date.getTime())) {
@@ -412,11 +480,11 @@ export class XRechnungBuilder {
                 return `${year}${month}${day}`;
             }
         } catch {
-            // Fall through to return empty
+            // Fall through to throw error
         }
 
-        console.warn(`XRechnung: Could not parse date format: ${dateString}`);
-        return '';
+        logger.warn('XRechnung: Could not parse date format', { date: dateString });
+        throw new Error(`Invalid date format "${dateString}". Use ISO format (YYYY-MM-DD) or German format (DD.MM.YYYY)`);
     }
 }
 

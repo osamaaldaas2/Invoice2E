@@ -5,20 +5,20 @@ export default function Footer(): React.ReactElement {
     const t = useTranslations('footer');
 
     return (
-        <footer className="border-t border-border bg-muted/50 py-8">
+        <footer className="border-t border-white/10 bg-slate-950/60 py-10">
             <div className="container mx-auto px-4">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                    <p className="text-sm text-muted-foreground">
+                <div className="glass-panel rounded-2xl px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <p className="text-sm text-faded">
                         {t('copyright').replace('Invoice2E', APP_NAME)}
                     </p>
-                    <div className="flex items-center gap-6 text-sm">
-                        <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                    <div className="flex items-center gap-4 text-sm">
+                        <a href="#" className="text-faded hover:text-white transition-colors">
                             {t('privacy')}
                         </a>
-                        <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <a href="#" className="text-faded hover:text-white transition-colors">
                             {t('terms')}
                         </a>
-                        <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <a href="#" className="text-faded hover:text-white transition-colors">
                             {t('contact')}
                         </a>
                     </div>

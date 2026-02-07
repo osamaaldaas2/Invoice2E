@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { CreditPackage } from '@/types/credit-package';
 import { Button } from '@/components/ui/button';
 
-interface CheckoutPageProps {
-    params: { locale: string };
-}
-
-export default function CheckoutPage({ params }: CheckoutPageProps) {
-    const isGerman = params.locale === 'de';
+export default function CheckoutPage() {
+    const routeParams = useParams();
+    const locale = (routeParams?.locale as string) || 'en';
+    const isGerman = locale === 'de';
     const searchParams = useSearchParams();
     const router = useRouter();
     const packageSlug = searchParams.get('package') || 'starter';
@@ -78,9 +76,9 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
         return (
             <div className="container mx-auto px-4 py-12 max-w-2xl">
                 <div className="animate-pulse">
-                    <div className="h-8 bg-muted rounded w-48 mb-8" />
-                    <div className="h-32 bg-muted rounded mb-8" />
-                    <div className="h-48 bg-muted rounded" />
+                    <div className="h-8 bg-white/10 rounded w-48 mb-8" />
+                    <div className="h-32 bg-white/10 rounded mb-8" />
+                    <div className="h-48 bg-white/10 rounded" />
                 </div>
             </div>
         );
@@ -89,10 +87,10 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
     if (!selectedPackage) {
         return (
             <div className="container mx-auto px-4 py-12 text-center">
-                <h1 className="text-2xl font-bold mb-4">
+                <h1 className="text-2xl font-bold mb-4 text-white font-display">
                     {isGerman ? 'Paket nicht gefunden' : 'Package not found'}
                 </h1>
-                <Button onClick={() => router.push(`/${params.locale}/pricing`)}>
+                <Button onClick={() => router.push(`/${locale}/pricing`)}>
                     {isGerman ? 'Zurück zur Preisseite' : 'Back to Pricing'}
                 </Button>
             </div>
@@ -104,19 +102,19 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
 
     return (
         <div className="container mx-auto px-4 py-12 max-w-2xl">
-            <h1 className="text-3xl font-bold mb-8">
+            <h1 className="text-3xl font-bold mb-8 text-white font-display">
                 {isGerman ? 'Kasse' : 'Checkout'}
             </h1>
 
             {/* Order Summary */}
-            <div className="bg-card border rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-semibold mb-4">
+            <div className="glass-card p-6 mb-8">
+                <h2 className="text-lg font-semibold mb-4 text-white font-display">
                     {isGerman ? 'Bestellübersicht' : 'Order Summary'}
                 </h2>
                 <div className="flex justify-between items-center">
                     <div>
                         <p className="font-medium">{getLocalizedName()}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-faded">
                             {selectedPackage.credits} {isGerman ? 'Konvertierungen' : 'conversions'}
                         </p>
                     </div>
@@ -127,12 +125,12 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
             </div>
 
             {/* Payment Method Selection */}
-            <div className="bg-card border rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-semibold mb-4">
+            <div className="glass-card p-6 mb-8">
+                <h2 className="text-lg font-semibold mb-4 text-white font-display">
                     {isGerman ? 'Zahlungsmethode' : 'Payment Method'}
                 </h2>
                 <div className="space-y-3">
-                    <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <label className="flex items-center p-4 border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
                         <input
                             type="radio"
                             name="payment"
@@ -145,7 +143,7 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
                             💳 {isGerman ? 'Kreditkarte' : 'Credit Card'}
                         </span>
                     </label>
-                    <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <label className="flex items-center p-4 border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
                         <input
                             type="radio"
                             name="payment"
@@ -161,7 +159,7 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
 
             {/* Error Message */}
             {error && (
-                <div className="bg-destructive/10 text-destructive p-4 rounded-lg mb-8">
+                <div className="glass-panel border border-rose-400/30 text-rose-200 p-4 rounded-lg mb-8">
                     {error}
                 </div>
             )}
@@ -179,7 +177,7 @@ export default function CheckoutPage({ params }: CheckoutPageProps) {
                 {isGerman ? 'Jetzt bezahlen' : 'Pay Now'} - {selectedPackage.currency === 'EUR' ? '€' : '$'}{selectedPackage.price}
             </Button>
 
-            <p className="text-sm text-muted-foreground text-center mt-4">
+            <p className="text-sm text-faded text-center mt-4">
                 🔒 {isGerman ? 'Sichere Zahlung' : 'Secure payment'}
             </p>
         </div>

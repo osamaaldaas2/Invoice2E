@@ -141,8 +141,12 @@ export class GeminiAdapter implements IGeminiAdapter {
             "sellerEmail": "string or null",
             "sellerAddress": "string or null",
             "sellerTaxId": "string or null",
+            "sellerIban": "string or null",
+            "sellerBic": "string or null",
+            "bankName": "string or null",
             "lineItems": [{ "description": "string", "quantity": number, "unitPrice": number, "totalPrice": number, "taxRate": number }],
             "subtotal": number,
+            "taxRate": number or null,
             "taxAmount": number,
             "totalAmount": number,
             "currency": "string",
@@ -160,6 +164,28 @@ export class GeminiAdapter implements IGeminiAdapter {
             }
             const data = JSON.parse(jsonMatch[0]);
 
+            const subtotal = Number(data.subtotal) || 0;
+            const totalAmount = Number(data.totalAmount) || 0;
+            const rawTaxAmount = Number(data.taxAmount);
+            const hasTaxAmount = data.taxAmount !== null && data.taxAmount !== undefined && data.taxAmount !== '';
+            const taxAmount = hasTaxAmount && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
+                ? rawTaxAmount
+                : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) * 100) / 100 : 0);
+            const hasTaxRate = data.taxRate !== null && data.taxRate !== undefined && data.taxRate !== '';
+            const parsedTaxRate = hasTaxRate ? Number(data.taxRate) : NaN;
+            const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
+            const fallbackTaxRate = !isNaN(parsedTaxRate) ? parsedTaxRate : derivedTaxRate;
+
+            const rawItems = Array.isArray(data.lineItems)
+                ? data.lineItems
+                : (Array.isArray(data.items) ? data.items : []);
+
+            const normalizeIban = (value: unknown) => {
+                if (value === null || value === undefined) return null;
+                const text = String(value).replace(/\s+/g, '').toUpperCase();
+                return text || null;
+            };
+
             return {
                 invoiceNumber: data.invoiceNumber || null,
                 invoiceDate: data.invoiceDate || null,
@@ -171,10 +197,24 @@ export class GeminiAdapter implements IGeminiAdapter {
                 sellerEmail: data.sellerEmail || null,
                 sellerAddress: data.sellerAddress || null,
                 sellerTaxId: data.sellerTaxId || null,
-                lineItems: Array.isArray(data.lineItems) ? data.lineItems : (Array.isArray(data.items) ? data.items : []),
-                subtotal: Number(data.subtotal) || 0,
-                taxAmount: Number(data.taxAmount) || 0,
-                totalAmount: Number(data.totalAmount) || 0,
+                sellerIban: normalizeIban(data.sellerIban),
+                sellerBic: data.sellerBic || null,
+                bankName: data.bankName || null,
+                lineItems: rawItems.map((item: any) => {
+                    const itemHasTaxRate = item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';
+                    const itemTaxRate = itemHasTaxRate ? Number(item.taxRate) : fallbackTaxRate;
+                    return {
+                        description: item?.description || '',
+                        quantity: Number(item?.quantity) || 1,
+                        unitPrice: Number(item?.unitPrice) || 0,
+                        totalPrice: Number(item?.totalPrice) || 0,
+                        taxRate: !isNaN(itemTaxRate) ? itemTaxRate : 0,
+                    };
+                }),
+                subtotal,
+                taxRate: !isNaN(parsedTaxRate) ? parsedTaxRate : derivedTaxRate,
+                taxAmount,
+                totalAmount,
                 currency: data.currency || 'EUR',
                 paymentTerms: data.paymentTerms || null,
                 notes: data.notes || null,

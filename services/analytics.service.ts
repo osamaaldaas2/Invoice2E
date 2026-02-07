@@ -17,11 +17,13 @@ export interface ConversionHistoryItem {
     credits_used: number;
     // processing_time_ms: number | null; // Commented out until column added
     created_at: string;
+    record_type?: 'conversion' | 'draft';
+    extraction_id?: string;
 }
 
 export interface HistoryFilters {
     format?: 'CII' | 'UBL';
-    status?: 'valid' | 'invalid';
+    status?: 'valid' | 'invalid' | 'draft' | 'completed';
     startDate?: string;
     endDate?: string;
 }
@@ -73,76 +75,130 @@ export class AnalyticsService {
         const supabase = createServerClient();
         const offset = (page - 1) * limit;
 
-        // Build query
-        let query = supabase
-            .from('invoice_conversions')
-            .select('*', { count: 'exact' })
-            .eq('user_id', userId);
+        const statusFilter = filters?.status;
+        const wantsDrafts = !statusFilter || statusFilter === 'draft';
+        const wantsConversions = !statusFilter || statusFilter === 'completed' || statusFilter === 'valid' || statusFilter === 'invalid';
 
-        // Apply filters
-        if (filters?.format) {
-            query = query.eq('conversion_format', filters.format);
-        }
-        if (filters?.status) {
-            query = query.eq('validation_status', filters.status);
-        }
-        if (filters?.startDate) {
-            query = query.gte('created_at', filters.startDate);
-        }
-        if (filters?.endDate) {
-            query = query.lte('created_at', filters.endDate);
-        }
+        const fetchEnd = offset + limit - 1;
+        const combinedRange = { start: 0, end: fetchEnd };
 
-        // Execute with pagination
-        try {
-            const { data, count, error } = await query
-                .order('created_at', { ascending: false })
-                .range(offset, offset + limit - 1);
+        const mapConversion = (row: any): ConversionHistoryItem => ({
+            id: row.id,
+            invoice_number: row.invoice_number || 'N/A',
+            file_name: row.buyer_name || 'Invoice',
+            output_format: row.conversion_format || 'CII',
+            status: row.conversion_status || 'completed',
+            credits_used: row.credits_used || 1,
+            created_at: row.created_at,
+            record_type: 'conversion',
+            extraction_id: row.extraction_id,
+        });
 
-            if (error) {
-                logger.error('Failed to get conversion history', {
-                    error,
-                    code: error.code,
-                    message: error.message,
-                    userId
-                });
-                return {
-                    items: [],
-                    total: 0,
-                    page,
-                    limit,
-                    totalPages: 0,
-                };
-            }
-
-            logger.info('Conversion history fetched', {
-                count: data?.length,
-                total: count,
-                userId
-            });
-
-            if (!data || data.length === 0) {
-                return {
-                    items: [],
-                    total: 0,
-                    page,
-                    limit,
-                    totalPages: 0,
-                };
-            }
-
-            const items: any[] = data.map(row => ({
+        const mapDraft = (row: any): ConversionHistoryItem => {
+            const data = row.extraction_data || {};
+            const invoiceNumber = data.invoiceNumber || data.invoice_number || 'N/A';
+            const buyerName = data.buyerName || data.buyer_name || data.sellerName || data.seller_name || 'Draft';
+            return {
                 id: row.id,
-                invoice_number: row.invoice_number || 'N/A',
-                file_name: row.buyer_name || 'Invoice', // Map buyer_name as fallback for file_name
-                output_format: row.conversion_format || 'CII',
-                status: row.validation_status || 'pending',
-                credits_used: row.credits_used || 1,
+                invoice_number: invoiceNumber,
+                file_name: buyerName,
+                output_format: '',
+                status: 'draft',
+                credits_used: 1,
                 created_at: row.created_at,
-                // processing_time_ms: row.processing_time_ms // Missing column
-            }));
+                record_type: 'draft',
+                extraction_id: row.id,
+            };
+        };
 
-            const total = count || 0;
+        try {
+            let conversionItems: ConversionHistoryItem[] = [];
+            let draftItems: ConversionHistoryItem[] = [];
+            let conversionCount = 0;
+            let draftCount = 0;
+
+            if (wantsConversions) {
+                let conversionQuery = supabase
+                    .from('invoice_conversions')
+                    .select('*', { count: 'exact' })
+                    .eq('user_id', userId)
+                    .or('conversion_status.eq.completed,validation_status.not.is.null');
+
+                if (filters?.format) {
+                    conversionQuery = conversionQuery.eq('conversion_format', filters.format);
+                }
+                if (filters?.status === 'valid' || filters?.status === 'invalid') {
+                    conversionQuery = conversionQuery.eq('validation_status', filters.status);
+                }
+                if (filters?.startDate) {
+                    conversionQuery = conversionQuery.gte('created_at', filters.startDate);
+                }
+                if (filters?.endDate) {
+                    conversionQuery = conversionQuery.lte('created_at', filters.endDate);
+                }
+
+                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
+                const { data, count, error } = await conversionQuery
+                    .order('created_at', { ascending: false })
+                    .range(range.start, range.end);
+
+                if (error) {
+                    logger.error('Failed to get conversion history', {
+                        error,
+                        code: error.code,
+                        message: error.message,
+                        userId
+                    });
+                } else {
+                    conversionItems = (data || []).map(mapConversion);
+                    conversionCount = count || 0;
+                }
+            }
+
+            if (wantsDrafts) {
+                let extractionQuery = supabase
+                    .from('invoice_extractions')
+                    .select('*', { count: 'exact' })
+                    .eq('user_id', userId)
+                    .in('status', ['draft', 'pending', 'processing']);
+
+                if (filters?.startDate) {
+                    extractionQuery = extractionQuery.gte('created_at', filters.startDate);
+                }
+                if (filters?.endDate) {
+                    extractionQuery = extractionQuery.lte('created_at', filters.endDate);
+                }
+
+                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
+                const { data, count, error } = await extractionQuery
+                    .order('created_at', { ascending: false })
+                    .range(range.start, range.end);
+
+                if (error) {
+                    logger.error('Failed to get draft history', {
+                        error,
+                        code: error.code,
+                        message: error.message,
+                        userId
+                    });
+                } else {
+                    draftItems = (data || []).map(mapDraft);
+                    draftCount = count || 0;
+                }
+            }
+
+            let items: ConversionHistoryItem[] = [];
+            if (!statusFilter) {
+                items = [...conversionItems, ...draftItems]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(offset, offset + limit);
+            } else if (statusFilter === 'draft') {
+                items = draftItems;
+            } else {
+                items = conversionItems;
+            }
+
+            const total = conversionCount + draftCount;
 
             return {
                 items,
@@ -151,10 +207,8 @@ export class AnalyticsService {
                 limit,
                 totalPages: Math.ceil(total / limit),
             };
-
         } catch (error: any) {
             logger.error('Failed to get conversion history', { error });
-            // Return empty list on exception instead of throwing
             return {
                 items: [],
                 total: 0,
@@ -176,7 +230,7 @@ export class AnalyticsService {
         // Get credits
         const { data: creditData, error: creditError } = await supabase
             .from('user_credits')
-            .select('available_credits')
+            .select('available_credits, used_credits')
             .eq('user_id', userId)
             .single();
 
@@ -187,6 +241,7 @@ export class AnalyticsService {
         logger.info('Fetched user credits', { userId, initialCredits: creditData?.available_credits });
 
         const availableCredits = creditData?.available_credits || 0;
+        const usedCredits = creditData?.used_credits || 0;
 
 
         // Get overall stats - handle missing table/columns gracefully
@@ -216,7 +271,7 @@ export class AnalyticsService {
         const total = conversions?.length || 0;
         const successful = conversions?.filter(c => c.validation_status === 'valid').length || 0;
         const failed = total - successful;
-        const totalCredits = conversions?.reduce((sum, c) => sum + (c.credits_used || 1), 0) || 0;
+        const totalCredits = usedCredits || (conversions?.reduce((sum, c) => sum + (c.credits_used || 1), 0) || 0);
         const processingTimes = conversions?.filter(c => c.processing_time_ms).map(c => c.processing_time_ms as number) || [];
         const avgTime = processingTimes.length > 0
             ? processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length

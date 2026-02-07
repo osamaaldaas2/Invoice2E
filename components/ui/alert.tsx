@@ -8,8 +8,8 @@ type AlertProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 const variantStyles: Record<AlertVariant, string> = {
-    default: 'bg-background text-foreground',
-    destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+    default: 'glass-panel text-slate-100',
+    destructive: 'border border-red-400/40 text-red-200 bg-red-500/10 [&>svg]:text-red-300',
 };
 
 const Alert = forwardRef<HTMLDivElement, AlertProps>(

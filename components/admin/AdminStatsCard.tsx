@@ -11,11 +11,11 @@ type AdminStatsCardProps = {
 };
 
 const colorClasses = {
-    blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-    green: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-    red: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400',
-    purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+    blue: 'bg-sky-500/15 text-sky-200 border border-sky-400/30',
+    green: 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30',
+    red: 'bg-rose-500/15 text-rose-200 border border-rose-400/30',
+    yellow: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
+    purple: 'bg-violet-500/15 text-violet-200 border border-violet-400/30',
 };
 
 export default function AdminStatsCard({
@@ -28,17 +28,17 @@ export default function AdminStatsCard({
     color = 'blue',
 }: AdminStatsCardProps) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div className="glass-card p-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <p className="text-sm font-medium text-faded">
                         {title}
                     </p>
-                    <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    <p className="mt-2 text-3xl font-bold text-white font-display">
                         {value}
                     </p>
                     {subtitle && (
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-sm text-faded">
                             {subtitle}
                         </p>
                     )}
@@ -46,10 +46,10 @@ export default function AdminStatsCard({
                         <p
                             className={`mt-2 text-sm font-medium ${
                                 changeType === 'positive'
-                                    ? 'text-green-600'
+                                    ? 'text-emerald-300'
                                     : changeType === 'negative'
-                                    ? 'text-red-600'
-                                    : 'text-gray-500'
+                                    ? 'text-rose-300'
+                                    : 'text-faded'
                             }`}
                         >
                             {change}
@@ -58,7 +58,7 @@ export default function AdminStatsCard({
                 </div>
                 {icon && (
                     <div
-                        className={`flex items-center justify-center w-12 h-12 rounded-lg ${colorClasses[color]}`}
+                        className={`flex items-center justify-center w-12 h-12 rounded-xl ${colorClasses[color]}`}
                     >
                         <span className="text-2xl">{icon}</span>
                     </div>

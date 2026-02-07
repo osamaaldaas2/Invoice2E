@@ -33,6 +33,11 @@ export const FILE_LIMITS = {
 export const CREDITS_PER_CONVERSION = 1;
 export const DEFAULT_CREDITS_ON_SIGNUP = 0;
 
+// Tax configuration (German VAT rates)
+// FIX (QA-BUG-4): Centralized VAT rate configuration
+export const DEFAULT_VAT_RATE = 19; // Standard German VAT rate
+export const REDUCED_VAT_RATE = 7;  // Reduced German VAT rate
+
 // Internationalization
 export const SUPPORTED_LOCALES = ['en', 'de'] as const;
 export const DEFAULT_LOCALE = 'en';

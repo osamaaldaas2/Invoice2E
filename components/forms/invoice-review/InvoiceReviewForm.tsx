@@ -44,8 +44,8 @@ export default function InvoiceReviewForm({
     return (
         <form onSubmit={onSubmit} className="space-y-6 max-w-4xl">
             {/* Confidence Alert */}
-            <div className={`p-4 rounded-lg ${confidence >= 0.8 ? 'bg-green-50' : 'bg-yellow-50'}`}>
-                <p className={confidence >= 0.8 ? 'text-green-800' : 'text-yellow-800'}>
+            <div className={`p-4 rounded-2xl border ${confidence >= 0.8 ? 'bg-emerald-500/15 border-emerald-400/30' : 'bg-amber-500/15 border-amber-400/30'}`}>
+                <p className={confidence >= 0.8 ? 'text-emerald-200' : 'text-amber-200'}>
                     Extraction Confidence: <strong>{(confidence * 100).toFixed(0)}%</strong>
                     {confidence < 0.8 && ' - Please review carefully'}
                 </p>
@@ -53,42 +53,42 @@ export default function InvoiceReviewForm({
 
             <InvoiceDetailsSection register={register} errors={errors} />
 
-            <div className="border-t pt-4">
+            <div className="border-t border-white/10 pt-4">
                 <SellerInfoSection register={register} errors={errors} countryCodes={COUNTRY_CODES} />
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t border-white/10 pt-4">
                 <BuyerInfoSection register={register} errors={errors} countryCodes={COUNTRY_CODES} />
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t border-white/10 pt-4">
                 <LineItemsSection register={register} control={control} errors={errors} />
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t border-white/10 pt-4">
                 <PaymentSection register={register} errors={errors} />
             </div>
 
             <TotalsSection register={register} watch={watch} setValue={setValue} />
 
             {/* Notes */}
-            <div className="border-t pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <div className="border-t border-white/10 pt-4">
+                <label className="block text-sm font-medium text-slate-300 mb-1">Notes</label>
                 <textarea
                     {...register('notes')}
                     rows={3}
-                    className="w-full px-4 py-2 border rounded-lg border-gray-300"
+                    className="w-full px-4 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white"
                 />
             </div>
 
             {submitError && (
-                <div className="p-3 bg-red-100 border border-red-400 rounded text-red-700">
+                <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200">
                     {submitError}
                 </div>
             )}
 
             {submitSuccess && (
-                <div className="p-3 bg-green-100 border border-green-400 rounded text-green-700">
+                <div className="p-3 glass-panel border border-emerald-400/30 rounded-xl text-emerald-200">
                     {submitSuccess}
                 </div>
             )}
@@ -96,7 +96,7 @@ export default function InvoiceReviewForm({
             <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className="w-full px-6 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-semibold hover:brightness-110 disabled:opacity-50"
             >
                 {isSubmitting ? 'Saving Review...' : 'Save & Continue to Conversion'}
             </button>

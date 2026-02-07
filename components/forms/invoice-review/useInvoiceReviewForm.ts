@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';
 
 export interface InvoiceReviewFormValues {
@@ -24,6 +24,7 @@ export interface InvoiceReviewFormValues {
     sellerTaxId: string;
     sellerIban: string;
     sellerBic: string;
+    bankName: string;
     buyerName: string;
     buyerEmail: string;
     buyerAddress: string;
@@ -64,8 +65,29 @@ interface UseInvoiceReviewFormProps {
 
 export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseInvoiceReviewFormProps) => {
     const router = useRouter();
+    const pathname = usePathname();
     const [submitError, setSubmitError] = useState('');
     const [submitSuccess, setSubmitSuccess] = useState('');
+
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const withLocale = useMemo(() => {
+        return (path: string) => {
+            if (!path.startsWith('/')) {
+                return `/${locale}/${path}`;
+            }
+            if (path === '/') {
+                return `/${locale}`;
+            }
+            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
+                return path;
+            }
+            return `/${locale}${path}`;
+        };
+    }, [locale]);
 
     // helper to parse address
     const parseAddress = (address: string) => {
@@ -95,6 +117,41 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
     const sellerDerived = parseAddress(initialData?.sellerAddress);
     const buyerDerived = parseAddress(initialData?.buyerAddress);
 
+    const rawSubtotal = Number(initialData?.subtotal) || 0;
+    const rawTotalAmount = Number(initialData?.totalAmount) || 0;
+    const rawTaxAmountValue = Number(initialData?.taxAmount);
+    const hasTaxAmount = initialData?.taxAmount !== null && initialData?.taxAmount !== undefined && initialData?.taxAmount !== '';
+    const resolvedTaxAmount = hasTaxAmount && !(rawTaxAmountValue === 0 && rawTotalAmount > rawSubtotal + 0.01)
+        ? rawTaxAmountValue
+        : (rawTotalAmount > rawSubtotal ? Math.round((rawTotalAmount - rawSubtotal) * 100) / 100 : 0);
+    const derivedTaxRate = rawSubtotal > 0 ? Math.round((resolvedTaxAmount / rawSubtotal) * 10000) / 100 : 0;
+    const hasProvidedTaxRate = initialData?.taxRate !== null && initialData?.taxRate !== undefined && initialData?.taxRate !== '';
+    const providedTaxRate = hasProvidedTaxRate ? Number(initialData?.taxRate) : NaN;
+    const fallbackTaxRate = !isNaN(providedTaxRate) ? providedTaxRate : derivedTaxRate;
+
+    const sourceItems = Array.isArray(initialData?.lineItems)
+        ? initialData.lineItems
+        : (Array.isArray(initialData?.items) ? initialData.items : []);
+
+    const defaultItems = sourceItems.length > 0
+        ? sourceItems.map((item: any) => {
+            const hasItemTaxRate = item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';
+            const itemTaxRate = hasItemTaxRate ? Number(item.taxRate) : fallbackTaxRate;
+            return {
+                description: item?.description || '',
+                quantity: Number(item?.quantity) || 1,
+                unitPrice: Number(item?.unitPrice) || 0,
+                totalPrice: Number(item?.totalPrice) || Number(item?.lineTotal) || 0,
+                taxRate: !isNaN(itemTaxRate) ? itemTaxRate : 0,
+            };
+        })
+        : [{ description: '', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: fallbackTaxRate || 0 }];
+
+    const normalizeIban = (value: unknown) => {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(/\s+/g, '').toUpperCase();
+    };
+
     const form = useForm<InvoiceReviewFormValues>({
         defaultValues: {
             invoiceNumber: initialData?.invoiceNumber || '',
@@ -114,8 +171,9 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             },
             // Keep flat fields synced via watch/effects or just use nested -> relying on parsed for now but mapping back for submission
             sellerTaxId: initialData?.sellerTaxId || '',
-            sellerIban: initialData?.sellerIban || '',
-            sellerBic: initialData?.sellerBic || '',
+            sellerIban: normalizeIban(initialData?.sellerIban || initialData?.iban || ''),
+            sellerBic: initialData?.sellerBic || initialData?.bic || '',
+            bankName: initialData?.bankName || '',
 
             buyerName: initialData?.buyerName || '',
             buyerEmail: initialData?.buyerEmail || '',
@@ -133,11 +191,11 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             paymentDueDate: initialData?.paymentDueDate || '',
             paymentInstructions: initialData?.paymentInstructions || '',
 
-            items: initialData?.lineItems || [{ description: '', quantity: 0, unitPrice: 0, totalPrice: 0, taxRate: 19 }],
+            items: defaultItems,
 
-            subtotal: initialData?.subtotal || 0,
-            taxAmount: initialData?.taxAmount || 0,
-            totalAmount: initialData?.totalAmount || 0,
+            subtotal: rawSubtotal || 0,
+            taxAmount: resolvedTaxAmount || 0,
+            totalAmount: rawTotalAmount || 0,
             notes: initialData?.notes || '',
         }
     });
@@ -190,7 +248,7 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             sessionStorage.setItem(`review_${extractionId}`, JSON.stringify(payload));
 
             setTimeout(() => {
-                router.push(`/convert/${extractionId}`);
+                router.push(withLocale(`/convert/${extractionId}`));
             }, 2000);
 
         } catch (err) {

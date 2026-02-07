@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { fetchSessionUser } from '@/lib/client-auth';
 
 type ProtectedRouteProps = {
     children: React.ReactNode;
@@ -23,51 +24,39 @@ export default function ProtectedRoute({
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const localizedFallback = useMemo(() => {
+        if (!fallbackUrl.startsWith('/')) {
+            return `/${locale}/${fallbackUrl}`;
+        }
+        if (fallbackUrl.startsWith(`/${locale}/`) || fallbackUrl === `/${locale}`) {
+            return fallbackUrl;
+        }
+        return `/${locale}${fallbackUrl}`;
+    }, [fallbackUrl, locale]);
+
     const redirectToLogin = useCallback(() => {
-        // Clear local storage on session expiry
-        localStorage.removeItem('user');
         // Redirect with return URL so user can continue after login
-        const returnUrl = encodeURIComponent(pathname || '/dashboard');
-        router.push(`${fallbackUrl}?returnUrl=${returnUrl}`);
-    }, [fallbackUrl, pathname, router]);
+        const returnUrl = encodeURIComponent(pathname || `/${locale}/dashboard`);
+        router.push(`${localizedFallback}?returnUrl=${returnUrl}`);
+    }, [localizedFallback, pathname, router]);
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const user = localStorage.getItem('user');
-
-                if (!user) {
+                const sessionUser = await fetchSessionUser();
+                if (!sessionUser) {
                     redirectToLogin();
                     return;
-                }
-
-                // Verify session is still valid on backend
-                const response = await fetch('/api/auth/me', {
-                    credentials: 'include',
-                });
-
-                if (response.status === 401) {
-                    // Session expired or invalid
-                    redirectToLogin();
-                    return;
-                }
-
-                if (!response.ok) {
-                    // Other error, but don't log out - might be temporary
-                    console.warn('Auth check failed, continuing with local session');
                 }
 
                 setIsAuthorized(true);
-            } catch (error) {
-                // Network error - allow access based on localStorage
-                // This enables offline usage for cached pages
-                console.warn('Auth check network error:', error);
-                const user = localStorage.getItem('user');
-                if (user) {
-                    setIsAuthorized(true);
-                } else {
-                    redirectToLogin();
-                }
+            } catch {
+                redirectToLogin();
             } finally {
                 setLoading(false);
             }
@@ -79,7 +68,7 @@ export default function ProtectedRoute({
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400" />
             </div>
         );
     }

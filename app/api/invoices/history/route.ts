@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         const page = parseInt(searchParams.get('page') || '1');
         const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
         const format = searchParams.get('format') as 'CII' | 'UBL' | null;
-        const status = searchParams.get('status') as 'valid' | 'invalid' | null;
+        const status = searchParams.get('status') as 'valid' | 'invalid' | 'draft' | 'completed' | null;
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const exportType = searchParams.get('export');

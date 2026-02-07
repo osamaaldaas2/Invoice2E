@@ -1,28 +1,29 @@
 import { PricingCards } from '@/components/payment/PricingCards';
 
 interface PricingPageProps {
-    params: { locale: string };
+    params: Promise<{ locale: string }>;
 }
 
-export default function PricingPage({ params }: PricingPageProps) {
-    const isGerman = params.locale === 'de';
+export default async function PricingPage({ params }: PricingPageProps) {
+    const { locale } = await params;
+    const isGerman = locale === 'de';
 
     return (
         <div className="container mx-auto px-4 py-12">
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold mb-4">
+                <h1 className="text-4xl font-bold mb-4 text-white font-display">
                     {isGerman ? 'Preise' : 'Pricing'}
                 </h1>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                <p className="text-lg text-faded max-w-2xl mx-auto">
                     {isGerman
                         ? 'Wählen Sie das passende Paket für Ihre Rechnungskonvertierungen. Alle Credits sind 12 Monate gültig.'
                         : 'Choose the right package for your invoice conversions. All credits are valid for 12 months.'}
                 </p>
             </div>
 
-            <PricingCards locale={params.locale} />
+            <PricingCards locale={locale} />
 
-            <div className="mt-12 text-center text-sm text-muted-foreground">
+            <div className="mt-12 text-center text-sm text-faded">
                 <p>
                     🔒 {isGerman ? 'Sichere Zahlung mit Stripe & PayPal' : 'Secure payment with Stripe & PayPal'}
                 </p>

@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger';
  */
 export async function GET(_request: NextRequest): Promise<NextResponse> {
     try {
-        const session = getSessionFromCookie();
+        const session = await getSessionFromCookie();
 
         if (!session) {
             return NextResponse.json(

@@ -1,0 +1,1052 @@
+{
+  "adapters/deepseek.adapter.ts": [
+    "axios",
+    "@/lib/constants",
+    "@/lib/logger",
+    "@/lib/errors",
+    "./interfaces",
+    "@/types"
+  ],
+  "adapters/gemini.adapter.ts": [
+    "@google/generative-ai",
+    "@/lib/constants",
+    "@/lib/logger",
+    "@/lib/errors",
+    "./interfaces",
+    "@/types"
+  ],
+  "adapters/index.ts": [],
+  "adapters/interfaces/IDeepSeekAdapter.ts": [
+    "@/types"
+  ],
+  "adapters/interfaces/IGeminiAdapter.ts": [
+    "@/types"
+  ],
+  "adapters/interfaces/index.ts": [],
+  "adapters/interfaces/IPayPalAdapter.ts": [],
+  "adapters/interfaces/ISendGridAdapter.ts": [],
+  "adapters/interfaces/IStripeAdapter.ts": [],
+  "adapters/interfaces/ISupabaseAdapter.ts": [
+    "@supabase/supabase-js"
+  ],
+  "adapters/paypal.adapter.ts": [
+    "@/lib/constants",
+    "@/lib/logger",
+    "./interfaces"
+  ],
+  "adapters/sendgrid.adapter.ts": [
+    "@/lib/constants",
+    "@/lib/logger",
+    "./interfaces"
+  ],
+  "adapters/stripe.adapter.ts": [
+    "@/lib/constants",
+    "@/lib/logger",
+    "./interfaces",
+    "crypto"
+  ],
+  "adapters/supabase.adapter.ts": [
+    "@/lib/supabase.server",
+    "@/lib/constants",
+    "@/lib/logger",
+    "@/lib/errors",
+    "./interfaces/ISupabaseAdapter",
+    "@supabase/supabase-js"
+  ],
+  "app/[locale]/(auth)/login/page.tsx": [
+    "@/components/forms/LoginForm",
+    "next/link"
+  ],
+  "app/[locale]/(auth)/signup/page.tsx": [
+    "@/components/forms/SignupForm",
+    "next/link"
+  ],
+  "app/[locale]/admin/audit-logs/page.tsx": [
+    "react",
+    "@/types/admin"
+  ],
+  "app/[locale]/admin/layout.tsx": [
+    "@/components/admin/AdminProtectedRoute",
+    "@/components/admin/AdminLayout"
+  ],
+  "app/[locale]/admin/packages/page.tsx": [
+    "react"
+  ],
+  "app/[locale]/admin/page.tsx": [
+    "react",
+    "next/link",
+    "next/navigation",
+    "@/components/admin/AdminStatsCard",
+    "@/types/admin"
+  ],
+  "app/[locale]/admin/transactions/page.tsx": [
+    "react"
+  ],
+  "app/[locale]/admin/users/[id]/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/types/admin",
+    "@/components/admin/AdminStatsCard"
+  ],
+  "app/[locale]/admin/users/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/types/admin"
+  ],
+  "app/[locale]/admin/vouchers/page.tsx": [
+    "react",
+    "@/components/admin/AdminProtectedRoute"
+  ],
+  "app/[locale]/checkout/cancel/page.tsx": [
+    "next/navigation",
+    "@/components/ui/button"
+  ],
+  "app/[locale]/checkout/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/types/credit-package",
+    "@/components/ui/button"
+  ],
+  "app/[locale]/checkout/success/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/components/ui/button"
+  ],
+  "app/[locale]/convert/[extractionId]/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/components/ProtectedRoute"
+  ],
+  "app/[locale]/dashboard/analytics/page.tsx": [
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/dashboard/DashboardStats",
+    "@/components/dashboard/AnalyticsCharts",
+    "@/components/dashboard/CreditUsageChart"
+  ],
+  "app/[locale]/dashboard/credits/page.tsx": [
+    "react",
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/forms/CreditPurchaseForm",
+    "@/components/forms/VoucherRedeemForm"
+  ],
+  "app/[locale]/dashboard/history/page.tsx": [
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/dashboard/ConversionHistory"
+  ],
+  "app/[locale]/dashboard/page.tsx": [
+    "react",
+    "next/navigation",
+    "next/link",
+    "@/components/forms/FileUploadForm"
+  ],
+  "app/[locale]/dashboard/profile/page.tsx": [
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/forms/ProfileForm"
+  ],
+  "app/[locale]/dashboard/templates/page.tsx": [
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/forms/TemplateManager"
+  ],
+  "app/[locale]/invoices/bulk-upload/page.tsx": [
+    "next-intl",
+    "@/components/layout/DashboardLayout",
+    "@/components/forms/BulkUploadForm"
+  ],
+  "app/[locale]/layout.tsx": [
+    "next-intl",
+    "next/navigation",
+    "@/lib/constants",
+    "@/components/layout/Header",
+    "@/components/layout/Footer",
+    "@/styles/globals.css",
+    "@/styles/variables.css",
+    "next/font/google"
+  ],
+  "app/[locale]/page.tsx": [
+    "@/components/home/HeroActions"
+  ],
+  "app/[locale]/pricing/page.tsx": [
+    "@/components/payment/PricingCards"
+  ],
+  "app/[locale]/review/[extractionId]/page.tsx": [
+    "react",
+    "next/navigation",
+    "next/link",
+    "@/components/forms/InvoiceReviewForm"
+  ],
+  "app/[locale]/upload/page.tsx": [
+    "react",
+    "next/navigation",
+    "@/components/forms/FileUploadForm"
+  ],
+  "app/api/admin/audit-logs/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin"
+  ],
+  "app/api/admin/packages/[id]/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "zod"
+  ],
+  "app/api/admin/packages/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "zod"
+  ],
+  "app/api/admin/stats/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors"
+  ],
+  "app/api/admin/transactions/[id]/refund/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "zod"
+  ],
+  "app/api/admin/transactions/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin"
+  ],
+  "app/api/admin/users/[id]/ban/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "zod"
+  ],
+  "app/api/admin/users/[id]/credits/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "zod"
+  ],
+  "app/api/admin/users/[id]/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors"
+  ],
+  "app/api/admin/users/route.ts": [
+    "next/server",
+    "@/lib/authorization",
+    "@/services/admin",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin",
+    "@/types/index"
+  ],
+  "app/api/admin/vouchers/[id]/route.ts": [
+    "next/server",
+    "zod",
+    "@/lib/authorization",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/services/admin",
+    "@/lib/database-helpers"
+  ],
+  "app/api/admin/vouchers/route.ts": [
+    "next/server",
+    "zod",
+    "@/lib/authorization",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/services/admin",
+    "@/lib/database-helpers"
+  ],
+  "app/api/auth/login/route.ts": [
+    "next/server",
+    "@/services/auth.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "zod",
+    "@/lib/session",
+    "@/lib/rate-limiter"
+  ],
+  "app/api/auth/logout/route.ts": [
+    "next/server",
+    "@/lib/session",
+    "@/lib/logger"
+  ],
+  "app/api/auth/me/route.ts": [
+    "next/server",
+    "@/lib/session",
+    "@/lib/logger"
+  ],
+  "app/api/auth/signup/route.ts": [
+    "next/server",
+    "@/services/auth.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/session",
+    "zod"
+  ],
+  "app/api/credits/usage/route.ts": [
+    "next/server",
+    "@/lib/supabase.server",
+    "@/lib/auth",
+    "@/lib/logger"
+  ],
+  "app/api/files/upload/route.ts": [
+    "next/server",
+    "@/services/file.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/auth"
+  ],
+  "app/api/health/route.ts": [
+    "next/server",
+    "@/lib/logger",
+    "@/lib/constants",
+    "@/types/api.types"
+  ],
+  "app/api/invoices/analytics/route.ts": [
+    "next/server",
+    "@/services/analytics.service",
+    "@/lib/logger",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/bulk-upload/download/route.ts": [
+    "next/server",
+    "@/services/batch.service",
+    "@/lib/logger",
+    "@/lib/auth",
+    "@/lib/session"
+  ],
+  "app/api/invoices/bulk-upload/route.ts": [
+    "next/server",
+    "@/services/batch.service",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/auth",
+    "@/lib/session"
+  ],
+  "app/api/invoices/convert/route.ts": [
+    "next/server",
+    "@/services/xrechnung.service",
+    "@/services/ubl.service",
+    "@/services/invoice.db.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/extract/route.ts": [
+    "next/server",
+    "@/services/ai/extractor.factory",
+    "@/services/invoice.db.service",
+    "@/services/credits.db.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/constants",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/extractions/[id]/route.ts": [
+    "next/server",
+    "@/services/invoice.db.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/history/route.ts": [
+    "next/server",
+    "@/services/analytics.service",
+    "@/lib/logger",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/review/route.ts": [
+    "next/server",
+    "@/services/invoice.db.service",
+    "@/services/review.service",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/auth"
+  ],
+  "app/api/invoices/templates/[id]/route.ts": [
+    "next/server",
+    "@/services/template.db.service",
+    "@/lib/auth",
+    "@/lib/logger"
+  ],
+  "app/api/invoices/templates/route.ts": [
+    "next/server",
+    "@/services/template.db.service",
+    "@/lib/auth",
+    "@/lib/logger"
+  ],
+  "app/api/packages/route.ts": [
+    "next/server",
+    "@/services/package.service",
+    "@/lib/logger"
+  ],
+  "app/api/payments/create-checkout/route.ts": [
+    "next/server",
+    "@/services/package.service",
+    "@/adapters/stripe.adapter",
+    "@/adapters/paypal.adapter",
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/types/credit-package",
+    "@/lib/auth"
+  ],
+  "app/api/payments/history/route.ts": [
+    "next/server",
+    "@/services/payment-processor",
+    "@/lib/supabase.server",
+    "@/lib/auth",
+    "@/lib/logger"
+  ],
+  "app/api/payments/verify/route.ts": [
+    "next/server",
+    "@/adapters/stripe.adapter",
+    "@/adapters/paypal.adapter",
+    "@/lib/supabase.server",
+    "@/lib/session",
+    "@/lib/logger"
+  ],
+  "app/api/payments/webhook/route.ts": [
+    "next/server",
+    "@/services/payment-processor",
+    "@/services/stripe.service",
+    "@/services/paypal.service",
+    "@/lib/logger"
+  ],
+  "app/api/users/profile/route.ts": [
+    "next/server",
+    "zod",
+    "@/lib/auth",
+    "@/lib/validators",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/services/user.service"
+  ],
+  "app/api/vouchers/redeem/route.ts": [
+    "next/server",
+    "zod",
+    "@/lib/auth",
+    "@/lib/supabase.server",
+    "@/lib/logger"
+  ],
+  "app/layout.tsx": [
+    "next",
+    "@/lib/constants"
+  ],
+  "app/not-found.tsx": [
+    "next/link",
+    "@/lib/constants"
+  ],
+  "components/admin/AdminLayout.tsx": [
+    "next/link",
+    "next/navigation",
+    "react"
+  ],
+  "components/admin/AdminProtectedRoute.tsx": [
+    "react",
+    "next/navigation"
+  ],
+  "components/admin/AdminStatsCard.tsx": [],
+  "components/admin/index.ts": [],
+  "components/common/index.ts": [],
+  "components/common/LoadingSpinner.tsx": [
+    "@/lib/utils"
+  ],
+  "components/dashboard/AnalyticsCharts.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/dashboard/ConversionHistory.tsx": [
+    "react",
+    "next-intl",
+    "next/navigation",
+    "next/link"
+  ],
+  "components/dashboard/CreditUsageChart.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/dashboard/DashboardStats.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/features/index.ts": [],
+  "components/forms/BulkUploadForm.tsx": [
+    "react",
+    "next-intl",
+    "@/lib/constants"
+  ],
+  "components/forms/CreditPurchaseForm.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/forms/FileUploadForm.tsx": [
+    "react",
+    "next/navigation",
+    "@/lib/constants"
+  ],
+  "components/forms/index.ts": [],
+  "components/forms/invoice-review/BuyerInfoSection.tsx": [
+    "react",
+    "react-hook-form"
+  ],
+  "components/forms/invoice-review/index.ts": [],
+  "components/forms/invoice-review/InvoiceDetailsSection.tsx": [
+    "react",
+    "react-hook-form"
+  ],
+  "components/forms/invoice-review/InvoiceReviewForm.tsx": [
+    "react",
+    "./useInvoiceReviewForm",
+    "./InvoiceDetailsSection",
+    "./SellerInfoSection",
+    "./BuyerInfoSection",
+    "./LineItemsSection",
+    "./PaymentSection",
+    "./TotalsSection"
+  ],
+  "components/forms/invoice-review/LineItemsSection.tsx": [
+    "react",
+    "react-hook-form",
+    "lucide-react"
+  ],
+  "components/forms/invoice-review/PaymentSection.tsx": [
+    "react",
+    "react-hook-form"
+  ],
+  "components/forms/invoice-review/SellerInfoSection.tsx": [
+    "react",
+    "react-hook-form"
+  ],
+  "components/forms/invoice-review/TotalsSection.tsx": [
+    "react",
+    "react-hook-form"
+  ],
+  "components/forms/invoice-review/useInvoiceReviewForm.ts": [
+    "react",
+    "react-hook-form",
+    "next/navigation",
+    "@/lib/logger"
+  ],
+  "components/forms/InvoiceReviewForm.tsx": [],
+  "components/forms/LoginForm.tsx": [
+    "react",
+    "next/navigation"
+  ],
+  "components/forms/ProfileForm.tsx": [
+    "react",
+    "next-intl",
+    "@/components/ui/input",
+    "@/components/ui/button"
+  ],
+  "components/forms/SignupForm.tsx": [
+    "react",
+    "next/navigation",
+    "next-intl"
+  ],
+  "components/forms/TemplateManager.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/forms/VoucherRedeemForm.tsx": [
+    "react",
+    "next-intl"
+  ],
+  "components/home/HeroActions.tsx": [
+    "next/link",
+    "react",
+    "next/navigation"
+  ],
+  "components/layout/DashboardLayout.tsx": [
+    "react",
+    "next/navigation",
+    "next/link"
+  ],
+  "components/layout/Footer.tsx": [
+    "next-intl",
+    "@/lib/constants"
+  ],
+  "components/layout/Header.tsx": [
+    "react",
+    "next/link",
+    "next/navigation",
+    "next-intl",
+    "@/lib/constants"
+  ],
+  "components/layout/index.ts": [],
+  "components/payment/PricingCards.tsx": [
+    "react",
+    "next/navigation",
+    "@/types/credit-package",
+    "@/components/ui/button",
+    "@/lib/utils"
+  ],
+  "components/ProtectedRoute.tsx": [
+    "react",
+    "next/navigation"
+  ],
+  "components/ui/alert.tsx": [
+    "react",
+    "@/lib/utils"
+  ],
+  "components/ui/button.tsx": [
+    "react",
+    "@/lib/utils"
+  ],
+  "components/ui/card.tsx": [
+    "react",
+    "@/lib/utils"
+  ],
+  "components/ui/dialog.tsx": [],
+  "components/ui/form.tsx": [],
+  "components/ui/input.tsx": [
+    "react",
+    "@/lib/utils"
+  ],
+  "hooks/index.ts": [],
+  "hooks/useAuth.ts": [],
+  "hooks/useUser.ts": [],
+  "i18n.config.ts": [
+    "next-intl/server",
+    "./lib/constants"
+  ],
+  "i18n.ts": [
+    "next-intl/server"
+  ],
+  "lib/auth.ts": [
+    "next/server",
+    "@/lib/logger",
+    "@/lib/session"
+  ],
+  "lib/authorization.ts": [
+    "next/server",
+    "@/lib/session",
+    "@/lib/logger",
+    "@/lib/errors"
+  ],
+  "lib/constants.ts": [],
+  "lib/database-helpers.ts": [],
+  "lib/errors.ts": [],
+  "lib/gemini.ts": [],
+  "lib/logger.ts": [],
+  "lib/rate-limiter.ts": [
+    "@/lib/logger"
+  ],
+  "lib/session.ts": [
+    "crypto",
+    "next/headers",
+    "@/lib/logger"
+  ],
+  "lib/supabase.server.ts": [
+    "@supabase/ssr",
+    "next/headers"
+  ],
+  "lib/supabase.ts": [
+    "@supabase/ssr"
+  ],
+  "lib/utils.ts": [
+    "clsx",
+    "tailwind-merge"
+  ],
+  "lib/validators.ts": [
+    "zod"
+  ],
+  "middleware.ts": [
+    "next-intl/middleware",
+    "next/server",
+    "./lib/constants"
+  ],
+  "next.config.js": [
+    "next-intl/plugin"
+  ],
+  "next-env.d.ts": [],
+  "postcss.config.js": [],
+  "prettier.config.js": [],
+  "scripts/run-migration.ts": [
+    "fs",
+    "path"
+  ],
+  "scripts/test_workflow.js": [
+    "fs",
+    "form-data"
+  ],
+  "services/admin/audit.admin.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin",
+    "@/lib/database-helpers"
+  ],
+  "services/admin/index.ts": [],
+  "services/admin/stats.admin.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin"
+  ],
+  "services/admin/transaction.admin.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin",
+    "./audit.admin.service",
+    "../stripe.service",
+    "../paypal.service"
+  ],
+  "services/admin/user.admin.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/admin",
+    "@/types/index",
+    "./audit.admin.service"
+  ],
+  "services/ai/deepseek.extractor.ts": [
+    "./IAIExtractor",
+    "@/adapters",
+    "@/adapters/interfaces"
+  ],
+  "services/ai/extractor.factory.ts": [
+    "@/lib/logger",
+    "@/lib/errors",
+    "./IAIExtractor",
+    "./gemini.extractor",
+    "./deepseek.extractor"
+  ],
+  "services/ai/gemini.extractor.ts": [
+    "./IAIExtractor",
+    "@/adapters",
+    "@/adapters/interfaces"
+  ],
+  "services/ai/IAIExtractor.ts": [],
+  "services/analytics.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger"
+  ],
+  "services/audit.db.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/auth.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/validators",
+    "@/types/index",
+    "@/lib/constants",
+    "bcrypt"
+  ],
+  "services/batch.service.ts": [],
+  "services/batch/batch.generator.ts": [
+    "jszip",
+    "./types"
+  ],
+  "services/batch/batch.processor.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/services/ai/extractor.factory",
+    "@/services/credits.db.service",
+    "@/services/xrechnung.service",
+    "@/services/ubl.service",
+    "./types"
+  ],
+  "services/batch/batch.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "jszip",
+    "./types",
+    "./batch.processor",
+    "./batch.generator"
+  ],
+  "services/batch/types.ts": [],
+  "services/credits.db.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/database.service.ts": [
+    "@/types",
+    "./database/user.service",
+    "./database/credit.service",
+    "./database/extraction.service",
+    "./database/conversion.service",
+    "./database/payment.service",
+    "./database/audit.service",
+    "./database/types"
+  ],
+  "services/database/audit.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers",
+    "./types"
+  ],
+  "services/database/conversion.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers",
+    "./types"
+  ],
+  "services/database/credit.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/database/extraction.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers",
+    "./types"
+  ],
+  "services/database/payment.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers",
+    "./types"
+  ],
+  "services/database/types.ts": [],
+  "services/database/user.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers",
+    "./types"
+  ],
+  "services/email.service.ts": [],
+  "services/email/email.service.ts": [
+    "@/lib/logger",
+    "@/adapters",
+    "@/adapters/interfaces",
+    "./types",
+    "./templates/conversion.template",
+    "./templates/payment.template",
+    "./templates/welcome.template",
+    "./templates/error.template"
+  ],
+  "services/email/templates/conversion.template.ts": [
+    "../types"
+  ],
+  "services/email/templates/error.template.ts": [],
+  "services/email/templates/payment.template.ts": [
+    "../types"
+  ],
+  "services/email/templates/welcome.template.ts": [],
+  "services/email/types.ts": [],
+  "services/file.service.ts": [
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/constants"
+  ],
+  "services/gemini.service.ts": [
+    "@google/generative-ai",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/lib/constants"
+  ],
+  "services/index.ts": [],
+  "services/invoice.db.service.ts": [
+    "@/lib/supabase.server",
+    "@supabase/supabase-js",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/package.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types/credit-package"
+  ],
+  "services/payment.db.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/payment-processor.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "./stripe.service",
+    "./paypal.service",
+    "./email.service"
+  ],
+  "services/paypal.service.ts": [
+    "@/lib/logger",
+    "@/adapters",
+    "./stripe.service"
+  ],
+  "services/review.service.ts": [
+    "@/lib/errors"
+  ],
+  "services/stripe.service.ts": [
+    "@/lib/logger",
+    "@/adapters"
+  ],
+  "services/template.db.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger"
+  ],
+  "services/ubl.service.ts": [
+    "@/lib/logger"
+  ],
+  "services/user.db.service.ts": [
+    "@/lib/supabase.server",
+    "@/lib/logger",
+    "@/lib/errors",
+    "@/types",
+    "@/lib/database-helpers"
+  ],
+  "services/user.service.ts": [
+    "@/types",
+    "@/types/user.types",
+    "@/services"
+  ],
+  "services/xrechnung.service.ts": [],
+  "services/xrechnung/builder.ts": [
+    "@/lib/constants",
+    "@/lib/logger"
+  ],
+  "services/xrechnung/types.ts": [],
+  "services/xrechnung/validator.ts": [
+    "@/lib/errors"
+  ],
+  "services/xrechnung/xrechnung.service.ts": [
+    "@/lib/logger",
+    "./types",
+    "./validator",
+    "./builder"
+  ],
+  "tailwind.config.js": [],
+  "tests/integration/index.ts": [],
+  "tests/setup.ts": [
+    "@testing-library/jest-dom"
+  ],
+  "tests/unit/adapters/deepseek.adapter.test.ts": [
+    "vitest",
+    "@/adapters/deepseek.adapter",
+    "@/lib/errors",
+    "axios"
+  ],
+  "tests/unit/adapters/gemini.adapter.test.ts": [
+    "vitest",
+    "@/adapters/gemini.adapter",
+    "@/lib/errors",
+    "@google/generative-ai"
+  ],
+  "tests/unit/adapters/paypal.adapter.test.ts": [
+    "vitest",
+    "@/adapters/paypal.adapter"
+  ],
+  "tests/unit/adapters/sendgrid.adapter.test.ts": [
+    "vitest",
+    "@/adapters/sendgrid.adapter",
+    "@/adapters/interfaces/ISendGridAdapter"
+  ],
+  "tests/unit/adapters/stripe.adapter.test.ts": [
+    "vitest",
+    "@/adapters/stripe.adapter"
+  ],
+  "tests/unit/adapters/supabase.adapter.test.ts": [
+    "vitest",
+    "@/adapters/supabase.adapter",
+    "@/lib/errors"
+  ],
+  "tests/unit/ai/extractors.test.ts": [
+    "vitest",
+    "@/services/ai/extractor.factory",
+    "@/services/ai/gemini.extractor",
+    "@/services/ai/deepseek.extractor",
+    "@/lib/errors"
+  ],
+  "tests/unit/auth.service.test.ts": [
+    "vitest",
+    "@/services/auth.service"
+  ],
+  "tests/unit/database.service.test.ts": [
+    "vitest",
+    "@/services/database.service",
+    "@/services/database.service"
+  ],
+  "tests/unit/database-helpers.test.ts": [
+    "vitest",
+    "@/lib/database-helpers"
+  ],
+  "tests/unit/file.service.test.ts": [
+    "vitest",
+    "@/services/file.service",
+    "@/lib/errors"
+  ],
+  "tests/unit/gemini.service.test.ts": [
+    "vitest",
+    "@/services/gemini.service",
+    "@/lib/errors"
+  ],
+  "tests/unit/review.service.test.ts": [
+    "vitest",
+    "@/services/review.service",
+    "@/lib/errors"
+  ],
+  "tests/unit/utils.test.ts": [
+    "vitest",
+    "@/lib/utils"
+  ],
+  "tests/unit/xrechnung.service.test.ts": [
+    "vitest",
+    "../../services/xrechnung.service",
+    "../../lib/errors"
+  ],
+  "types/admin.ts": [
+    "./index"
+  ],
+  "types/api.types.ts": [],
+  "types/auth.types.ts": [],
+  "types/credit-package.ts": [],
+  "types/errors.types.ts": [],
+  "types/index.ts": [],
+  "types/user.types.ts": [],
+  "vitest.config.ts": [
+    "vitest/config",
+    "path"
+  ]
+}

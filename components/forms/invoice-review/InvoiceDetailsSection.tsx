@@ -9,18 +9,17 @@ interface InvoiceDetailsSectionProps {
 
 export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ register, errors }) => {
     return (
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h3>
+        <div className="glass-card p-6">
+            <h3 className="text-lg font-medium text-white mb-4 font-display">Invoice Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         Invoice Number
                     </label>
                     <input
                         type="text"
                         {...register('invoiceNumber')}
-                        className={`w-full p-2 border rounded-md ${errors.invoiceNumber ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                        className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors.invoiceNumber ? 'border-rose-400/60' : 'border-white/10'} text-white`}
                     />
                     {errors.invoiceNumber && (
                         <p className="mt-1 text-sm text-red-500">{errors.invoiceNumber.message as string}</p>
@@ -28,14 +27,13 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ re
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         Invoice Date
                     </label>
                     <input
                         type="date"
                         {...register('invoiceDate')}
-                        className={`w-full p-2 border rounded-md ${errors.invoiceDate ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                        className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors.invoiceDate ? 'border-rose-400/60' : 'border-white/10'} text-white`}
                     />
                     {errors.invoiceDate && (
                         <p className="mt-1 text-sm text-red-500">{errors.invoiceDate.message as string}</p>
@@ -43,14 +41,14 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ re
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         Currency (e.g. EUR)
                     </label>
                     <input
                         type="text"
                         readOnly
                         {...register('currency')}
-                        className={`w-full p-2 border rounded-md bg-gray-50 border-gray-300`}
+                        className="w-full p-2 rounded-xl bg-slate-950/80 border border-white/10 text-white"
                     />
                 </div>
             </div>

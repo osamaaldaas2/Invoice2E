@@ -129,16 +129,16 @@ export default function BulkUploadForm() {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+        <div className="glass-card p-6">
+            <h2 className="text-xl font-bold text-white mb-4 font-display">
                 {t('title')}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-faded mb-6">
                 {t('description')}
             </p>
 
             {error && (
-                <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                <div className="mb-4 p-4 glass-panel text-rose-200 rounded-lg border border-rose-400/30">
                     {error}
                 </div>
             )}
@@ -148,7 +148,7 @@ export default function BulkUploadForm() {
                     {/* File Upload Area */}
                     <div
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+                        className="border-2 border-dashed border-white/20 rounded-2xl p-8 text-center cursor-pointer hover:border-sky-400/60 transition-colors bg-white/5"
                     >
                         <input
                             ref={fileInputRef}
@@ -160,15 +160,15 @@ export default function BulkUploadForm() {
                         <div className="text-4xl mb-4">📦</div>
                         {file ? (
                             <div>
-                                <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                <p className="font-medium text-white">{file.name}</p>
+                                <p className="text-sm text-faded">
                                     {(file.size / 1024 / 1024).toFixed(2)} MB
                                 </p>
                             </div>
                         ) : (
                             <div>
-                                <p className="font-medium text-gray-900 dark:text-white">{t('dropZip')}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{t('maxSize')}</p>
+                                <p className="font-medium text-white">{t('dropZip')}</p>
+                                <p className="text-sm text-faded">{t('maxSize')}</p>
                             </div>
                         )}
                     </div>
@@ -177,7 +177,7 @@ export default function BulkUploadForm() {
                     <button
                         onClick={handleUpload}
                         disabled={!file || uploading}
-                        className="mt-4 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mt-4 w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {uploading ? t('uploading') : t('startProcessing')}
                     </button>
@@ -187,36 +187,36 @@ export default function BulkUploadForm() {
                     {/* Progress Display */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <span className="text-sm font-medium text-slate-300">
                                 {t('processing')}
                             </span>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${job.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                                job.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${job.status === 'completed' ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30' :
+                                job.status === 'failed' ? 'bg-rose-500/15 text-rose-200 border-rose-400/30' :
+                                    'bg-sky-500/15 text-sky-200 border-sky-400/30'
                                 }`}>
                                 {job.status}
                             </span>
                         </div>
 
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        <div className="w-full bg-white/10 rounded-full h-3">
                             <div
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500"
+                                className="bg-gradient-to-r from-sky-400 to-blue-500 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${job.progress}%` }}
                             />
                         </div>
 
                         <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{job.totalFiles}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{t('total')}</div>
+                                <div className="text-2xl font-bold text-white">{job.totalFiles}</div>
+                                <div className="text-xs text-faded">{t('total')}</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-green-600">{job.completedFiles}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{t('completed')}</div>
+                                <div className="text-2xl font-bold text-emerald-200">{job.completedFiles}</div>
+                                <div className="text-xs text-faded">{t('completed')}</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-red-600">{job.failedFiles}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{t('failed')}</div>
+                                <div className="text-2xl font-bold text-rose-200">{job.failedFiles}</div>
+                                <div className="text-xs text-faded">{t('failed')}</div>
                             </div>
                         </div>
 
@@ -224,7 +224,7 @@ export default function BulkUploadForm() {
                             {polling && (
                                 <button
                                     onClick={handleCancel}
-                                    className="flex-1 py-2 px-4 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                    className="flex-1 py-2 px-4 rounded-full border border-rose-400/30 text-rose-200 bg-rose-500/15 hover:bg-rose-500/25 transition-colors"
                                 >
                                     {t('cancel')}
                                 </button>
@@ -232,7 +232,7 @@ export default function BulkUploadForm() {
                             {!polling && (
                                 <button
                                     onClick={handleReset}
-                                    className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                    className="flex-1 py-2 px-4 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                                 >
                                     {t('newUpload')}
                                 </button>

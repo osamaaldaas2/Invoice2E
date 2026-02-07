@@ -15,7 +15,8 @@
         "edit": "Edit",
         "back": "Back",
         "next": "Next",
-        "submit": "Submit"
+        "submit": "Submit",
+        "profile": "Profile"
     },
     "home": {
         "title": "Welcome to Invoice2E",
@@ -30,7 +31,17 @@
         "no_account": "Don't have an account?",
         "have_account": "Already have an account?",
         "first_name": "First Name",
-        "last_name": "Last Name"
+        "last_name": "Last Name",
+        "email": "Email",
+        "password": "Password",
+        "confirm_password": "Confirm Password",
+        "address_line1": "Street Address",
+        "address_line2": "Address Line 2",
+        "postal_code": "Postal Code",
+        "city": "City",
+        "country": "Country Code",
+        "phone": "Phone",
+        "create_account": "Create Account"
     },
     "errors": {
         "generic": "An error occurred. Please try again.",
@@ -63,6 +74,14 @@
         "format": "Format",
         "status": "Status",
         "date": "Date",
+        "action": "Action",
+        "filterAll": "All",
+        "filterDraft": "Drafts",
+        "filterCompleted": "Completed",
+        "resume": "Resume",
+        "review": "Review",
+        "downloadXml": "Download XML",
+        "downloading": "Downloading...",
         "showing": "Showing",
         "of": "of",
         "previous": "Previous",
@@ -72,6 +91,12 @@
         "pageTitle": "Analytics",
         "pageDescription": "View detailed analytics and statistics",
         "conversionTrend": "Conversion Trend",
+        "creditUsageTitle": "Credit Usage",
+        "creditUsageSubtitle": "Used vs. remaining credits",
+        "thisMonth": "This Month",
+        "used": "Used",
+        "remaining": "Remaining",
+        "totalCreditsLabel": "Total credits: {total}",
         "week": "Week",
         "month": "Month",
         "quarter": "Quarter",
@@ -89,7 +114,14 @@
         "processing": "Processing...",
         "purchaseNow": "Purchase Now",
         "yourBalance": "Your Balance",
-        "creditsAvailable": "credits available"
+        "creditsAvailable": "credits available",
+        "redeemTitle": "Redeem Voucher",
+        "redeemDescription": "Enter a voucher code to add credits to your account",
+        "redeemPlaceholder": "Enter voucher code",
+        "redeemButton": "Redeem",
+        "redeeming": "Redeeming...",
+        "redeemSuccess": "Voucher applied. +{credits} credits (Balance: {balance})",
+        "redeemError": "Failed to redeem voucher"
     },
     "templates": {
         "pageTitle": "Invoice Templates",
@@ -133,5 +165,30 @@
         "instruction2": "Maximum 100 invoices per batch",
         "instruction3": "Supported formats: PDF, PNG, JPG, JPEG",
         "instruction4": "Each invoice will be converted to XRechnung format"
+    },
+    "profile": {
+        "pageTitle": "Profile",
+        "pageDescription": "Manage your account details",
+        "sectionAccount": "Account",
+        "sectionAccountHint": "Update your personal details and preferred language",
+        "sectionAddress": "Address",
+        "sectionAddressHint": "Used for invoices and contact details",
+        "firstName": "First Name",
+        "lastName": "Last Name",
+        "email": "Email",
+        "phone": "Phone",
+        "language": "Language",
+        "languageEn": "English",
+        "languageDe": "German",
+        "addressStreet": "Street / Address",
+        "addressPostalCode": "Postal Code",
+        "addressCity": "City",
+        "addressCountry": "Country Code",
+        "taxId": "Tax ID",
+        "save": "Save Changes",
+        "saving": "Saving...",
+        "saveSuccess": "Profile updated successfully.",
+        "saveError": "Failed to save profile.",
+        "loadError": "Failed to load profile."
     }
 }

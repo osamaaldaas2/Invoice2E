@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
+import { creditsDbService } from '@/services/credits.db.service';
 import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { FILE_LIMITS } from '@/lib/constants';
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
         // Check credits before processing
         try {
-            const credits = await import('@/services/credits.db.service').then(m => m.creditsDbService.getUserCredits(userId));
+            const credits = await creditsDbService.getUserCredits(userId);
             if (credits.availableCredits < 1) {
                 return NextResponse.json(
                     { success: false, error: 'Insufficient credits. Please purchase more credits.' },
@@ -130,7 +131,40 @@ export async function POST(request: NextRequest) {
             extractionData: extractedData as unknown as Record<string, unknown>,
             confidenceScore: extractedData.confidence,
             geminiResponseTimeMs: responseTime, // Schema expected this name, keep it for now
+            status: 'draft',
         });
+
+        // Deduct credits AFTER successful extraction and save
+        try {
+            const deducted = await creditsDbService.deductCredits(userId, 1, 'extraction');
+            if (!deducted) {
+                // Best-effort cleanup to avoid unpaid drafts
+                try {
+                    await invoiceDbService.deleteExtraction(extraction.id);
+                } catch (cleanupError) {
+                    logger.warn('Failed to cleanup extraction after credit deduction failure', {
+                        extractionId: extraction.id,
+                        userId,
+                        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                    });
+                }
+
+                return NextResponse.json(
+                    { success: false, error: 'Insufficient credits. Please purchase more credits.' },
+                    { status: 402 }
+                );
+            }
+        } catch (deductError) {
+            logger.error('Failed to deduct credits after extraction', {
+                extractionId: extraction.id,
+                userId,
+                error: deductError instanceof Error ? deductError.message : String(deductError),
+            });
+            return NextResponse.json(
+                { success: false, error: 'Failed to deduct credits. Please try again.' },
+                { status: 500 }
+            );
+        }
 
         logger.info('Invoice extraction and storage completed', {
             extractionId: extraction.id,

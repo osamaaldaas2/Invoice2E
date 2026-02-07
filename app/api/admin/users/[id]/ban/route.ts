@@ -17,13 +17,13 @@ const BanUserSchema = z.object({
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
     try {
         // Require admin role
         const admin = await requireAdmin(request);
 
-        const userId = params.id;
+        const { id: userId } = await context.params;
         const body = await request.json();
 
         // Validate input
@@ -102,7 +102,8 @@ export async function POST(
             );
         }
 
-        logger.error('Admin ban user error', { error, userId: params.id });
+        const { id: userId } = await context.params;
+        logger.error('Admin ban user error', { error, userId });
         return NextResponse.json(
             { success: false, error: 'Failed to process ban/unban' },
             { status: 500 }

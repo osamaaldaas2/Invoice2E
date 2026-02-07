@@ -9,6 +9,7 @@ export default function AdminUserDetailPage() {
     const params = useParams();
     const router = useRouter();
     const userId = params.id as string;
+    const locale = (params.locale as string) || 'en';
 
     const [user, setUser] = useState<AdminUserWithCredits | null>(null);
     const [loading, setLoading] = useState(true);
@@ -121,8 +122,8 @@ export default function AdminUserDetailPage() {
 
     if (error || !user) {
         return (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <p className="text-red-600 dark:text-red-400">{error || 'User not found'}</p>
+            <div className="glass-panel border border-rose-400/30 rounded-lg p-4 text-rose-200">
+                <p className="text-rose-200">{error || 'User not found'}</p>
             </div>
         );
     }
@@ -131,24 +132,24 @@ export default function AdminUserDetailPage() {
         <div className="space-y-6">
             {/* Back button */}
             <button
-                onClick={() => router.push('/en/admin/users')}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-2"
+                onClick={() => router.push(`/${locale}/admin/users`)}
+                className="text-faded hover:text-white flex items-center gap-2"
             >
                 ← Back to Users
             </button>
 
             {/* User header */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+            <div className="glass-card p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold">
                             {user.firstName[0]}{user.lastName[0]}
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            <h1 className="text-2xl font-bold text-white font-display">
                                 {user.firstName} {user.lastName}
                             </h1>
-                            <p className="text-gray-500 dark:text-gray-400">{user.email}</p>
+                            <p className="text-faded">{user.email}</p>
                             <div className="mt-2 flex gap-2">
                                 <span
                                     className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -156,13 +157,13 @@ export default function AdminUserDetailPage() {
                                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                                             : user.role === 'admin'
                                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                            : 'bg-white/5 text-slate-200 border border-white/10'
                                     }`}
                                 >
                                     {user.role}
                                 </span>
                                 {user.isBanned && (
-                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-rose-500/15 text-rose-200 border border-rose-400/30">
                                         Banned
                                     </span>
                                 )}
@@ -192,11 +193,11 @@ export default function AdminUserDetailPage() {
 
             {/* Ban info */}
             {user.isBanned && user.bannedReason && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <h3 className="font-medium text-red-800 dark:text-red-200">Ban Reason</h3>
-                    <p className="mt-1 text-red-700 dark:text-red-300">{user.bannedReason}</p>
+                <div className="glass-panel border border-rose-400/30 rounded-lg p-4 text-rose-200">
+                    <h3 className="font-medium text-rose-200">Ban Reason</h3>
+                    <p className="mt-1 text-rose-200/80">{user.bannedReason}</p>
                     {user.bannedAt && (
-                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                        <p className="mt-2 text-sm text-rose-200">
                             Banned on: {new Date(user.bannedAt).toLocaleString()}
                         </p>
                     )}
@@ -226,28 +227,28 @@ export default function AdminUserDetailPage() {
             </div>
 
             {/* User details */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="glass-card p-6">
+                <h2 className="text-lg font-semibold text-white font-display mb-4">
                     User Details
                 </h2>
                 <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">User ID</dt>
-                        <dd className="text-sm font-mono text-gray-900 dark:text-white">{user.id}</dd>
+                        <dt className="text-sm text-faded">User ID</dt>
+                        <dd className="text-sm font-mono text-white font-display">{user.id}</dd>
                     </div>
                     <div>
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Email</dt>
-                        <dd className="text-sm text-gray-900 dark:text-white">{user.email}</dd>
+                        <dt className="text-sm text-faded">Email</dt>
+                        <dd className="text-sm text-white font-display">{user.email}</dd>
                     </div>
                     <div>
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Joined</dt>
-                        <dd className="text-sm text-gray-900 dark:text-white">
+                        <dt className="text-sm text-faded">Joined</dt>
+                        <dd className="text-sm text-white font-display">
                             {new Date(user.createdAt).toLocaleString()}
                         </dd>
                     </div>
                     <div>
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Last Login</dt>
-                        <dd className="text-sm text-gray-900 dark:text-white">
+                        <dt className="text-sm text-faded">Last Login</dt>
+                        <dd className="text-sm text-white font-display">
                             {user.lastLoginAt
                                 ? new Date(user.lastLoginAt).toLocaleString()
                                 : 'Never'}

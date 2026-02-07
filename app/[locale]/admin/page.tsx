@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import AdminStatsCard from '@/components/admin/AdminStatsCard';
 import { AdminDashboardStats } from '@/types/admin';
 
 export default function AdminDashboardPage() {
+    const params = useParams();
+    const locale = (params?.locale as string) || 'en';
     const [stats, setStats] = useState<AdminDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -36,15 +40,15 @@ export default function AdminDashboardPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600" />
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400" />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <p className="text-red-600 dark:text-red-400">{error}</p>
+            <div className="glass-panel border border-rose-400/30 rounded-lg p-4">
+                <p className="text-rose-200">{error}</p>
             </div>
         );
     }
@@ -57,10 +61,10 @@ export default function AdminDashboardPage() {
         <div className="space-y-6">
             {/* Page header */}
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-white font-display">
                     Dashboard
                 </h1>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-sm text-faded">
                     Overview of your Invoice2E platform
                 </p>
             </div>
@@ -120,29 +124,29 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Quick actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="glass-card p-6">
+                <h2 className="text-lg font-semibold text-white font-display mb-4">
                     Quick Actions
                 </h2>
                 <div className="flex flex-wrap gap-4">
-                    <a
-                        href="/en/admin/users"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    <Link
+                        href={`/${locale}/admin/users`}
+                        className="nav-pill nav-pill-active"
                     >
                         Manage Users
-                    </a>
-                    <a
-                        href="/en/admin/packages"
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    </Link>
+                    <Link
+                        href={`/${locale}/admin/packages`}
+                        className="nav-pill nav-pill-active"
                     >
                         Manage Packages
-                    </a>
-                    <a
-                        href="/en/admin/audit-logs"
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    </Link>
+                    <Link
+                        href={`/${locale}/admin/audit-logs`}
+                        className="nav-pill"
                     >
                         View Audit Logs
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

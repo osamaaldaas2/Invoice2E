@@ -137,9 +137,19 @@ export function setSessionCookie(user: {
     firstName: string;
     lastName: string;
     role?: UserRole;
-}): void {
+}): Promise<void> {
+    return setSessionCookieInternal(user);
+}
+
+async function setSessionCookieInternal(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role?: UserRole;
+}): Promise<void> {
     const token = createSessionToken(user);
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
 
     cookieStore.set(SESSION_COOKIE_NAME, token, {
         httpOnly: true,
@@ -163,9 +173,9 @@ export function setSessionCookie(user: {
  * Get session from cookie
  * Returns null if no valid session
  */
-export function getSessionFromCookie(): SessionPayload | null {
+export async function getSessionFromCookie(): Promise<SessionPayload | null> {
     try {
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
         if (!token) {
@@ -182,8 +192,8 @@ export function getSessionFromCookie(): SessionPayload | null {
 /**
  * Clear session cookie (logout)
  */
-export function clearSessionCookie(): void {
-    const cookieStore = cookies();
+export async function clearSessionCookie(): Promise<void> {
+    const cookieStore = await cookies();
 
     cookieStore.set(SESSION_COOKIE_NAME, '', {
         httpOnly: true,

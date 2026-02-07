@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CreditPurchaseForm from '@/components/forms/CreditPurchaseForm';
+import VoucherRedeemForm from '@/components/forms/VoucherRedeemForm';
 
 export default function CreditsPage() {
     const t = useTranslations('credits');
@@ -26,32 +27,39 @@ export default function CreditsPage() {
         };
 
         fetchCredits();
+        const handleCreditsUpdate = () => fetchCredits();
+        window.addEventListener('credits-updated', handleCreditsUpdate);
+        return () => window.removeEventListener('credits-updated', handleCreditsUpdate);
     }, []);
 
     return (
         <DashboardLayout>
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-white font-display">
                     {t('pageTitle')}
                 </h1>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-faded">
                     {t('pageDescription')}
                 </p>
             </div>
 
             <CreditPurchaseForm />
 
+            <div className="mt-6">
+                <VoucherRedeemForm />
+            </div>
+
             {/* Current Balance Card */}
-            <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="mt-6 glass-card p-6">
+                <h3 className="text-lg font-semibold text-white font-display mb-4">
                     {t('yourBalance')}
                 </h3>
                 <div className="flex items-center justify-between">
                     <div>
-                        <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        <div className="text-4xl font-bold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
                             {loading ? '...' : credits ?? 0}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="text-sm text-faded">
                             {t('creditsAvailable')}
                         </div>
                     </div>

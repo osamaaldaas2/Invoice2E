@@ -8,13 +8,13 @@ interface PaymentSectionProps {
 
 export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors }) => {
     return (
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Information</h3>
+        <div className="glass-card p-6">
+            <h3 className="text-lg font-medium text-white mb-4 font-display">Payment Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         IBAN <span className="text-red-500">*</span>
-                        <span className="text-xs text-gray-500 ml-1">(BR-DE-23-a)</span>
+                        <span className="text-xs text-faded ml-1">(BR-DE-23-a)</span>
                     </label>
                     <input
                         type="text"
@@ -23,9 +23,11 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors
                             pattern: {
                                 value: /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/,
                                 message: 'Invalid IBAN format (e.g., DE89370400440532013000)'
-                            }
+                            },
+                            setValueAs: (value) =>
+                                typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value
                         })}
-                        className={`w-full p-2 border rounded-md ${errors?.sellerIban ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors?.sellerIban ? 'border-rose-400/60' : 'border-white/10'} text-white`}
                         placeholder="DE89370400440532013000"
                     />
                     {errors?.sellerIban && (
@@ -34,35 +36,35 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         BIC (Swift)
                     </label>
                     <input
                         type="text"
-                        {...register('bic')}
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        {...register('sellerBic')}
+                        className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         Bank Name
                     </label>
                     <input
                         type="text"
                         {...register('bankName')}
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white"
                     />
                 </div>
 
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
                         Payment Terms / Notes
                     </label>
                     <textarea
                         {...register('paymentTerms')}
                         rows={3}
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white"
                     />
                 </div>
             </div>

@@ -9,6 +9,9 @@ export interface ExtractedInvoiceData {
     sellerEmail: string | null;
     sellerAddress: string | null;
     sellerTaxId: string | null;
+    sellerIban?: string | null;
+    sellerBic?: string | null;
+    bankName?: string | null;
     lineItems: Array<{
         description: string;
         quantity: number;
@@ -17,6 +20,7 @@ export interface ExtractedInvoiceData {
         taxRate?: number;
     }>;
     subtotal: number;
+    taxRate?: number | null;
     taxAmount: number;
     totalAmount: number;
     currency: string;

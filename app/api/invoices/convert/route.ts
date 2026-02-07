@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { xrechnungService } from '@/services/xrechnung.service';
 import { ublService } from '@/services/ubl.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { creditsDbService } from '@/services/credits.db.service';
 import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
@@ -46,30 +45,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     error: 'Missing required fields: conversionId or invoiceData',
                 },
                 { status: 400 }
-            );
-        }
-
-        // Check if user has enough credits BEFORE conversion
-        try {
-            const userCredits = await creditsDbService.getUserCredits(userId);
-            logger.info('User credits check', { userId, availableCredits: userCredits.availableCredits });
-
-            if (userCredits.availableCredits < 1) {
-                logger.warn('Insufficient credits for conversion', { userId, availableCredits: userCredits.availableCredits });
-                return NextResponse.json(
-                    {
-                        success: false,
-                        error: 'Insufficient credits. Please purchase more credits to continue.',
-                        errorCode: 'INSUFFICIENT_CREDITS',
-                    },
-                    { status: 402 } // 402 Payment Required
-                );
-            }
-        } catch (creditError) {
-            logger.error('Failed to check user credits', { userId, error: creditError });
-            return NextResponse.json(
-                { success: false, error: 'Failed to verify credits. Please try again.' },
-                { status: 500 }
             );
         }
 
@@ -228,7 +203,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        // Update conversion and deduct credits transactionally
+        // Update conversion status after successful generation
         try {
             // conversionId from frontend is actually extractionId, resolve to actual conversion ID
             const conversion = await invoiceDbService.getConversionByExtractionId(conversionId);
@@ -242,35 +217,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
 
             const actualConversionId = conversion.id;
-            logger.info('Processing conversion transaction', {
+            logger.info('Updating conversion record', {
                 extractionId: conversionId,
                 conversionId: actualConversionId,
                 userId
             });
 
-            // First, update validation status (without marking as completed)
+            // Update validation status and mark conversion as completed
             await invoiceDbService.updateConversion(actualConversionId, {
                 validationStatus: result.validationStatus,
                 validationErrors: result.validationErrors.length > 0
                     ? { errors: result.validationErrors } as Record<string, unknown>
                     : undefined,
+                conversionStatus: 'completed',
             });
 
-            // Then execute transaction
-            const txResult = await invoiceDbService.processConversionTransaction(userId, actualConversionId);
-
-            if (!txResult.success) {
-                logger.error('Transaction failed', { error: txResult.error });
-                return NextResponse.json(
-                    { success: false, error: txResult.error || 'Transaction failed' },
-                    { status: 500 }
-                );
-            }
-
-            logger.info('Conversion transaction successful', { remainingCredits: txResult.remainingCredits });
+            // Mark extraction as completed
+            await invoiceDbService.updateExtraction(conversionId, { status: 'completed' });
         } catch (txError) {
-            // FIX (BUG-050): Removed console.error debug logging - use structured logger only
-            logger.error('Transaction error', {
+            logger.error('Failed to update conversion status', {
                 userId,
                 conversionId,
                 errorMessage: txError instanceof Error ? txError.message : String(txError),
@@ -278,7 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 errorType: txError instanceof Error ? txError.constructor.name : typeof txError
             });
             return NextResponse.json(
-                { success: false, error: 'Payment transaction failed. Please try again.' },
+                { success: false, error: 'Failed to update conversion status. Please try again.' },
                 { status: 500 }
             );
         }

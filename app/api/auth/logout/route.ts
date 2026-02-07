@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 export async function POST(): Promise<NextResponse> {
     try {
         // Clear the session cookie
-        clearSessionCookie();
+        await clearSessionCookie();
 
         logger.info('User logged out');
 

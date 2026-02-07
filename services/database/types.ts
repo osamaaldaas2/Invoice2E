@@ -25,6 +25,7 @@ export type CreateExtractionData = {
     extractionData: Record<string, unknown>;
     confidenceScore?: number;
     geminiResponseTimeMs?: number;
+    status?: string;
 };
 
 export type CreateConversionData = {
@@ -34,9 +35,13 @@ export type CreateConversionData = {
     buyerName?: string;
     conversionFormat: string;
     creditsUsed?: number;
+    conversionStatus?: string;
 };
 
 export type UpdateConversionData = {
+    invoiceNumber?: string;
+    buyerName?: string;
+    conversionFormat?: string;
     validationStatus?: string;
     validationErrors?: Record<string, unknown>;
     conversionStatus?: string;

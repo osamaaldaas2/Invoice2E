@@ -41,9 +41,9 @@ export default function DashboardStats() {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-6 animate-pulse">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
-                        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                    <div key={i} className="glass-card p-6 animate-pulse">
+                        <div className="h-4 bg-white/10 rounded w-1/2 mb-2"></div>
+                        <div className="h-8 bg-white/10 rounded w-3/4"></div>
                     </div>
                 ))}
             </div>
@@ -52,7 +52,7 @@ export default function DashboardStats() {
 
     if (error) {
         return (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl">
+            <div className="glass-panel text-red-200 p-4 rounded-xl border border-red-400/30">
                 {error}
             </div>
         );
@@ -90,10 +90,10 @@ export default function DashboardStats() {
             {statCards.map((card, index) => (
                 <div
                     key={index}
-                    className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                    className="glass-card p-6 hover:shadow-[0_20px_50px_-30px_rgba(2,6,23,0.8)] transition-shadow"
                 >
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                        <span className="text-faded text-sm font-medium">
                             {card.label}
                         </span>
                         <span className="text-2xl">{card.icon}</span>

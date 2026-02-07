@@ -163,10 +163,10 @@ export default function AdminPackagesPage() {
             {/* Page header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-2xl font-bold text-white font-display">
                         Credit Packages
                     </h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-sm text-faded">
                         Manage credit packages available for purchase
                     </p>
                 </div>
@@ -184,11 +184,11 @@ export default function AdminPackagesPage() {
 
             {/* Error state */}
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-600 dark:text-red-400">{error}</p>
+                <div className="glass-panel border border-rose-400/30 rounded-lg p-4 text-rose-200">
+                    <p className="text-rose-200">{error}</p>
                     <button
                         onClick={() => setError(null)}
-                        className="mt-2 text-sm text-red-500 hover:text-red-700"
+                        className="mt-2 text-sm text-rose-200 hover:text-rose-100"
                     >
                         Dismiss
                     </button>
@@ -205,10 +205,10 @@ export default function AdminPackagesPage() {
                     {packages.map((pkg) => (
                         <div
                             key={pkg.id}
-                            className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border ${
+                            className={`glass-card border ${
                                 pkg.isFeatured
                                     ? 'border-red-500 ring-2 ring-red-500/20'
-                                    : 'border-gray-200 dark:border-gray-700'
+                                    : 'border-white/10'
                             } overflow-hidden`}
                         >
                             {/* Featured badge */}
@@ -222,20 +222,20 @@ export default function AdminPackagesPage() {
                                 {/* Package header */}
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <h3 className="text-lg font-semibold text-white font-display">
                                             {pkg.name}
                                         </h3>
                                         {pkg.description && (
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            <p className="text-sm text-faded mt-1">
                                                 {pkg.description}
                                             </p>
                                         )}
                                     </div>
                                     <span
-                                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        className={`px-2 py-1 text-xs font-medium rounded-full border ${
                                             pkg.isActive
-                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+                                                ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30'
+                                                : 'bg-white/5 text-slate-300 border-white/10'
                                         }`}
                                     >
                                         {pkg.isActive ? 'Active' : 'Inactive'}
@@ -245,26 +245,26 @@ export default function AdminPackagesPage() {
                                 {/* Package details */}
                                 <div className="space-y-3 mb-6">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Credits</span>
-                                        <span className="font-semibold text-gray-900 dark:text-white">
+                                        <span className="text-faded">Credits</span>
+                                        <span className="font-semibold text-white font-display">
                                             {pkg.credits}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Price</span>
-                                        <span className="font-semibold text-gray-900 dark:text-white">
+                                        <span className="text-faded">Price</span>
+                                        <span className="font-semibold text-white font-display">
                                             {formatCurrency(pkg.price, pkg.currency)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Per Credit</span>
-                                        <span className="text-gray-900 dark:text-white">
+                                        <span className="text-faded">Per Credit</span>
+                                        <span className="text-white font-display">
                                             {formatCurrency(pkg.price / pkg.credits, pkg.currency)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Sort Order</span>
-                                        <span className="text-gray-900 dark:text-white">{pkg.sortOrder}</span>
+                                        <span className="text-faded">Sort Order</span>
+                                        <span className="text-white font-display">{pkg.sortOrder}</span>
                                     </div>
                                 </div>
 
@@ -272,14 +272,14 @@ export default function AdminPackagesPage() {
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => openEditModal(pkg)}
-                                        className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+                                        className="flex-1 px-4 py-2 text-slate-200 bg-white/5 rounded-lg hover:bg-white/10"
                                     >
                                         Edit
                                     </button>
                                     <button
                                         onClick={() => handleDelete(pkg)}
                                         disabled={deleting === pkg.id}
-                                        className="px-4 py-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 disabled:opacity-50"
+                                        className="px-4 py-2 text-rose-200 glass-panel border border-rose-400/30 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 disabled:opacity-50"
                                     >
                                         {deleting === pkg.id ? '...' : 'Delete'}
                                     </button>
@@ -289,7 +289,7 @@ export default function AdminPackagesPage() {
                     ))}
 
                     {packages.length === 0 && (
-                        <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">
+                        <div className="col-span-full text-center py-12 text-faded">
                             No packages found. Create your first package to get started.
                         </div>
                     )}
@@ -299,35 +299,35 @@ export default function AdminPackagesPage() {
             {/* Create/Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    <div className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-lg font-semibold text-white font-display mb-4">
                             {editingPackage ? 'Edit Package' : 'Create Package'}
                         </h3>
 
                         <div className="space-y-4">
                             {/* Name */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-medium text-slate-200 mb-1">
                                     Name *
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                     placeholder="e.g., Starter Pack"
                                 />
                             </div>
 
                             {/* Description */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                <label className="block text-sm font-medium text-slate-200 mb-1">
                                     Description
                                 </label>
                                 <textarea
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                     rows={2}
                                     placeholder="Optional description..."
                                 />
@@ -336,26 +336,26 @@ export default function AdminPackagesPage() {
                             {/* Credits and Price */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    <label className="block text-sm font-medium text-slate-200 mb-1">
                                         Credits *
                                     </label>
                                     <input
                                         type="number"
                                         value={formData.credits}
                                         onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                         min="1"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    <label className="block text-sm font-medium text-slate-200 mb-1">
                                         Price *
                                     </label>
                                     <input
                                         type="number"
                                         value={formData.price}
                                         onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                         min="0"
                                         step="0.01"
                                     />
@@ -365,13 +365,13 @@ export default function AdminPackagesPage() {
                             {/* Currency and Sort Order */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    <label className="block text-sm font-medium text-slate-200 mb-1">
                                         Currency
                                     </label>
                                     <select
                                         value={formData.currency}
                                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                     >
                                         <option value="EUR">EUR</option>
                                         <option value="USD">USD</option>
@@ -379,14 +379,14 @@ export default function AdminPackagesPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    <label className="block text-sm font-medium text-slate-200 mb-1">
                                         Sort Order
                                     </label>
                                     <input
                                         type="number"
                                         value={formData.sortOrder}
                                         onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                     />
                                 </div>
                             </div>
@@ -398,18 +398,18 @@ export default function AdminPackagesPage() {
                                         type="checkbox"
                                         checked={formData.isActive}
                                         onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                                        className="w-4 h-4 text-rose-300 rounded focus:ring-rose-400/60"
                                     />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
+                                    <span className="text-sm text-slate-200">Active</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={formData.isFeatured}
                                         onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                                        className="w-4 h-4 text-rose-300 rounded focus:ring-rose-400/60"
                                     />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Featured</span>
+                                    <span className="text-sm text-slate-200">Featured</span>
                                 </label>
                             </div>
                         </div>
@@ -417,7 +417,7 @@ export default function AdminPackagesPage() {
                         <div className="flex gap-3 justify-end mt-6">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                className="px-4 py-2 text-slate-200 hover:bg-white/10 rounded-lg"
                             >
                                 Cancel
                             </button>

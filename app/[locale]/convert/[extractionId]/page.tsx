@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { fetchSessionUser } from '@/lib/client-auth';
 
 type User = {
     id: string;
@@ -15,6 +16,22 @@ export default function ConvertPage() {
     const router = useRouter();
     const params = useParams();
     const extractionId = params.extractionId as string;
+    const locale = (params.locale as string) || 'en';
+
+    const withLocale = useMemo(() => {
+        return (path: string) => {
+            if (!path.startsWith('/')) {
+                return `/${locale}/${path}`;
+            }
+            if (path === '/') {
+                return `/${locale}`;
+            }
+            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
+                return path;
+            }
+            return `/${locale}${path}`;
+        };
+    }, [locale]);
 
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -26,21 +43,21 @@ export default function ConvertPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const userData = localStorage.getItem('user');
-                if (!userData) {
-                    router.push('/login');
+                const sessionUser = await fetchSessionUser();
+                if (!sessionUser) {
+                    router.push(withLocale('/login'));
                     return;
                 }
 
-                setUser(JSON.parse(userData));
+                setUser(sessionUser);
                 setLoading(false);
             } catch {
-                router.push('/login');
+                router.push(withLocale('/login'));
             }
         };
 
         loadData();
-    }, [router]);
+    }, [router, withLocale]);
 
     const handleConvert = async () => {
         setConverting(true);
@@ -96,8 +113,8 @@ export default function ConvertPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400" />
             </div>
         );
     }
@@ -108,38 +125,34 @@ export default function ConvertPage() {
 
     return (
         <ProtectedRoute fallbackUrl="/login">
-            <div className="min-h-screen bg-gray-50">
-                {/* Header */}
-                <header className="bg-white shadow-sm border-b">
-                    <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-blue-600">Invoice2E</h1>
-                        <button
-                            onClick={() => router.push('/dashboard')}
-                            className="px-4 py-2 text-gray-600 hover:text-gray-900"
-                        >
-                            Exit
-                        </button>
-                    </div>
-                </header>
-
+            <div className="min-h-screen">
                 {/* Progress Steps */}
-                <div className="bg-white border-b mb-8">
+                <div className="bg-slate-950/70 border-b border-white/10 backdrop-blur-xl mb-8">
                     <div className="container mx-auto px-4 py-4">
-                        <div className="flex items-center justify-center gap-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="w-20" />
+                            <div className="flex-1 flex items-center justify-center gap-4">
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
-                                <span className="text-green-600 font-medium">Upload</span>
+                                <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center text-white">✓</div>
+                                <span className="text-emerald-200 font-medium">Upload</span>
                             </div>
-                            <div className="h-px w-12 bg-green-300" />
+                            <div className="h-px w-12 bg-emerald-400/30" />
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
-                                <span className="text-green-600 font-medium">Review</span>
+                                <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center text-white">✓</div>
+                                <span className="text-emerald-200 font-medium">Review</span>
                             </div>
-                            <div className="h-px w-12 bg-blue-300" />
+                            <div className="h-px w-12 bg-sky-500/30" />
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white">3</div>
-                                <span className="text-blue-600 font-medium">Convert</span>
+                                <div className="w-8 h-8 bg-sky-500/20 rounded-full flex items-center justify-center text-white">3</div>
+                                <span className="text-sky-200 font-medium">Convert</span>
                             </div>
+                            </div>
+                            <button
+                                onClick={() => router.push(withLocale('/dashboard'))}
+                                className="px-4 py-2 text-faded hover:text-white"
+                            >
+                                Exit
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -147,32 +160,32 @@ export default function ConvertPage() {
                 <div className="container mx-auto px-4 py-8">
                     <div className="max-w-2xl mx-auto">
                         <div className="mb-8 text-center">
-                            <h1 className="text-3xl font-bold text-gray-900 mb-2">Convert to XRechnung</h1>
-                            <p className="text-gray-600">
+                            <h1 className="text-3xl font-bold text-white mb-2">Convert to XRechnung</h1>
+                            <p className="text-faded">
                                 Generate compliant XRechnung 3.0 XML from your validated invoice data.
                             </p>
                         </div>
 
-                        <div className="bg-white border rounded-xl shadow-sm p-8">
+                        <div className="glass-card p-8">
                             <div className="space-y-6">
-                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                                    <h3 className="font-semibold text-blue-900 flex items-center gap-2">
+                                <div className="p-4 glass-panel rounded-lg border border-white/10">
+                                    <h3 className="font-semibold text-sky-200 flex items-center gap-2">
                                         ℹ️ What is XRechnung?
                                     </h3>
-                                    <p className="text-sm text-blue-800 mt-2">
+                                    <p className="text-sm text-faded mt-2">
                                         XRechnung is the standard for electronic invoicing in Germany (CEN/TC 434).
                                         It ensures your invoice is machine-readable and compliant with EU regulations.
                                     </p>
                                 </div>
 
                                 {error && (
-                                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+                                    <div className="p-4 glass-panel border border-rose-400/30 rounded-xl text-rose-200">
                                         ❌ {error}
                                     </div>
                                 )}
 
                                 {success && (
-                                    <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-700">
+                                    <div className="p-4 glass-panel border border-emerald-400/30 rounded-xl text-emerald-200">
                                         ✅ {success}
                                     </div>
                                 )}
@@ -181,7 +194,7 @@ export default function ConvertPage() {
                                     <button
                                         onClick={handleConvert}
                                         disabled={converting}
-                                        className="w-full px-6 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
+                                        className="w-full px-6 py-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-bold text-lg hover:brightness-110 disabled:opacity-50 transition-colors shadow-lg shadow-sky-500/30"
                                     >
                                         {converting ? (
                                             <span className="flex items-center justify-center gap-2">
@@ -194,26 +207,26 @@ export default function ConvertPage() {
                                     </button>
                                 ) : (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="p-4 bg-gray-50 border rounded-lg">
+                                        <div className="p-4 glass-panel border border-white/10 rounded-lg">
                                             <div className="flex justify-between items-center mb-2">
-                                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">XML Preview</span>
-                                                <span className="text-xs text-gray-400">invoice_xrechnung.xml</span>
+                                                <span className="text-xs font-semibold text-faded uppercase tracking-wider">XML Preview</span>
+                                                <span className="text-xs text-faded">invoice_xrechnung.xml</span>
                                             </div>
-                                            <pre className="text-xs text-gray-700 font-mono overflow-x-auto p-2 bg-white border rounded h-48">
+                                            <pre className="text-xs text-slate-200 font-mono overflow-x-auto p-2 bg-slate-950/80 border border-white/10 rounded-xl h-48">
                                                 {xmlContent}
                                             </pre>
                                         </div>
 
                                         <button
                                             onClick={handleDownload}
-                                            className="w-full px-6 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors shadow-lg shadow-green-200 flex items-center justify-center gap-2"
+                                            className="w-full px-6 py-4 bg-gradient-to-r from-emerald-400 to-green-500 text-white rounded-full font-bold text-lg hover:brightness-110 transition-colors shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                                         >
                                             📥 Download XML File
                                         </button>
 
                                         <button
-                                            onClick={() => router.push('/dashboard')}
-                                            className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                                            onClick={() => router.push(withLocale('/dashboard'))}
+                                            className="w-full px-6 py-3 bg-white/5 text-slate-100 border border-white/10 rounded-full font-semibold hover:bg-white/10 transition-colors"
                                         >
                                             Start New Invoice
                                         </button>

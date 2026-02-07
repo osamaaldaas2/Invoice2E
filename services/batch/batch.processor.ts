@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
+import { creditsDbService } from '@/services/credits.db.service';
 import { xrechnungService } from '@/services/xrechnung.service';
 import { ublService } from '@/services/ubl.service';
 import { BatchResult } from './types';
@@ -28,6 +29,20 @@ export class BatchProcessor {
 
         // FIX (BUG-020): Wrap entire processing in try/catch to handle unexpected failures
         try {
+            // Fetch batch job owner for credit deduction
+            const { data: job, error: jobError } = await supabase
+                .from('batch_jobs')
+                .select('user_id')
+                .eq('id', jobId)
+                .single();
+
+            if (jobError || !job?.user_id) {
+                logger.error('Failed to resolve batch job owner', { jobId, error: jobError?.message });
+                throw new Error('Batch job not found');
+            }
+
+            const userId = job.user_id as string;
+
             // Update status to processing
             await supabase
                 .from('batch_jobs')
@@ -44,6 +59,32 @@ export class BatchProcessor {
                 try {
                     // Extract invoice data using AI
                     const extractedData = await extractor.extractFromFile(file.content, file.name, 'application/pdf');
+
+                    // Deduct credits AFTER successful extraction
+                    const deducted = await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
+                    if (!deducted) {
+                        result = {
+                            filename: file.name,
+                            status: 'failed' as const,
+                            error: 'Insufficient credits during batch processing',
+                        };
+                        results.push(result);
+
+                        // Update progress after failure
+                        const successCount = results.filter(r => r.status === 'success').length;
+                        const failCount = results.filter(r => r.status === 'failed').length;
+
+                        await supabase
+                            .from('batch_jobs')
+                            .update({
+                                completed_files: successCount,
+                                failed_files: failCount,
+                                results: results,
+                            })
+                            .eq('id', jobId);
+
+                        continue;
+                    }
 
                     // Generate XML based on format
                     let xml: string;

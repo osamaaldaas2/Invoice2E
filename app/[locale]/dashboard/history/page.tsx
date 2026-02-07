@@ -10,10 +10,10 @@ export default function HistoryPage() {
     return (
         <DashboardLayout>
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-white font-display">
                     {t('pageTitle')}
                 </h1>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-faded">
                     {t('pageDescription')}
                 </p>
             </div>

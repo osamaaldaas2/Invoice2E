@@ -48,14 +48,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const changes = reviewService.trackChanges(extractionData, reviewedData);
         const accuracy = reviewService.calculateAccuracy(extractionData, reviewedData);
 
-        // Create conversion record
-        const conversion = await invoiceDbService.createConversion({
-            userId,
-            extractionId,
-            invoiceNumber: reviewedData.invoiceNumber,
-            buyerName: reviewedData.buyerName,
-            conversionFormat: 'xrechnung',
+        // Persist reviewed data back to extraction for resume/download flow
+        await invoiceDbService.updateExtraction(extractionId, {
+            extractionData: reviewedData,
+            status: 'draft',
         });
+
+        // Create or update conversion record
+        const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+        const conversion = existingConversion
+            ? await invoiceDbService.updateConversion(existingConversion.id, {
+                invoiceNumber: reviewedData.invoiceNumber,
+                buyerName: reviewedData.buyerName,
+                conversionFormat: 'xrechnung',
+                conversionStatus: 'draft',
+            })
+            : await invoiceDbService.createConversion({
+                userId,
+                extractionId,
+                invoiceNumber: reviewedData.invoiceNumber,
+                buyerName: reviewedData.buyerName,
+                conversionFormat: 'xrechnung',
+                conversionStatus: 'draft',
+            });
 
         logger.info('Invoice review completed', {
             extractionId,

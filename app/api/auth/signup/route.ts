@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/services/auth.service';
 import { logger } from '@/lib/logger';
 import { ValidationError, AppError } from '@/lib/errors';
+import { setSessionCookie } from '@/lib/session';
 import { ZodError } from 'zod';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -11,6 +12,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const user = await authService.signup(body);
 
         logger.info('Signup successful', { userId: user.id });
+
+        // Set session cookie so backend recognizes the new user as logged in
+        await setSessionCookie(user);
 
         return NextResponse.json(
             {

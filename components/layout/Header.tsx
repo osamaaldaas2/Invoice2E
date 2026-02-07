@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { APP_NAME } from '@/lib/constants';
+import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
 
 type User = {
     id: string;
@@ -16,36 +17,80 @@ type User = {
 export default function Header(): React.ReactElement {
     const t = useTranslations('common');
     const router = useRouter();
+    const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [mounted, setMounted] = useState(false);
 
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const withLocale = useMemo(() => {
+        return (path: string) => {
+            if (!path.startsWith('/')) {
+                return `/${locale}/${path}`;
+            }
+            if (path === '/') {
+                return `/${locale}`;
+            }
+            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
+                return path;
+            }
+            return `/${locale}${path}`;
+        };
+    }, [locale]);
+
     useEffect(() => {
         setMounted(true);
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            try {
-                setUser(JSON.parse(userData));
-            } catch {
-                // Invalid user data
-            }
-        }
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('user');
-        setUser(null);
-        router.push('/');
+    useEffect(() => {
+        const loadUser = async () => {
+            try {
+                const sessionUser = await fetchSessionUser();
+                setUser(sessionUser);
+            } catch {
+                setUser(null);
+            }
+        };
+
+        void loadUser();
+
+        const handleAuthChanged = () => void loadUser();
+        window.addEventListener('auth-changed', handleAuthChanged);
+        window.addEventListener('profile-updated', handleAuthChanged);
+
+        return () => {
+            window.removeEventListener('auth-changed', handleAuthChanged);
+            window.removeEventListener('profile-updated', handleAuthChanged);
+        };
+    }, [pathname]);
+
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+        } catch {
+            // Ignore logout API errors
+        } finally {
+            emitAuthChanged();
+            setUser(null);
+            router.push(withLocale('/'));
+        }
     };
 
     // Prevent hydration mismatch by not rendering auth buttons until mounted
     if (!mounted) {
         return (
-            <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
                 <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-                    <Link href="/" className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
+                    <Link
+                        href={withLocale('/')}
+                        className="text-2xl font-semibold font-display tracking-tight gradient-text hover:opacity-90 transition-opacity"
+                    >
                         {APP_NAME}
                     </Link>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         {/* Placeholder for hydration */}
                     </div>
                 </nav>
@@ -54,26 +99,32 @@ export default function Header(): React.ReactElement {
     }
 
     return (
-        <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
             <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-                <Link href="/" className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
+                <Link
+                    href={withLocale('/')}
+                    className="text-2xl font-semibold font-display tracking-tight gradient-text hover:opacity-90 transition-opacity"
+                >
                     {APP_NAME}
                 </Link>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {user ? (
                         <>
-                            <span className="text-muted-foreground hidden sm:inline">
-                                {user.firstName}
-                            </span>
                             <Link
-                                href="/dashboard"
-                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
+                                href={withLocale('/dashboard/profile')}
+                                className={`nav-pill ${pathname === withLocale('/dashboard/profile') ? 'nav-pill-active' : ''}`}
+                            >
+                                {t('profile')}
+                            </Link>
+                            <Link
+                                href={withLocale('/dashboard')}
+                                className={`nav-pill ${pathname === withLocale('/dashboard') ? 'nav-pill-active' : ''}`}
                             >
                                 Dashboard
                             </Link>
                             <button
                                 onClick={handleLogout}
-                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                className="nav-pill"
                             >
                                 {t('logout')}
                             </button>
@@ -81,14 +132,14 @@ export default function Header(): React.ReactElement {
                     ) : (
                         <>
                             <Link
-                                href="/auth/login"
-                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                href={withLocale('/login')}
+                                className="nav-pill"
                             >
                                 {t('login')}
                             </Link>
                             <Link
-                                href="/auth/signup"
-                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
+                                href={withLocale('/signup')}
+                                className="nav-pill nav-pill-active"
                             >
                                 {t('signup')}
                             </Link>

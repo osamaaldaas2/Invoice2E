@@ -10,6 +10,7 @@ export type CreateExtractionData = {
     extractionData: Record<string, unknown>;
     confidenceScore?: number;
     geminiResponseTimeMs?: number;
+    status?: string;
 };
 
 export type CreateConversionData = {
@@ -19,9 +20,13 @@ export type CreateConversionData = {
     buyerName?: string;
     conversionFormat: string;
     creditsUsed?: number;
+    conversionStatus?: string;
 };
 
 export type UpdateConversionData = {
+    invoiceNumber?: string;
+    buyerName?: string;
+    conversionFormat?: string;
     validationStatus?: string;
     validationErrors?: Record<string, unknown>;
     conversionStatus?: string;
@@ -107,6 +112,42 @@ export class InvoiceDatabaseService {
         }
 
         return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceExtraction);
+    }
+
+    async updateExtraction(
+        extractionId: string,
+        data: { status?: string; extractionData?: Record<string, unknown> }
+    ): Promise<InvoiceExtraction> {
+        const supabase = this.getAdminClient();
+        const snakeData = camelToSnakeKeys(data);
+
+        const { data: extraction, error } = await supabase
+            .from('invoice_extractions')
+            .update(snakeData)
+            .eq('id', extractionId)
+            .select()
+            .single();
+
+        if (error) {
+            logger.error('Failed to update extraction', { extractionId, error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
+        }
+
+        return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    }
+
+    async deleteExtraction(extractionId: string): Promise<void> {
+        const supabase = this.getAdminClient();
+
+        const { error } = await supabase
+            .from('invoice_extractions')
+            .delete()
+            .eq('id', extractionId);
+
+        if (error) {
+            logger.error('Failed to delete extraction', { extractionId, error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to delete extraction', 500);
+        }
     }
 
     async createConversion(data: CreateConversionData): Promise<InvoiceConversion> {

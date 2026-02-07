@@ -4,48 +4,48 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --background: 228 28% 8%;
+    --foreground: 210 40% 96%;
+    --card: 228 26% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 228 26% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 212 92% 62%;
+    --primary-foreground: 220 40% 10%;
+    --secondary: 224 20% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 225 16% 18%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 24 94% 60%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 76% 56%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 220 22% 20%;
+    --input: 220 22% 20%;
+    --ring: 212 92% 62%;
+    --radius: 1rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 228 28% 8%;
+    --foreground: 210 40% 96%;
+    --card: 228 26% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 228 26% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 212 92% 62%;
+    --primary-foreground: 220 40% 10%;
+    --secondary: 224 20% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 225 16% 18%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 24 94% 60%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 76% 56%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 220 22% 20%;
+    --input: 220 22% 20%;
+    --ring: 212 92% 62%;
   }
 }
 
@@ -55,7 +55,80 @@
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(1200px circle at 12% 0%, rgba(56, 189, 248, 0.18), transparent 55%),
+      radial-gradient(900px circle at 88% 10%, rgba(249, 115, 22, 0.16), transparent 50%),
+      linear-gradient(180deg, #0b0f1a 0%, #090d17 35%, #070a12 100%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display, ui-sans-serif);
+    letter-spacing: -0.02em;
+  }
+
+  p,
+  span,
+  li,
+  input,
+  textarea,
+  button {
+    font-family: var(--font-body, ui-sans-serif);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/5 border border-white/10 shadow-[0_30px_60px_-28px_rgba(2,6,23,0.8)] backdrop-blur-xl;
+  }
+
+  .glass-card {
+    @apply glass-panel rounded-2xl;
+  }
+
+  .glass-card-strong {
+    @apply bg-white/10 border border-white/15 shadow-[0_30px_70px_-32px_rgba(2,6,23,0.85)] backdrop-blur-2xl rounded-2xl;
+  }
+
+  .surface-outline {
+    @apply border border-white/10;
+  }
+
+  .nav-pill {
+    @apply rounded-full px-4 py-2 text-sm font-semibold text-slate-200 bg-white/5 border border-white/10 hover:bg-white/10 transition;
+  }
+
+  .nav-pill-active {
+    @apply bg-gradient-to-r from-sky-400/20 via-blue-500/10 to-sky-500/20 text-sky-100 border-sky-300/30 shadow-[0_0_24px_rgba(56,189,248,0.25)];
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-slate-200 bg-white/5 border border-white/10;
+  }
+
+  .gradient-text {
+    background: linear-gradient(90deg, #7dd3fc 0%, #60a5fa 45%, #f97316 100%);
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .glow-ring {
+    box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.1), 0 0 30px rgba(56, 189, 248, 0.2);
+  }
+}
+
+@layer utilities {
+  .text-muted {
+    @apply text-slate-300/80;
+  }
+
+  .text-faded {
+    @apply text-slate-400/80;
   }
 }

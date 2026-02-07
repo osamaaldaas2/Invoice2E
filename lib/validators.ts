@@ -17,6 +17,12 @@ export const SignupSchema = z.object({
     password: PasswordSchema,
     firstName: z.string().min(2, 'First name too short'),
     lastName: z.string().min(2, 'Last name too short'),
+    addressLine1: z.string().min(2, 'Address is required'),
+    addressLine2: z.string().optional(),
+    city: z.string().min(2, 'City is required'),
+    postalCode: z.string().min(3, 'Postal code is required').max(10, 'Postal code too long'),
+    country: z.string().length(2, 'Country must be 2-letter code'),
+    phone: z.string().min(4, 'Phone is required'),
 });
 
 // Login form validation schema

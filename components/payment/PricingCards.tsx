@@ -49,13 +49,13 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
         return (
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
                 {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-card rounded-lg p-6 animate-pulse">
-                        <div className="h-8 bg-muted rounded w-32 mb-4" />
-                        <div className="h-4 bg-muted rounded w-48 mb-6" />
-                        <div className="h-12 bg-muted rounded w-24 mb-6" />
+                    <div key={i} className="glass-card p-6 animate-pulse">
+                        <div className="h-8 bg-white/10 rounded w-32 mb-4" />
+                        <div className="h-4 bg-white/10 rounded w-48 mb-6" />
+                        <div className="h-12 bg-white/10 rounded w-24 mb-6" />
                         <div className="space-y-2">
                             {[1, 2, 3, 4].map((j) => (
-                                <div key={j} className="h-4 bg-muted rounded w-full" />
+                                <div key={j} className="h-4 bg-white/10 rounded w-full" />
                             ))}
                         </div>
                     </div>
@@ -70,25 +70,25 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                 <div
                     key={pkg.id}
                     className={cn(
-                        'relative bg-card rounded-lg border p-6 transition-all',
-                        pkg.is_popular && 'border-primary shadow-lg scale-105 z-10'
+                        'relative glass-card border border-white/10 p-6 transition-all',
+                        pkg.is_popular && 'border-sky-300/40 shadow-[0_0_32px_rgba(56,189,248,0.25)] scale-105 z-10'
                     )}
                 >
                     {pkg.is_popular && (
-                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-sky-500/20 text-sky-100 border border-sky-300/30 text-xs font-medium px-3 py-1 rounded-full">
                             {locale === 'de' ? 'Am beliebtesten' : 'Most Popular'}
                         </span>
                     )}
 
-                    <h3 className="text-2xl font-bold mb-2">{getLocalizedName(pkg)}</h3>
-                    <p className="text-muted-foreground mb-4">{getLocalizedDescription(pkg)}</p>
+                    <h3 className="text-2xl font-bold mb-2 text-white font-display">{getLocalizedName(pkg)}</h3>
+                    <p className="text-faded mb-4">{getLocalizedDescription(pkg)}</p>
 
                     <div className="mb-6">
                         <span className="text-4xl font-bold">
                             {pkg.currency === 'EUR' ? '€' : '$'}{pkg.price}
                         </span>
                         {pkg.savings_percent && (
-                            <span className="ml-2 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded">
+                            <span className="ml-2 bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 text-xs font-medium px-2 py-1 rounded">
                                 {locale === 'de' ? 'Spare' : 'Save'} {pkg.savings_percent}%
                             </span>
                         )}
@@ -132,7 +132,7 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
 
 function CheckIcon() {
     return (
-        <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-5 w-5 text-emerald-300 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
     );

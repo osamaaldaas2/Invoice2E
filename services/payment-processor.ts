@@ -65,8 +65,9 @@ export class PaymentProcessor {
         }
 
         // Create pending transaction record
+        // FIX (QA-BUG-5): Check for insertion errors before proceeding
         const supabase = createServerClient();
-        await supabase.from('payment_transactions').insert({
+        const { error: insertError } = await supabase.from('payment_transactions').insert({
             user_id: userId,
             amount: pkg.price / 100,
             currency: pkg.currency,
@@ -75,6 +76,15 @@ export class PaymentProcessor {
             payment_status: 'pending',
             email,
         });
+
+        if (insertError) {
+            logger.error('Failed to create payment transaction', {
+                userId,
+                packageId,
+                error: insertError.message
+            });
+            throw new Error('Unable to start payment process. Please try again.');
+        }
 
         if (method === 'stripe') {
             if (!stripeService.isConfigured()) {

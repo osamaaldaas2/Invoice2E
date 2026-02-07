@@ -112,6 +112,7 @@ export type PaginatedResponse<T> = ApiResponse<{
 
 // Extraction status enum
 export const ExtractionStatus = {
+    DRAFT: 'draft',
     PENDING: 'pending',
     PROCESSING: 'processing',
     COMPLETED: 'completed',
@@ -122,6 +123,7 @@ export type ExtractionStatusType = (typeof ExtractionStatus)[keyof typeof Extrac
 
 // Conversion status enum
 export const ConversionStatus = {
+    DRAFT: 'draft',
     PENDING: 'pending',
     VALIDATING: 'validating',
     VALIDATED: 'validated',
@@ -155,6 +157,9 @@ export interface ExtractedInvoiceData {
     sellerEmail: string | null;
     sellerAddress: string | null;
     sellerTaxId: string | null;
+    sellerIban?: string | null;
+    sellerBic?: string | null;
+    bankName?: string | null;
     lineItems: Array<{
         description: string;
         quantity: number;
@@ -163,6 +168,7 @@ export interface ExtractedInvoiceData {
         taxRate?: number;
     }>;
     subtotal: number;
+    taxRate?: number | null;
     taxAmount: number;
     totalAmount: number;
     currency: string;

@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         resetRateLimit(rateLimitId);
 
         // SECURITY FIX: Use signed session token instead of plain user ID
-        setSessionCookie(user);
+        await setSessionCookie(user);
 
         return NextResponse.json(
             {

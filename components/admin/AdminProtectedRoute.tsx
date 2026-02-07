@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { fetchSessionUser } from '@/lib/client-auth';
 
 type AdminProtectedRouteProps = {
     children: React.ReactNode;
@@ -22,69 +23,50 @@ export default function AdminProtectedRoute({
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const dashboardPath = useMemo(() => `/${locale}/dashboard`, [locale]);
+    const loginPath = useMemo(() => `/${locale}/login`, [locale]);
+    const adminPath = useMemo(() => `/${locale}/admin`, [locale]);
+
     const redirectUnauthorized = useCallback(() => {
         // Redirect non-admins to dashboard
-        router.push('/dashboard');
-    }, [router]);
+        router.push(dashboardPath);
+    }, [dashboardPath, router]);
 
     const redirectToLogin = useCallback(() => {
-        localStorage.removeItem('user');
-        const returnUrl = encodeURIComponent(pathname || '/admin');
-        router.push(`/login?returnUrl=${returnUrl}`);
-    }, [pathname, router]);
+        const returnUrl = encodeURIComponent(pathname || adminPath);
+        router.push(`${loginPath}?returnUrl=${returnUrl}`);
+    }, [adminPath, loginPath, pathname, router]);
 
     useEffect(() => {
         const checkAdminAuth = async () => {
             try {
-                // Check local storage first
-                const userData = localStorage.getItem('user');
-                if (!userData) {
+                const sessionUser = await fetchSessionUser();
+                if (!sessionUser) {
                     redirectToLogin();
                     return;
                 }
-
-                // Verify session with backend
-                const response = await fetch('/api/auth/me', {
-                    credentials: 'include',
-                });
-
-                if (response.status === 401) {
-                    redirectToLogin();
-                    return;
-                }
-
-                if (!response.ok) {
-                    console.warn('Auth check failed');
-                    redirectUnauthorized();
-                    return;
-                }
-
-                const { data } = await response.json();
 
                 // Check role
-                const isAdmin = ['admin', 'super_admin'].includes(data.role);
-                const isSuperAdmin = data.role === 'super_admin';
+                const isAdmin = ['admin', 'super_admin'].includes(sessionUser.role || '');
+                const isSuperAdmin = sessionUser.role === 'super_admin';
 
                 if (!isAdmin) {
-                    console.warn('User is not an admin');
                     redirectUnauthorized();
                     return;
                 }
 
                 if (requireSuperAdmin && !isSuperAdmin) {
-                    console.warn('Super admin required');
                     redirectUnauthorized();
                     return;
                 }
 
-                // Update local storage with role
-                const user = JSON.parse(userData);
-                user.role = data.role;
-                localStorage.setItem('user', JSON.stringify(user));
-
                 setIsAuthorized(true);
-            } catch (error) {
-                console.error('Admin auth check error:', error);
+            } catch {
                 redirectUnauthorized();
             } finally {
                 setLoading(false);
@@ -96,10 +78,10 @@ export default function AdminProtectedRoute({
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto" />
-                    <p className="mt-4 text-gray-600 dark:text-gray-400">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400 mx-auto" />
+                    <p className="mt-4 text-faded">
                         Verifying admin access...
                     </p>
                 </div>

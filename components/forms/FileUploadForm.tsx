@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useCallback, useMemo } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { FILE_LIMITS } from '@/lib/constants';
 
@@ -22,12 +22,33 @@ type FileUploadFormProps = {
 
 export default function FileUploadForm({ userId, onExtractionComplete, availableCredits = 0 }: FileUploadFormProps) {
     const router = useRouter();
+    const pathname = usePathname();
     const [state, setState] = useState<UploadState>('idle');
     const [error, setError] = useState('');
     const [result, setResult] = useState<ExtractedData | null>(null);
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const withLocale = useMemo(() => {
+        return (path: string) => {
+            if (!path.startsWith('/')) {
+                return `/${locale}/${path}`;
+            }
+            if (path === '/') {
+                return `/${locale}`;
+            }
+            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
+                return path;
+            }
+            return `/${locale}${path}`;
+        };
+    }, [locale]);
 
     const hasCredits = availableCredits > 0;
 
@@ -188,9 +209,9 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     fileInputRef.current?.click();
                 }}
                 className={`
-                    border-2 border-dashed rounded-xl p-8 text-center transition-all
-                    ${isDisabled ? 'cursor-not-allowed opacity-75 bg-gray-50 border-gray-200' : 'cursor-pointer hover:border-blue-400'}
-                    ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+                    border-2 border-dashed rounded-2xl p-8 text-center transition-all
+                    ${isDisabled ? 'cursor-not-allowed opacity-70 bg-white/5 border-white/10' : 'cursor-pointer hover:border-sky-400/60'}
+                    ${isDragging ? 'border-sky-400 bg-sky-500/10' : 'border-white/20'}
                 `}
             >
                 <input
@@ -205,27 +226,27 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
                 <div className="pointer-events-none">
                     <div className="text-5xl mb-4">{getStatusIcon()}</div>
-                    <p className={`text-lg font-semibold ${!hasCredits ? 'text-red-500' : 'text-gray-700'}`}>
+                    <p className={`text-lg font-semibold ${!hasCredits ? 'text-rose-300' : 'text-white'}`}>
                         {getStatusMessage()}
                     </p>
 
                     {!hasCredits ? (
                         <div className="mt-4 pointer-events-auto">
-                            <p className="text-sm text-gray-500 mb-3">
+                            <p className="text-sm text-faded mb-3">
                                 You need at least 1 credit to upload.
                             </p>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push('/dashboard/credits');
+                                    router.push(withLocale('/dashboard/credits'));
                                 }}
-                                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg text-sm font-medium hover:from-amber-600 hover:to-amber-700 transition-colors shadow-sm"
+                                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition-colors shadow-sm"
                             >
                                 Buy Credits
                             </button>
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500 mt-2">
+                        <p className="text-sm text-faded mt-2">
                             AI extracts data automatically (PDF, JPG, PNG - Max {FILE_LIMITS.MAX_FILE_SIZE_MB}MB)
                         </p>
                     )}
@@ -235,24 +256,24 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
             {isProcessing && (
                 <div className="mt-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="w-full bg-white/10 rounded-full h-2.5">
                         <div
-                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            className="bg-gradient-to-r from-sky-400 to-blue-500 h-2.5 rounded-full transition-all duration-300"
                             style={{ width: `${progress}%` }}
                         />
                     </div>
-                    <p className="text-sm text-gray-600 mt-2 text-center">
+                    <p className="text-sm text-faded mt-2 text-center">
                         {state === 'uploading' ? 'Uploading...' : '🤖 AI extracting invoice data...'}
                     </p>
                 </div>
             )}
 
             {state === 'error' && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-700 font-medium">❌ {error}</p>
+                <div className="mt-4 p-4 glass-panel border border-rose-400/30 rounded-xl">
+                    <p className="text-rose-200 font-medium">❌ {error}</p>
                     <button
                         onClick={resetForm}
-                        className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                        className="mt-2 text-sm text-rose-200/80 hover:text-rose-100 underline"
                     >
                         Try again
                     </button>
@@ -260,28 +281,28 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             )}
 
             {state === 'success' && result && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-green-700 font-medium mb-3">✅ Invoice extracted successfully!</p>
+                <div className="mt-4 p-4 glass-panel border border-emerald-400/30 rounded-xl">
+                    <p className="text-emerald-200 font-medium mb-3">✅ Invoice extracted successfully!</p>
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="bg-white p-3 rounded-lg">
-                            <p className="text-gray-500">Confidence</p>
-                            <p className="text-xl font-bold text-green-600">{result.confidenceScore}%</p>
+                        <div className="glass-panel p-3 rounded-lg">
+                            <p className="text-faded">Confidence</p>
+                            <p className="text-xl font-bold text-emerald-200">{result.confidenceScore}%</p>
                         </div>
-                        <div className="bg-white p-3 rounded-lg">
-                            <p className="text-gray-500">Response Time</p>
-                            <p className="text-xl font-bold text-blue-600">{(result.responseTime / 1000).toFixed(1)}s</p>
+                        <div className="glass-panel p-3 rounded-lg">
+                            <p className="text-faded">Response Time</p>
+                            <p className="text-xl font-bold text-sky-200">{(result.responseTime / 1000).toFixed(1)}s</p>
                         </div>
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
-                            onClick={() => router.push(`/review/${result.extractionId}`)}
-                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            onClick={() => router.push(withLocale(`/review/${result.extractionId}`))}
+                            className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 text-white font-semibold hover:brightness-110 transition-colors"
                         >
                             Review & Edit Data
                         </button>
                         <button
                             onClick={resetForm}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
                             New Upload
                         </button>

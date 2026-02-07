@@ -11,13 +11,13 @@ import { UnauthorizedError, ForbiddenError, NotFoundError } from '@/lib/errors';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
     try {
         // Require admin role
         await requireAdmin(request);
 
-        const userId = params.id;
+        const { id: userId } = await context.params;
 
         // Get user details
         const user = await adminUserService.getUserById(userId);
@@ -46,7 +46,8 @@ export async function GET(
             );
         }
 
-        logger.error('Admin user detail error', { error, userId: params.id });
+        const { id: userId } = await context.params;
+        logger.error('Admin user detail error', { error, userId });
         return NextResponse.json(
             { success: false, error: 'Failed to fetch user' },
             { status: 500 }

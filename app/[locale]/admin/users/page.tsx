@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AdminUserWithCredits } from '@/types/admin';
 
 export default function AdminUsersPage() {
     const router = useRouter();
+    const params = useParams();
+    const locale = (params?.locale as string) || 'en';
     const [users, setUsers] = useState<AdminUserWithCredits[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -88,17 +90,17 @@ export default function AdminUsersPage() {
             {/* Page header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-2xl font-bold text-white font-display">
                         Users
                     </h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-sm text-faded">
                         Manage platform users
                     </p>
                 </div>
             </div>
 
             {/* Filters and search */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="glass-card p-4">
                 <div className="flex flex-col sm:flex-row gap-4">
                     <form onSubmit={handleSearch} className="flex-1">
                         <div className="flex gap-2">
@@ -107,7 +109,7 @@ export default function AdminUsersPage() {
                                 placeholder="Search by email or name..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="flex-1 px-4 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                             />
                             <button
                                 type="submit"
@@ -122,8 +124,8 @@ export default function AdminUsersPage() {
                             onClick={() => { setFilter('all'); setPage(1); }}
                             className={`px-4 py-2 rounded-lg ${
                                 filter === 'all'
-                                    ? 'bg-gray-900 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    ? 'bg-white/10 text-white'
+                                    : 'bg-white/5 text-slate-200 border border-white/10'
                             }`}
                         >
                             All
@@ -133,7 +135,7 @@ export default function AdminUsersPage() {
                             className={`px-4 py-2 rounded-lg ${
                                 filter === 'banned'
                                     ? 'bg-red-600 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    : 'bg-white/5 text-slate-200 border border-white/10'
                             }`}
                         >
                             Banned
@@ -143,7 +145,7 @@ export default function AdminUsersPage() {
                             className={`px-4 py-2 rounded-lg ${
                                 filter === 'admin'
                                     ? 'bg-purple-600 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    : 'bg-white/5 text-slate-200 border border-white/10'
                             }`}
                         >
                             Admins
@@ -154,8 +156,8 @@ export default function AdminUsersPage() {
 
             {/* Error state */}
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-600 dark:text-red-400">{error}</p>
+                <div className="glass-panel border border-rose-400/30 rounded-lg p-4 text-rose-200">
+                    <p className="text-rose-200">{error}</p>
                 </div>
             )}
 
@@ -167,40 +169,40 @@ export default function AdminUsersPage() {
             ) : (
                 <>
                     {/* Users table */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div className="glass-card overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                <thead className="bg-white/5">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             User
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Role
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Credits
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Status
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Joined
                                         </th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-faded uppercase tracking-wider">
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {users.map((user) => (
-                                        <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <tr key={user.id} className="hover:bg-white/5">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                    <div className="text-sm font-medium text-white font-display">
                                                         {user.firstName} {user.lastName}
                                                     </div>
-                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    <div className="text-sm text-faded">
                                                         {user.email}
                                                     </div>
                                                 </div>
@@ -212,18 +214,18 @@ export default function AdminUsersPage() {
                                                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                                                             : user.role === 'admin'
                                                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                                            : 'bg-white/5 text-slate-200 border border-white/10'
                                                     }`}
                                                 >
                                                     {user.role}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-display">
                                                 {user.availableCredits}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {user.isBanned ? (
-                                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-rose-500/15 text-rose-200 border border-rose-400/30">
                                                         Banned
                                                     </span>
                                                 ) : (
@@ -232,13 +234,13 @@ export default function AdminUsersPage() {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-faded">
                                                 {new Date(user.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                                 <div className="flex justify-end gap-2">
                                                     <button
-                                                        onClick={() => router.push(`/en/admin/users/${user.id}`)}
+                                                        onClick={() => router.push(`/${locale}/admin/users/${user.id}`)}
                                                         className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                                     >
                                                         View
@@ -248,7 +250,7 @@ export default function AdminUsersPage() {
                                                         className={`${
                                                             user.isBanned
                                                                 ? 'text-green-600 hover:text-green-800'
-                                                                : 'text-red-600 hover:text-red-800'
+                                                                : 'text-rose-200 hover:text-rose-100'
                                                         }`}
                                                     >
                                                         {user.isBanned ? 'Unban' : 'Ban'}
@@ -268,17 +270,17 @@ export default function AdminUsersPage() {
                             <button
                                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50"
+                                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg disabled:opacity-50"
                             >
                                 Previous
                             </button>
-                            <span className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                            <span className="px-4 py-2 text-slate-200">
                                 Page {page} of {totalPages}
                             </span>
                             <button
                                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50"
+                                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg disabled:opacity-50"
                             >
                                 Next
                             </button>

@@ -20,7 +20,7 @@ import { logger } from '@/lib/logger';
 export async function POST(req: NextRequest) {
     try {
         // Use secure signed session token for authentication
-        const session = getSessionFromCookie();
+        const session = await getSessionFromCookie();
 
         if (!session) {
             logger.warn('Payment verification attempted without valid session');

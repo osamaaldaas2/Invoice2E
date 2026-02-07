@@ -21,8 +21,9 @@ export interface AuthenticatedUser {
  */
 export async function getAuthenticatedUser(req: NextRequest): Promise<AuthenticatedUser | null> {
     try {
+        void req;
         // Get session from signed cookie token
-        const session = getSessionFromCookie();
+        const session = await getSessionFromCookie();
 
         if (!session) {
             logger.debug('No valid session found');

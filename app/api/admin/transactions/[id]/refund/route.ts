@@ -16,13 +16,13 @@ const RefundSchema = z.object({
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
     try {
         // Require SUPER ADMIN for refunds - dangerous operation
         const admin = await requireSuperAdmin(request);
 
-        const transactionId = params.id;
+        const { id: transactionId } = await context.params;
         const body = await request.json();
 
         // Validate input
@@ -77,7 +77,8 @@ export async function POST(
             );
         }
 
-        logger.error('Admin refund error', { error, transactionId: params.id });
+        const { id: transactionId } = await context.params;
+        logger.error('Admin refund error', { error, transactionId });
         return NextResponse.json(
             { success: false, error: 'Failed to process refund' },
             { status: 500 }

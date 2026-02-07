@@ -40,19 +40,19 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+            <div className="glass-card p-6">
                 <div className="animate-pulse">
-                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-                    <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-6 bg-white/10 rounded w-1/4 mb-4"></div>
+                    <div className="h-64 bg-white/10 rounded"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="glass-card overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white font-display">
                     {t('conversionTrend')}
                 </h3>
                 <div className="flex gap-2">
@@ -60,9 +60,9 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
                         <button
                             key={p}
                             onClick={() => setSelectedPeriod(p)}
-                            className={`px-3 py-1 text-sm rounded-lg transition-colors ${selectedPeriod === p
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            className={`px-3 py-1 text-sm rounded-full transition-colors border ${selectedPeriod === p
+                                    ? 'bg-gradient-to-r from-sky-400/20 via-blue-500/10 to-transparent text-sky-100 border-sky-300/30'
+                                    : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
                                 }`}
                         >
                             {p === '7d' ? t('week') : p === '30d' ? t('month') : t('quarter')}
@@ -73,7 +73,7 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
 
             <div className="p-4">
                 {chartData.length === 0 ? (
-                    <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                    <div className="h-64 flex items-center justify-center text-faded">
                         {t('noData')}
                     </div>
                 ) : (
@@ -87,16 +87,16 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
                                 >
                                     <div className="relative w-full flex justify-center mb-1">
                                         <div
-                                            className="absolute bottom-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs px-2 py-1 rounded -translate-y-full whitespace-nowrap"
+                                            className="absolute bottom-0 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-xs px-2 py-1 rounded -translate-y-full whitespace-nowrap border border-white/10"
                                         >
                                             {item.count} {t('conversions')}
                                         </div>
                                     </div>
                                     <div
-                                        className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-300 hover:from-blue-600 hover:to-blue-500"
+                                        className="w-full bg-gradient-to-t from-sky-500 to-blue-400 rounded-t transition-all duration-300 hover:from-sky-400 hover:to-blue-500"
                                         style={{ height: `${Math.max(height, 2)}%` }}
                                     />
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate w-full text-center">
+                                    <span className="text-xs text-slate-400 mt-1 truncate w-full text-center">
                                         {new Date(item.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
                                     </span>
                                 </div>
@@ -106,9 +106,9 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
                 )}
             </div>
 
-            <div className="px-4 pb-4 flex items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+            <div className="px-4 pb-4 flex items-center justify-center gap-4 text-sm text-slate-300">
                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-gradient-to-r from-blue-500 to-blue-400"></div>
+                    <div className="w-3 h-3 rounded bg-gradient-to-r from-sky-500 to-blue-400"></div>
                     <span>{t('dailyConversions')}</span>
                 </div>
             </div>

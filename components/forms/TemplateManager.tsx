@@ -132,19 +132,19 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+            <div className="glass-card p-6">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-                    <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-8 bg-white/10 rounded w-1/4"></div>
+                    <div className="h-24 bg-white/10 rounded"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="glass-card">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white font-display">
                     {t('title')}
                 </h3>
                 <button
@@ -152,93 +152,93 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                         setShowForm(true);
                         setEditingTemplate(null);
                     }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="nav-pill nav-pill-active"
                 >
                     {t('newTemplate')}
                 </button>
             </div>
 
             {error && (
-                <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                <div className="m-4 p-4 glass-panel text-rose-200 rounded-lg border border-rose-400/30">
                     {error}
                 </div>
             )}
 
             {showForm && (
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <div className="p-4 border-b border-white/10 bg-white/5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 {t('templateName')} *
                             </label>
                             <input
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 {t('description')}
                             </label>
                             <input
                                 type="text"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 {t('sellerName')}
                             </label>
                             <input
                                 type="text"
                                 value={formData.sellerName}
                                 onChange={(e) => setFormData({ ...formData, sellerName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 {t('sellerEmail')}
                             </label>
                             <input
                                 type="email"
                                 value={formData.sellerEmail}
                                 onChange={(e) => setFormData({ ...formData, sellerEmail: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 {t('taxId')}
                             </label>
                             <input
                                 type="text"
                                 value={formData.sellerTaxId}
                                 onChange={(e) => setFormData({ ...formData, sellerTaxId: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                                 IBAN
                             </label>
                             <input
                                 type="text"
                                 value={formData.sellerIban}
                                 onChange={(e) => setFormData({ ...formData, sellerIban: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-white/10 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
                             />
                         </div>
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
                             onClick={handleSave}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            className="nav-pill nav-pill-active"
                         >
                             {editingTemplate ? t('update') : t('save')}
                         </button>
@@ -247,7 +247,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                                 setShowForm(false);
                                 setEditingTemplate(null);
                             }}
-                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="nav-pill"
                         >
                             {t('cancel')}
                         </button>
@@ -257,7 +257,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
 
             <div className="p-4">
                 {templates.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <div className="text-center py-8 text-faded">
                         {t('noTemplates')}
                     </div>
                 ) : (
@@ -265,21 +265,21 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                         {templates.map((template) => (
                             <div
                                 key={template.id}
-                                className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                                className="flex items-center justify-between p-4 border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
                             >
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h4 className="font-medium text-gray-900 dark:text-white">
+                                        <h4 className="font-medium text-white">
                                             {template.name}
                                         </h4>
                                         {template.is_default && (
-                                            <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
+                                            <span className="chip">
                                                 {t('default')}
                                             </span>
                                         )}
                                     </div>
                                     {template.description && (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        <p className="text-sm text-faded">
                                             {template.description}
                                         </p>
                                     )}
@@ -288,20 +288,20 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                                     {onApplyTemplate && (
                                         <button
                                             onClick={() => handleApply(template)}
-                                            className="px-3 py-1.5 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                                            className="px-3 py-1.5 text-sm rounded-full border border-emerald-400/30 text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors"
                                         >
                                             {t('apply')}
                                         </button>
                                     )}
                                     <button
                                         onClick={() => handleEdit(template)}
-                                        className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        className="px-3 py-1.5 text-sm rounded-full border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10 transition-colors"
                                     >
                                         {t('edit')}
                                     </button>
                                     <button
                                         onClick={() => handleDelete(template.id)}
-                                        className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                        className="px-3 py-1.5 text-sm rounded-full border border-rose-400/30 text-rose-200 bg-rose-500/15 hover:bg-rose-500/25 transition-colors"
                                     >
                                         {t('delete')}
                                     </button>

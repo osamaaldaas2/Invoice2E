@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { fetchSessionUser } from '@/lib/client-auth';
 
 type User = {
     id: string;
@@ -30,27 +31,58 @@ export default function DashboardLayout({ children }: Props) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const withLocale = useMemo(() => {
+        return (path: string) => {
+            if (!path.startsWith('/')) {
+                return `/${locale}/${path}`;
+            }
+            if (path === '/') {
+                return `/${locale}`;
+            }
+            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
+                return path;
+            }
+            return `/${locale}${path}`;
+        };
+    }, [locale]);
+
     useEffect(() => {
-        const userData = localStorage.getItem('user');
+        const loadUser = async () => {
+            try {
+                const sessionUser = await fetchSessionUser();
+                if (!sessionUser) {
+                    router.push(withLocale('/login'));
+                    return;
+                }
+                setUser(sessionUser);
+            } catch {
+                router.push(withLocale('/login'));
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        if (!userData) {
-            router.push('/login');
-            return;
-        }
+        void loadUser();
 
-        try {
-            setUser(JSON.parse(userData));
-        } catch {
-            router.push('/login');
-        } finally {
-            setLoading(false);
-        }
-    }, [router]);
+        const handleAuthChanged = () => void loadUser();
+        window.addEventListener('auth-changed', handleAuthChanged);
+        window.addEventListener('profile-updated', handleAuthChanged);
+
+        return () => {
+            window.removeEventListener('auth-changed', handleAuthChanged);
+            window.removeEventListener('profile-updated', handleAuthChanged);
+        };
+    }, [router, withLocale]);
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400" />
             </div>
         );
     }
@@ -59,32 +91,28 @@ export default function DashboardLayout({ children }: Props) {
         return null;
     }
 
-    // Get locale from pathname
-    const locale = pathname.split('/')[1] || 'en';
-
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="min-h-screen">
             <div className="flex">
                 {/* Sidebar Navigation */}
-                <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen fixed left-0 top-16">
+                <aside className="hidden md:block w-64 min-h-screen fixed left-0 top-16 border-r border-white/10 bg-slate-950/70 backdrop-blur-xl">
                     <div className="p-4">
-                        <div className="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Welcome back,</p>
-                            <p className="font-semibold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500">{user.email}</p>
+                        <div className="mb-6 pb-4 border-b border-white/10">
+                            <p className="text-xs uppercase tracking-[0.2em] text-faded">Welcome back</p>
+                            <p className="font-semibold text-white mt-2">{user.firstName} {user.lastName}</p>
+                            <p className="text-xs text-faded">{user.email}</p>
                         </div>
-                        <nav className="space-y-1">
+                        <nav className="space-y-2">
                             {navItems.map((item) => {
-                                const fullPath = `/${locale}${item.href}`;
-                                const isActive = pathname === fullPath ||
-                                    (item.href === '/dashboard' && pathname === `/${locale}/dashboard`);
+                                const fullPath = withLocale(item.href);
+                                const isActive = pathname === fullPath;
                                 return (
                                     <Link
                                         key={item.href}
-                                        href={item.href}
-                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
-                                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        href={fullPath}
+                                        className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${isActive
+                                            ? 'bg-gradient-to-r from-sky-400/20 via-blue-500/10 to-transparent text-sky-100 border border-sky-300/30 shadow-[0_0_24px_rgba(56,189,248,0.2)]'
+                                            : 'text-slate-200 hover:bg-white/5 border border-transparent'
                                             }`}
                                     >
                                         <span>{item.icon}</span>
@@ -97,8 +125,29 @@ export default function DashboardLayout({ children }: Props) {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 ml-64 p-8">
+                <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8">
                     <div className="max-w-6xl mx-auto">
+                        <div className="md:hidden mb-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="chip">{user.firstName}</span>
+                                <span className="text-faded text-sm">{user.email}</span>
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {navItems.map((item) => {
+                                    const fullPath = withLocale(item.href);
+                                    const isActive = pathname === fullPath;
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={fullPath}
+                                            className={`nav-pill whitespace-nowrap ${isActive ? 'nav-pill-active' : ''}`}
+                                        >
+                                            {item.label}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         {children}
                     </div>
                 </main>

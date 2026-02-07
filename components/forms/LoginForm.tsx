@@ -1,14 +1,43 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { emitAuthChanged } from '@/lib/client-auth';
 
 export default function LoginForm() {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+
+    const locale = useMemo(() => {
+        const parts = pathname?.split('/') || [];
+        return parts.length > 1 ? parts[1] : 'en';
+    }, [pathname]);
+
+    const redirectTarget = useMemo(() => {
+        const fallback = `/${locale}/dashboard`;
+        const returnUrl = searchParams?.get('returnUrl');
+        if (!returnUrl) {
+            return fallback;
+        }
+
+        let decoded = returnUrl;
+        try {
+            decoded = decodeURIComponent(returnUrl);
+        } catch {
+            return fallback;
+        }
+
+        if (!decoded.startsWith('/')) {
+            return fallback;
+        }
+
+        return decoded;
+    }, [locale, searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,11 +58,8 @@ export default function LoginForm() {
                 return;
             }
 
-            // Store user data
-            localStorage.setItem('user', JSON.stringify(data.data));
-
-            // Navigate to dashboard
-            router.push('/dashboard');
+            emitAuthChanged();
+            router.push(redirectTarget);
         } catch {
             setError('An error occurred. Please try again.');
         } finally {
@@ -44,7 +70,7 @@ export default function LoginForm() {
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
                     Email
                 </label>
                 <input
@@ -53,14 +79,14 @@ export default function LoginForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-white/10 text-white focus:ring-2 focus:ring-sky-400/60 focus:border-sky-400/60 transition-colors"
                     placeholder="you@example.com"
                     disabled={loading}
                 />
             </div>
 
             <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
                     Password
                 </label>
                 <input
@@ -69,14 +95,14 @@ export default function LoginForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    placeholder="••••••••"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-white/10 text-white focus:ring-2 focus:ring-sky-400/60 focus:border-sky-400/60 transition-colors"
+                    placeholder="********"
                     disabled={loading}
                 />
             </div>
 
             {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm">
                     {error}
                 </div>
             )}
@@ -84,7 +110,7 @@ export default function LoginForm() {
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full px-4 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
                 {loading ? (
                     <span className="flex items-center justify-center gap-2">

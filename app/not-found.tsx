@@ -8,7 +8,7 @@ export default function NotFound(): React.ReactElement {
                 <div className="min-h-screen flex flex-col items-center justify-center bg-background">
                     <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
                     <h2 className="text-2xl font-semibold mb-2">Page Not Found</h2>
-                    <p className="text-muted-foreground mb-8">
+                    <p className="text-faded mb-8">
                         The page you&apos;re looking for doesn&apos;t exist.
                     </p>
                     <Link

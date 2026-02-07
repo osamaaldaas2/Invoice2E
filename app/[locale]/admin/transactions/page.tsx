@@ -101,9 +101,9 @@ export default function AdminTransactionsPage() {
         const colors: Record<string, string> = {
             completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            failed: 'bg-rose-500/15 text-rose-200 border border-rose-400/30',
             refunded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-            unknown: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400',
+            unknown: 'bg-white/5 text-slate-200 border border-white/10',
         };
 
         return (
@@ -125,10 +125,10 @@ export default function AdminTransactionsPage() {
             {/* Page header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-2xl font-bold text-white font-display">
                         Transactions
                     </h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-sm text-faded">
                         View and manage all payment transactions
                     </p>
                 </div>
@@ -140,7 +140,7 @@ export default function AdminTransactionsPage() {
                         setStatusFilter(e.target.value);
                         setPage(1);
                     }}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="px-4 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                 >
                     <option value="all">All Status</option>
                     <option value="completed">Completed</option>
@@ -151,11 +151,11 @@ export default function AdminTransactionsPage() {
 
             {/* Error state */}
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-600 dark:text-red-400">{error}</p>
+                <div className="glass-panel border border-rose-400/30 rounded-lg p-4 text-rose-200">
+                    <p className="text-rose-200">{error}</p>
                     <button
                         onClick={() => setError(null)}
-                        className="mt-2 text-sm text-red-500 hover:text-red-700"
+                        className="mt-2 text-sm text-rose-200 hover:text-rose-100"
                     >
                         Dismiss
                     </button>
@@ -170,57 +170,57 @@ export default function AdminTransactionsPage() {
             ) : (
                 <>
                     {/* Transactions table */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div className="glass-card overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                <thead className="bg-white/5">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Date
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             User
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Method
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Amount
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Credits
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Status
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-faded uppercase tracking-wider">
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                     {transactions.map((transaction) => (
-                                        <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        <tr key={transaction.id} className="hover:bg-white/5">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-faded">
                                                 {new Date(transaction.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                    <div className="text-sm font-medium text-white font-display">
                                                         {transaction.userName}
                                                     </div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    <div className="text-xs text-faded">
                                                         {transaction.userEmail}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white capitalize">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-display capitalize">
                                                 {transaction.paymentMethod}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white font-display">
                                                 {formatCurrency(transaction.amount, transaction.currency)}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-display">
                                                 {transaction.creditsPurchased}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -230,13 +230,13 @@ export default function AdminTransactionsPage() {
                                                 {transaction.paymentStatus === 'completed' && (
                                                     <button
                                                         onClick={() => openRefundModal(transaction)}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                                        className="text-rose-200 hover:text-rose-100"
                                                     >
                                                         Refund
                                                     </button>
                                                 )}
                                                 {transaction.paymentStatus === 'refunded' && (
-                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                    <span className="text-faded">
                                                         Refunded
                                                     </span>
                                                 )}
@@ -254,17 +254,17 @@ export default function AdminTransactionsPage() {
                             <button
                                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50"
+                                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg disabled:opacity-50"
                             >
                                 Previous
                             </button>
-                            <span className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                            <span className="px-4 py-2 text-slate-200">
                                 Page {page} of {totalPages}
                             </span>
                             <button
                                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50"
+                                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg disabled:opacity-50"
                             >
                                 Next
                             </button>
@@ -276,12 +276,12 @@ export default function AdminTransactionsPage() {
             {/* Refund Modal */}
             {showRefundModal && selectedTransaction && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    <div className="glass-card p-6 w-full max-w-md mx-4">
+                        <h3 className="text-lg font-semibold text-white font-display mb-4">
                             Refund Transaction
                         </h3>
 
-                        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                        <div className="mb-4 p-4 glass-panel border border-amber-400/30 rounded-lg">
                             <p className="text-sm text-yellow-800 dark:text-yellow-200">
                                 <strong>Warning:</strong> This will refund {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)} and
                                 deduct {selectedTransaction.creditsPurchased} credits from the user&apos;s balance.
@@ -289,13 +289,13 @@ export default function AdminTransactionsPage() {
                         </div>
 
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-slate-200 mb-2">
                                 Refund Reason *
                             </label>
                             <textarea
                                 value={refundReason}
                                 onChange={(e) => setRefundReason(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                 rows={3}
                                 placeholder="Enter reason for refund..."
                             />
@@ -304,7 +304,7 @@ export default function AdminTransactionsPage() {
                         <div className="flex gap-3 justify-end">
                             <button
                                 onClick={() => setShowRefundModal(false)}
-                                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                className="px-4 py-2 text-slate-200 hover:bg-white/10 rounded-lg"
                             >
                                 Cancel
                             </button>

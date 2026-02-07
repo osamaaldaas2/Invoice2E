@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError, UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { SignupSchema, LoginSchema } from '@/lib/validators';
 import { UserRole } from '@/types/index';
+import { DEFAULT_CREDITS_ON_SIGNUP } from '@/lib/constants';
 import bcrypt from 'bcrypt';
 
 type SignupData = {
@@ -10,6 +11,12 @@ type SignupData = {
     password: string;
     firstName: string;
     lastName: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    postalCode: string;
+    country: string;
+    phone: string;
 };
 
 type LoginData = {
@@ -56,9 +63,11 @@ export class AuthService {
     async signup(data: SignupData): Promise<AuthUser> {
         // Validate input with Zod
         const validated = SignupSchema.parse(data);
+        const normalizedEmail = validated.email.trim().toLowerCase();
+        const normalizedCountry = validated.country.trim().toUpperCase();
 
         // Check if user exists
-        const existingUser = await this.getUserByEmail(validated.email);
+        const existingUser = await this.getUserByEmail(normalizedEmail);
         if (existingUser) {
             throw new ValidationError('Email already registered');
         }
@@ -73,10 +82,16 @@ export class AuthService {
             .from('users')
             .insert([
                 {
-                    email: validated.email,
+                    email: normalizedEmail,
                     password_hash: passwordHash,
                     first_name: validated.firstName,
                     last_name: validated.lastName,
+                    address_line1: validated.addressLine1,
+                    address_line2: validated.addressLine2 || null,
+                    city: validated.city,
+                    postal_code: validated.postalCode,
+                    country: normalizedCountry,
+                    phone: validated.phone,
                     language: 'en',
                 },
             ])
@@ -89,10 +104,11 @@ export class AuthService {
         }
 
         // Create initial credits - FIX (BUG-018): Rollback user creation if this fails
+        // FIX (QA-BUG-8): Use DEFAULT_CREDITS_ON_SIGNUP constant instead of hardcoded 0
         const { error: creditsError } = await supabase.from('user_credits').insert([
             {
                 user_id: user.id,
-                available_credits: 0,
+                available_credits: DEFAULT_CREDITS_ON_SIGNUP,
                 used_credits: 0,
             },
         ]);
@@ -133,9 +149,10 @@ export class AuthService {
     async login(data: LoginData): Promise<AuthUser> {
         // Validate input with Zod
         const validated = LoginSchema.parse(data);
+        const normalizedEmail = validated.email.trim().toLowerCase();
 
         // Get user
-        const user = await this.getUserByEmail(validated.email);
+        const user = await this.getUserByEmail(normalizedEmail);
         if (!user) {
             throw new UnauthorizedError('Invalid email or password');
         }
@@ -176,23 +193,33 @@ export class AuthService {
 
     /**
      * Update last_login_at and increment login_count
+     * FIX (QA-BUG-1): Fixed incorrect conditional that always set login_count to undefined
      */
     private async updateLoginStats(userId: string): Promise<void> {
         try {
             const supabase = this.getSupabase();
 
-            // Try to use the RPC function if available, otherwise update directly
+            // Try to use the RPC function if available
             const { error: rpcError } = await supabase.rpc('increment_login_count', {
                 p_user_id: userId,
             });
 
             if (rpcError) {
                 // Fallback to direct update if RPC not available
+                // First get current login_count to increment it
+                const { data: currentUser } = await supabase
+                    .from('users')
+                    .select('login_count')
+                    .eq('id', userId)
+                    .single();
+
+                const currentCount = currentUser?.login_count ?? 0;
+
                 await supabase
                     .from('users')
                     .update({
                         last_login_at: new Date().toISOString(),
-                        login_count: supabase.rpc ? undefined : 1, // Will be incremented by trigger if available
+                        login_count: currentCount + 1,
                     })
                     .eq('id', userId);
             }
@@ -204,11 +231,12 @@ export class AuthService {
 
     async getUserByEmail(email: string): Promise<DbUser | null> {
         const supabase = this.getSupabase();
+        const normalizedEmail = email.trim().toLowerCase();
 
         const { data, error } = await supabase
             .from('users')
             .select('*')
-            .eq('email', email)
+            .eq('email', normalizedEmail)
             .single();
 
         if (error) {

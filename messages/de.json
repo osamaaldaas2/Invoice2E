@@ -15,7 +15,8 @@
         "edit": "Bearbeiten",
         "back": "Zurück",
         "next": "Weiter",
-        "submit": "Absenden"
+        "submit": "Absenden",
+        "profile": "Profil"
     },
     "home": {
         "title": "Willkommen bei Invoice2E",
@@ -30,7 +31,17 @@
         "no_account": "Noch kein Konto?",
         "have_account": "Bereits ein Konto?",
         "first_name": "Vorname",
-        "last_name": "Nachname"
+        "last_name": "Nachname",
+        "email": "E-Mail",
+        "password": "Passwort",
+        "confirm_password": "Passwort best?tigen",
+        "address_line1": "Stra?e und Hausnummer",
+        "address_line2": "Adresszeile 2",
+        "postal_code": "Postleitzahl",
+        "city": "Stadt",
+        "country": "L?ndercode",
+        "phone": "Telefon",
+        "create_account": "Konto erstellen"
     },
     "errors": {
         "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
@@ -63,6 +74,14 @@
         "format": "Format",
         "status": "Status",
         "date": "Datum",
+        "action": "Aktion",
+        "filterAll": "Alle",
+        "filterDraft": "Entwürfe",
+        "filterCompleted": "Abgeschlossen",
+        "resume": "Fortsetzen",
+        "review": "Ansehen",
+        "downloadXml": "XML herunterladen",
+        "downloading": "Lädt...",
         "showing": "Zeige",
         "of": "von",
         "previous": "Zurück",
@@ -72,6 +91,12 @@
         "pageTitle": "Analyse",
         "pageDescription": "Detaillierte Statistiken und Analysen anzeigen",
         "conversionTrend": "Konvertierungstrend",
+        "creditUsageTitle": "Guthabenverbrauch",
+        "creditUsageSubtitle": "Genutzt vs. verbleibend",
+        "thisMonth": "Dieser Monat",
+        "used": "Genutzt",
+        "remaining": "Verbleibend",
+        "totalCreditsLabel": "Guthaben gesamt: {total}",
         "week": "Woche",
         "month": "Monat",
         "quarter": "Quartal",
@@ -89,7 +114,14 @@
         "processing": "Wird verarbeitet...",
         "purchaseNow": "Jetzt kaufen",
         "yourBalance": "Ihr Guthaben",
-        "creditsAvailable": "Guthaben verfügbar"
+        "creditsAvailable": "Guthaben verfügbar",
+        "redeemTitle": "Gutschein einl?sen",
+        "redeemDescription": "Gutscheincode eingeben, um Guthaben hinzuzuf?gen",
+        "redeemPlaceholder": "Gutscheincode eingeben",
+        "redeemButton": "Einl?sen",
+        "redeeming": "Wird eingel?st...",
+        "redeemSuccess": "Gutschein angewendet. +{credits} Guthaben (Saldo: {balance})",
+        "redeemError": "Gutschein konnte nicht eingel?st werden"
     },
     "templates": {
         "pageTitle": "Rechnungsvorlagen",
@@ -133,5 +165,30 @@
         "instruction2": "Maximal 100 Rechnungen pro Stapel",
         "instruction3": "Unterstützte Formate: PDF, PNG, JPG, JPEG",
         "instruction4": "Jede Rechnung wird in XRechnung-Format konvertiert"
+    },
+    "profile": {
+        "pageTitle": "Profil",
+        "pageDescription": "Verwalten Sie Ihre Kontodaten",
+        "sectionAccount": "Konto",
+        "sectionAccountHint": "Pers??nliche Daten und bevorzugte Sprache aktualisieren",
+        "sectionAddress": "Adresse",
+        "sectionAddressHint": "Wird f??r Rechnungen und Kontaktangaben verwendet",
+        "firstName": "Vorname",
+        "lastName": "Nachname",
+        "email": "E-Mail",
+        "phone": "Telefon",
+        "language": "Sprache",
+        "languageEn": "Englisch",
+        "languageDe": "Deutsch",
+        "addressStreet": "Stra??e / Adresse",
+        "addressPostalCode": "Postleitzahl",
+        "addressCity": "Stadt",
+        "addressCountry": "L??ndercode",
+        "taxId": "Steuernummer",
+        "save": "??nderungen speichern",
+        "saving": "Speichern...",
+        "saveSuccess": "Profil erfolgreich aktualisiert.",
+        "saveError": "Profil konnte nicht gespeichert werden.",
+        "loadError": "Profil konnte nicht geladen werden."
     }
 }
