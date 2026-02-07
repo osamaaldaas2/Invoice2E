@@ -44,10 +44,14 @@ export class BatchProcessor {
             const userId = job.user_id as string;
 
             // Update status to processing
-            await supabase
+            const { error: updateError } = await supabase
                 .from('batch_jobs')
                 .update({ status: 'processing', processing_started_at: new Date().toISOString() })
                 .eq('id', jobId);
+
+            if (updateError) {
+                logger.warn('Failed to update batch status to processing', { jobId, error: updateError.message });
+            }
 
             // FIX (BUG-022): Process files sequentially with progress updates
             for (let index = 0; index < files.length; index++) {

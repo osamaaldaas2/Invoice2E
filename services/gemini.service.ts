@@ -309,7 +309,7 @@ export class GeminiService {
             const totalAmount = Number(data.totalAmount) || 0;
             const rawTaxAmount = Number(data.taxAmount);
             const hasTaxAmount = data.taxAmount !== null && data.taxAmount !== undefined;
-            const taxAmount = hasTaxAmount && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
+            const taxAmount = hasTaxAmount && !isNaN(rawTaxAmount) && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
                 ? rawTaxAmount
                 : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) * 100) / 100 : 0);
 
