@@ -268,19 +268,19 @@ export class AnalyticsService {
         }
 
 
-        const total = conversions?.length || 0;
-        const successful = conversions?.filter(c => c.validation_status === 'valid').length || 0;
+        const total = conversions.length;
+        const successful = conversions.filter((c) => c.validation_status === 'valid').length;
         const failed = total - successful;
-        const totalCredits = usedCredits || (conversions?.reduce((sum, c) => sum + (c.credits_used || 1), 0) || 0);
-        const processingTimes = conversions?.filter(c => c.processing_time_ms).map(c => c.processing_time_ms as number) || [];
+        const totalCredits = usedCredits || conversions.reduce((sum, c) => sum + (c.credits_used || 1), 0);
+        const processingTimes = conversions.filter((c) => c.processing_time_ms).map((c) => c.processing_time_ms as number);
         const avgTime = processingTimes.length > 0
             ? processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length
             : 0;
 
         // Calculate format distribution
         const formatCounts: Record<string, number> = {};
-        conversions?.forEach(c => {
-            const format = c.conversion_format || 'CII';
+        conversions.forEach((c) => {
+            const format = c.conversion_format ?? 'CII';
             formatCounts[format] = (formatCounts[format] || 0) + 1;
         });
 
@@ -325,7 +325,7 @@ export class AnalyticsService {
                 startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
 
-        const { data: conversions, error } = await supabase
+        const { data, error } = await supabase
             .from('invoice_conversions')
             .select('created_at, validation_status, conversion_format')
             .eq('user_id', userId)
@@ -336,10 +336,16 @@ export class AnalyticsService {
             throw new Error(`Failed to get charts data: ${error.message}`);
         }
 
+        const conversions: Array<{
+            created_at: string;
+            validation_status: string | null;
+            conversion_format: string | null;
+        }> = data || [];
+
         // Calculate daily conversions
         const dailyMap: Record<string, { total: number; successful: number; failed: number }> = {};
-        conversions?.forEach(c => {
-            const date = c.created_at.split('T')[0];
+        conversions.forEach((c) => {
+            const date = c.created_at.split('T')[0] || '';
             if (!dailyMap[date]) {
                 dailyMap[date] = { total: 0, successful: 0, failed: 0 };
             }
@@ -362,12 +368,12 @@ export class AnalyticsService {
 
         // Calculate format distribution
         const formatCounts: Record<string, number> = {};
-        conversions?.forEach(c => {
-            const format = c.conversion_format || 'CII';
+        conversions.forEach((c) => {
+            const format = c.conversion_format ?? 'CII';
             formatCounts[format] = (formatCounts[format] || 0) + 1;
         });
 
-        const total = conversions?.length || 0;
+        const total = conversions.length;
         const formatDistribution = Object.entries(formatCounts).map(([format, count]) => ({
             format,
             count,
@@ -376,11 +382,11 @@ export class AnalyticsService {
 
         // Calculate weekly trend (aggregate by week)
         const weeklyMap: Record<string, number> = {};
-        conversions?.forEach(c => {
+        conversions.forEach((c) => {
             const date = new Date(c.created_at);
             const weekStart = new Date(date);
             weekStart.setDate(date.getDate() - date.getDay());
-            const weekKey = weekStart.toISOString().split('T')[0];
+            const weekKey = weekStart.toISOString().split('T')[0] || '';
             weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + 1;
         });
 

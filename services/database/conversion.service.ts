@@ -79,7 +79,7 @@ export class ConversionService {
             throw new AppError('DB_ERROR', 'Failed to fetch conversions', 500);
         }
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceConversion);
+        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as InvoiceConversion);
     }
 }
 

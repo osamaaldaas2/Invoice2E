@@ -21,6 +21,23 @@ const VoucherSchema = z.object({
     validUntil: z.string().optional().nullable(),
 });
 
+type VoucherRow = {
+    id: string;
+    code: string;
+    description: string | null;
+    credits: number;
+    is_active: boolean;
+    applies_to_all: boolean;
+    allowed_user_ids: string[] | null;
+    max_redemptions: number | null;
+    max_redemptions_per_user: number | null;
+    valid_from: string | null;
+    valid_until: string | null;
+    redemption_count: number | null;
+    created_at: string;
+    updated_at: string;
+};
+
 const parseAllowedUsers = async (raw: string | null | undefined, supabase: ReturnType<typeof createServerClient>) => {
     if (!raw) {
         return [];
@@ -89,7 +106,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ success: false, error: 'Failed to fetch vouchers' }, { status: 500 });
         }
 
-        const formatted = vouchers.map((voucher) => ({
+        const formatted = (vouchers as VoucherRow[]).map((voucher) => ({
             id: voucher.id,
             code: voucher.code,
             description: voucher.description,

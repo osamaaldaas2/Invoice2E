@@ -262,11 +262,16 @@ export class UBLService {
             // Try to parse German format DD.MM.YYYY
             const parts = date.split('.');
             if (parts.length === 3) {
-                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                const day = parts[0] ?? '';
+                const month = parts[1] ?? '';
+                const year = parts[2] ?? '';
+                if (day && month && year) {
+                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
             }
-            return new Date().toISOString().split('T')[0];
+            return new Date().toISOString().split('T')[0] || '';
         }
-        return d.toISOString().split('T')[0];
+        return d.toISOString().split('T')[0] || '';
     }
 
     /**

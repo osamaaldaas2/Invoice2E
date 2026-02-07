@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getClientIp, getUserAgent } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
 import { z } from 'zod';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '@/lib/errors';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 

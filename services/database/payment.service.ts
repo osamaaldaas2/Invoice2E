@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
-import { AppError, NotFoundError } from '@/lib/errors';
+import { AppError } from '@/lib/errors';
 import type { PaymentTransaction } from '@/types';
 import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { CreatePaymentData } from './types';
@@ -43,7 +43,7 @@ export class PaymentService {
             throw new AppError('DB_ERROR', 'Failed to fetch payments', 500);
         }
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as PaymentTransaction);
+        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as PaymentTransaction);
     }
 }
 

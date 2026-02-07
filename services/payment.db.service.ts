@@ -52,7 +52,7 @@ export class PaymentDatabaseService {
             throw new AppError('DB_ERROR', 'Failed to fetch payments', 500);
         }
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as PaymentTransaction);
+        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as PaymentTransaction);
     }
 
     async updatePaymentStatus(transactionId: string, status: string): Promise<PaymentTransaction> {

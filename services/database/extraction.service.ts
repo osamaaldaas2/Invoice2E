@@ -60,7 +60,7 @@ export class ExtractionService {
             throw new AppError('DB_ERROR', 'Failed to fetch extractions', 500);
         }
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceExtraction);
+        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as InvoiceExtraction);
     }
 }
 

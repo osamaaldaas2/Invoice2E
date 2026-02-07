@@ -5,6 +5,18 @@ import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
 import { batchGenerator } from './batch.generator';
 
+type BatchJobRow = {
+    id: string;
+    user_id: string;
+    status: string;
+    total_files: number;
+    completed_files: number;
+    failed_files: number;
+    results: BatchResult[] | null;
+    created_at: string;
+    completed_at?: string | null;
+};
+
 export class BatchService {
     // FIX (BUG-012/013): Size limits to prevent memory exhaustion and DoS
     private readonly MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB per file
@@ -226,16 +238,16 @@ export class BatchService {
             throw new Error(`Failed to list batch jobs: ${error.message}`);
         }
 
-        const jobs: BatchJob[] = (data || []).map(row => ({
+        const jobs: BatchJob[] = (data || []).map((row: BatchJobRow) => ({
             id: row.id,
             userId: row.user_id,
-            status: row.status,
+            status: row.status as BatchJob['status'],
             totalFiles: row.total_files,
             completedFiles: row.completed_files,
             failedFiles: row.failed_files,
             results: row.results || [],
             createdAt: row.created_at,
-            completedAt: row.completed_at,
+            completedAt: row.completed_at || undefined,
         }));
 
         return { jobs, total: count || 0 };

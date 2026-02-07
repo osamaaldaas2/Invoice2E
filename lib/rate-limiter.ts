@@ -282,9 +282,10 @@ export async function resetRateLimit(identifier: string): Promise<void> {
         try {
             const presetNames = Object.keys(RATE_LIMIT_PRESETS);
             await Promise.all(
-                presetNames.map(preset =>
-                    redisRateLimiters![preset as RateLimitPreset].resetUsedTokens(identifier)
-                )
+                presetNames.map((preset) => {
+                    const limiter = redisRateLimiters[preset as RateLimitPreset];
+                    return limiter ? limiter.resetUsedTokens(identifier) : Promise.resolve();
+                })
             );
         } catch (error) {
             logger.error('Failed to reset Redis rate limit', { error, identifier });

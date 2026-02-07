@@ -277,7 +277,10 @@ class AdminStatsService {
             if (!result[date]) {
                 result[date] = [];
             }
-            const value = valueField ? parseFloat((row as Record<string, string>)[valueField]) || 0 : 1;
+            const rawValue = valueField ? (row as Record<string, string>)[valueField] : undefined;
+            const value = valueField
+                ? (rawValue ? parseFloat(rawValue) || 0 : 0)
+                : 1;
             result[date].push(value);
         });
 
@@ -290,16 +293,16 @@ class AdminStatsService {
     private getDateKey(date: Date, period: 'day' | 'week' | 'month'): string {
         switch (period) {
             case 'day':
-                return date.toISOString().split('T')[0];
+                return date.toISOString().split('T')[0] || '';
             case 'week': {
                 const weekStart = new Date(date);
                 weekStart.setDate(date.getDate() - date.getDay());
-                return weekStart.toISOString().split('T')[0];
+                return weekStart.toISOString().split('T')[0] || '';
             }
             case 'month':
                 return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             default:
-                return date.toISOString().split('T')[0];
+                return date.toISOString().split('T')[0] || '';
         }
     }
 }

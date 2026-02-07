@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { logger } from '@/lib/logger';
-import { AppError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 

@@ -40,7 +40,7 @@ class PackageService {
         this.cache = data || [];
         this.cacheExpiry = Date.now() + CACHE_TTL_MS;
 
-        return this.cache;
+        return this.cache ?? [];
     }
 
     /**

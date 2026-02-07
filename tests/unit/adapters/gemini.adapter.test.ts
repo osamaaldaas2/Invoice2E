@@ -1,31 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiAdapter } from '@/adapters/gemini.adapter';
 import { AppError } from '@/lib/errors';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+const mockGenerateContent = vi.hoisted(() => vi.fn());
+const mockGetGenerativeModel = vi.hoisted(() =>
+    vi.fn(() => ({
+        generateContent: mockGenerateContent
+    }))
+);
+const GoogleGenerativeAIMock = vi.hoisted(() =>
+    class GoogleGenerativeAIMock {
+        getGenerativeModel = mockGetGenerativeModel;
+    }
+);
 
-// Mock module BEFORE imports using it (though vitest/jest hoist it usually)
-vi.mock('@google/generative-ai', () => {
-    return {
-        GoogleGenerativeAI: vi.fn()
-    };
-});
+vi.mock('@google/generative-ai', () => ({
+    GoogleGenerativeAI: GoogleGenerativeAIMock
+}));
 
 describe('GeminiAdapter', () => {
     let adapter: GeminiAdapter;
-    let mockGenerateContent: any;
-    let mockGetGenerativeModel: any;
-
     beforeEach(() => {
         vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
 
-        mockGenerateContent = vi.fn();
-        mockGetGenerativeModel = vi.fn().mockReturnValue({
+        mockGenerateContent.mockReset();
+        mockGetGenerativeModel.mockReset();
+        mockGetGenerativeModel.mockReturnValue({
             generateContent: mockGenerateContent
         });
-
-        (GoogleGenerativeAI as any).mockImplementation(() => ({
-            getGenerativeModel: mockGetGenerativeModel
-        }));
 
         adapter = new GeminiAdapter();
     });
@@ -45,7 +46,6 @@ describe('GeminiAdapter', () => {
         // So checking validateConfiguration() usually checks the internal property.
         // But if we want to test false, we need to init with empty env.
 
-        const noKeyAdapter = new GeminiAdapter();
         // Since constructor throws if no key? No, adapter constructor usually guarded?
         // Let's verify adapter source logic soon. Assuming it throws if no key in constructor.
     });

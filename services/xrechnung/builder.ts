@@ -457,8 +457,12 @@ export class XRechnungBuilder {
         // German format with dots: DD.MM.YYYY (unambiguous - dots are German)
         const germanMatch = dateString.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
         if (germanMatch) {
-            const [, day, month, year] = germanMatch;
-            return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
+            const day = germanMatch[1] ?? '';
+            const month = germanMatch[2] ?? '';
+            const year = germanMatch[3] ?? '';
+            if (day && month && year) {
+                return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
+            }
         }
 
         // FIX (QA-BUG-3): Reject ambiguous slash formats like MM/DD/YYYY or DD/MM/YYYY

@@ -12,7 +12,7 @@ interface LogAdminActionParams {
     adminUserId: string;
     targetUserId?: string;
     action: AdminAction | string;
-    resourceType: 'user' | 'package' | 'transaction' | 'system' | 'credits';
+    resourceType: 'user' | 'package' | 'transaction' | 'system' | 'credits' | 'voucher';
     resourceId?: string;
     oldValues?: Record<string, unknown>;
     newValues?: Record<string, unknown>;

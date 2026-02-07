@@ -1,4 +1,3 @@
-import { createUserClient } from '@/lib/supabase.server';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError } from '@/lib/errors';
@@ -38,10 +37,6 @@ export type UpdateConversionData = {
 };
 
 export class InvoiceDatabaseService {
-    private getSupabase() {
-        return createUserClient();
-    }
-
     private getAdminClient() {
         // Direct admin client using Service Role Key to bypass RLS completely
         // This is necessary because createUserClient() might lack session in some contexts

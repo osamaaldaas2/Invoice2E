@@ -17,7 +17,7 @@ export const camelToSnake = (str: string): string => {
     return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 };
 
-type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+type JsonValue = string | number | boolean | null | undefined | JsonObject | JsonArray;
 type JsonObject = { [key: string]: JsonValue };
 type JsonArray = JsonValue[];
 

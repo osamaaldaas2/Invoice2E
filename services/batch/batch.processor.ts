@@ -52,6 +52,10 @@ export class BatchProcessor {
             // FIX (BUG-022): Process files sequentially with progress updates
             for (let index = 0; index < files.length; index++) {
                 const file = files[index];
+                if (!file) {
+                    logger.warn('Skipping missing file entry', { jobId, index });
+                    continue;
+                }
                 logger.info('Processing file', { jobId, filename: file.name, index: index + 1, total: files.length });
 
                 let result: BatchResult;
@@ -91,7 +95,7 @@ export class BatchProcessor {
                     if (format === 'UBL') {
                         xml = await this.uService.generate({
                             invoiceNumber: extractedData.invoiceNumber || `INV-${Date.now()}`,
-                            invoiceDate: extractedData.invoiceDate || new Date().toISOString().split('T')[0],
+                            invoiceDate: extractedData.invoiceDate || (new Date().toISOString().split('T')[0] || new Date().toISOString()),
                             currency: extractedData.currency || 'EUR',
                             sellerName: extractedData.sellerName || '',
                             sellerEmail: extractedData.sellerEmail || '',

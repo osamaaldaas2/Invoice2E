@@ -36,12 +36,21 @@ describe('AuthService', () => {
     });
 
     describe('signup', () => {
+        const baseSignupData = {
+            addressLine1: 'Test Street 1',
+            city: 'Berlin',
+            postalCode: '10115',
+            country: 'DE',
+            phone: '+491234567890',
+        };
+
         it('should have signup method', () => {
             expect(typeof service.signup).toBe('function');
         });
 
         it('should reject invalid email format', async () => {
             const data = {
+                ...baseSignupData,
                 email: 'invalid-email',
                 password: 'ValidPassword123!',
                 firstName: 'Test',
@@ -53,6 +62,7 @@ describe('AuthService', () => {
 
         it('should reject weak password', async () => {
             const data = {
+                ...baseSignupData,
                 email: 'test@example.com',
                 password: 'weak',
                 firstName: 'Test',
@@ -64,6 +74,7 @@ describe('AuthService', () => {
 
         it('should reject missing first name', async () => {
             const data = {
+                ...baseSignupData,
                 email: 'test@example.com',
                 password: 'ValidPassword123!',
                 firstName: '',

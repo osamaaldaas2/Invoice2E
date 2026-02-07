@@ -11,6 +11,20 @@ import { adminAuditService } from './audit.admin.service';
 import { stripeService } from '../stripe.service';
 import { paypalService } from '../paypal.service';
 
+type TransactionRow = {
+    id: string;
+    user_id: string;
+    stripe_payment_id?: string | null;
+    paypal_order_id?: string | null;
+    amount: string;
+    currency?: string | null;
+    credits_purchased?: number | null;
+    payment_method?: string | null;
+    payment_status?: string | null;
+    created_at: string;
+    users?: { email?: string; first_name?: string; last_name?: string } | Array<{ email?: string; first_name?: string; last_name?: string }>;
+};
+
 class AdminTransactionService {
     private getSupabase() {
         return createServerClient();
@@ -70,7 +84,7 @@ class AdminTransactionService {
         }
 
         // Transform data
-        const transactions: AdminTransaction[] = (data || []).map((row) => {
+        const transactions: AdminTransaction[] = (data || []).map((row: TransactionRow) => {
             // Handle Supabase join - users can be object or array depending on query
             const user = Array.isArray(row.users) ? row.users[0] : row.users;
             return {

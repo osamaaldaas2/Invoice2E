@@ -102,7 +102,8 @@ export async function GET(req: NextRequest) {
         });
 
         // Return ZIP file
-        return new NextResponse(zipBuffer, {
+        const body = new Uint8Array(zipBuffer);
+        return new NextResponse(body, {
             status: 200,
             headers: {
                 'Content-Type': 'application/zip',

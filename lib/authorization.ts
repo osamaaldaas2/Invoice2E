@@ -157,11 +157,9 @@ export async function isSuperAdmin(): Promise<boolean> {
  * Get client IP address from request
  */
 export function getClientIp(request: NextRequest): string {
-    return (
-        request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-        request.headers.get('x-real-ip') ||
-        'unknown'
-    );
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const forwardedIp = forwardedFor?.split(',')[0]?.trim();
+    return forwardedIp || request.headers.get('x-real-ip') || 'unknown';
 }
 
 /**

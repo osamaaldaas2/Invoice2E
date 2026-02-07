@@ -195,21 +195,24 @@ export class ReviewService {
 
         // Last line usually contains postal code and city
         const lastLine = lines[lines.length - 1];
+        if (!lastLine) {
+            return { city: '', postalCode: '' };
+        }
 
         // Try to extract postal code (typically 5-6 digits at start)
         const postalCodeMatch = lastLine.match(/^(\d{4,6})\s+(.+)$/);
 
         if (postalCodeMatch) {
             return {
-                postalCode: postalCodeMatch[1],
-                city: postalCodeMatch[2],
+                postalCode: postalCodeMatch[1] || '',
+                city: postalCodeMatch[2] || '',
             };
         }
 
         // If no postal code found, assume it's a city
         return {
             postalCode: '',
-            city: lastLine,
+            city: lastLine || '',
         };
     }
 
@@ -219,7 +222,7 @@ export class ReviewService {
     extractPhoneFromAddress(addressLine: string): string {
         const phoneRegex = /(\+?\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,9})/;
         const match = addressLine?.match(phoneRegex);
-        return match ? match[1] : '';
+        return match?.[1] ?? '';
     }
 }
 

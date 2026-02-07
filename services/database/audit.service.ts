@@ -37,7 +37,7 @@ export class AuditService {
             throw new AppError('DB_ERROR', 'Failed to fetch audit logs', 500);
         }
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as AuditLog);
+        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as AuditLog);
     }
 }
 

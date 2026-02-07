@@ -40,7 +40,7 @@ export interface AdminAuditLog {
     targetUserId?: string;
     targetEmail?: string;
     action: string;
-    resourceType: 'user' | 'package' | 'transaction' | 'system' | 'credits';
+    resourceType: 'user' | 'package' | 'transaction' | 'system' | 'credits' | 'voucher';
     resourceId?: string;
     oldValues?: Record<string, unknown>;
     newValues?: Record<string, unknown>;

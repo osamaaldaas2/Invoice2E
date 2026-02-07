@@ -1,25 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const createServerClientMock = vi.fn();
+const createServerClientMock = vi.hoisted(() => vi.fn());
+const stripeServiceMock = vi.hoisted(() => ({
+    isConfigured: vi.fn(),
+    createCheckoutSession: vi.fn()
+}));
+const paypalServiceMock = vi.hoisted(() => ({
+    isConfigured: vi.fn(),
+    createOrder: vi.fn(),
+    captureOrder: vi.fn()
+}));
+const emailServiceMock = vi.hoisted(() => ({
+    sendPaymentConfirmationEmail: vi.fn()
+}));
 
 vi.mock('@/lib/supabase.server', () => ({
     createServerClient: () => createServerClientMock()
 }));
-
-const stripeServiceMock = {
-    isConfigured: vi.fn(),
-    createCheckoutSession: vi.fn()
-};
-
-const paypalServiceMock = {
-    isConfigured: vi.fn(),
-    createOrder: vi.fn(),
-    captureOrder: vi.fn()
-};
-
-const emailServiceMock = {
-    sendPaymentConfirmationEmail: vi.fn()
-};
 
 vi.mock('@/services/stripe.service', () => ({
     stripeService: stripeServiceMock,
@@ -50,14 +47,6 @@ const makeSelectSingle = (data: unknown, error: unknown = null) => {
 const makeInsert = (data: unknown = null, error: unknown = null) => ({
     insert: vi.fn(async () => ({ data, error }))
 });
-
-const makeUpdateChain = () => {
-    const api: any = {
-        update: vi.fn(() => api),
-        eq: vi.fn(() => api)
-    };
-    return api;
-};
 
 describe('PaymentProcessor', () => {
     let processor: PaymentProcessor;

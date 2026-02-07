@@ -14,9 +14,23 @@ import {
     ModifyCreditsInput,
     ChangeRoleInput,
 } from '@/types/admin';
-import { UserRole } from '@/types/index';
 import { adminAuditService } from './audit.admin.service';
 
+type UserRow = {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role?: string | null;
+    is_banned?: boolean | null;
+    banned_at?: string | null;
+    banned_reason?: string | null;
+    last_login_at?: string | null;
+    login_count?: number | null;
+    created_at: string;
+    updated_at: string;
+    user_credits?: Array<{ available_credits?: number | null; used_credits?: number | null }> | null;
+};
 class AdminUserService {
     private getSupabase() {
         return createServerClient();
@@ -76,7 +90,7 @@ class AdminUserService {
         }
 
         // Transform data
-        const users: AdminUserWithCredits[] = (data || []).map((row) => ({
+        const users: AdminUserWithCredits[] = (data || []).map((row: UserRow) => ({
             id: row.id,
             email: row.email,
             firstName: row.first_name,
@@ -159,7 +173,7 @@ class AdminUserService {
         }
 
         // Update user
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('users')
             .update({
                 is_banned: true,

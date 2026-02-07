@@ -95,6 +95,9 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
         if (lines.length === 0) return { street: '', postalCode: '', city: '', country: 'DE' };
 
         const lastLine = lines[lines.length - 1];
+        if (!lastLine) {
+            return { street: '', postalCode: '', city: '', country: 'DE' };
+        }
         const postalCodeMatch = lastLine.match(/^(\d{4,6})\s+(.+)$/);
 
         if (postalCodeMatch) {

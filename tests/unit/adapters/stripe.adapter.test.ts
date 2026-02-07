@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StripeAdapter } from '@/adapters/stripe.adapter';
+import crypto from 'crypto';
 
 describe('StripeAdapter', () => {
     let adapter: StripeAdapter;
@@ -56,10 +57,14 @@ describe('StripeAdapter', () => {
     });
 
     it('should construct webhook event verification', async () => {
-        // Since logic is internal manual verification for now
         const payload = JSON.stringify({ type: 'test' });
         const timestamp = Math.floor(Date.now() / 1000);
-        const signature = `t=${timestamp},v1=sig`;
+        const signedPayload = `${timestamp}.${payload}`;
+        const expectedSignature = crypto
+            .createHmac('sha256', 'test-webhook-secret')
+            .update(signedPayload, 'utf8')
+            .digest('hex');
+        const signature = `t=${timestamp},v1=${expectedSignature}`;
 
         const event = await adapter.constructWebhookEvent(payload, signature);
         expect(event).toEqual({ type: 'test' });

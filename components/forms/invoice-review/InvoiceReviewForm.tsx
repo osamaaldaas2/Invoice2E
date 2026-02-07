@@ -1,6 +1,4 @@
 'use client';
-
-import React from 'react';
 import { useInvoiceReviewForm } from './useInvoiceReviewForm';
 import { InvoiceDetailsSection } from './InvoiceDetailsSection';
 import { SellerInfoSection } from './SellerInfoSection';

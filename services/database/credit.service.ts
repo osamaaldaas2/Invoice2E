@@ -63,7 +63,7 @@ export class CreditService {
         const supabase = this.getSupabase();
 
         // FIX: Use atomic RPC call instead of invalid nested RPC in update
-        const { data: newBalance, error: rpcError } = await supabase.rpc('add_credits', {
+        const { error: rpcError } = await supabase.rpc('add_credits', {
             p_user_id: userId,
             p_amount: amount,
             p_source: source,

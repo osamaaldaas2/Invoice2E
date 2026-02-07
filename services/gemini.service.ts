@@ -308,11 +308,11 @@ export class GeminiService {
             const subtotal = Number(data.subtotal) || 0;
             const totalAmount = Number(data.totalAmount) || 0;
             const rawTaxAmount = Number(data.taxAmount);
-            const hasTaxAmount = data.taxAmount !== null && data.taxAmount !== undefined && data.taxAmount !== '';
+            const hasTaxAmount = data.taxAmount !== null && data.taxAmount !== undefined;
             const taxAmount = hasTaxAmount && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
                 ? rawTaxAmount
                 : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) * 100) / 100 : 0);
-            const hasTaxRate = data.taxRate !== null && data.taxRate !== undefined && data.taxRate !== '';
+            const hasTaxRate = data.taxRate !== null && data.taxRate !== undefined;
             const parsedTaxRate = hasTaxRate ? Number(data.taxRate) : NaN;
             const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
 

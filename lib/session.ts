@@ -89,7 +89,14 @@ export function verifySessionToken(token: string): SessionPayload | null {
             return null;
         }
 
-        const [version, payloadBase64, providedSignature] = parts;
+        const version = parts[0] ?? '';
+        const payloadBase64 = parts[1] ?? '';
+        const providedSignature = parts[2] ?? '';
+
+        if (!version || !payloadBase64 || !providedSignature) {
+            logger.warn('Invalid session token parts');
+            return null;
+        }
 
         // Check version
         if (version !== TOKEN_VERSION) {
@@ -276,7 +283,13 @@ export function verifySignedDownloadToken(
             return null;
         }
 
-        const [payloadBase64, providedSignature] = parts;
+        const payloadBase64 = parts[0] ?? '';
+        const providedSignature = parts[1] ?? '';
+
+        if (!payloadBase64 || !providedSignature) {
+            logger.warn('Invalid signed URL token parts');
+            return null;
+        }
 
         // Verify signature
         const expectedSignature = crypto

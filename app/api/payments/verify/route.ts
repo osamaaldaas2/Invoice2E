@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
                     // But for lookup, we MUST use what we stored.
                     // create-checkout stores session.id as stripe_session_id
                     paymentId = sessionId;
-                    stripePaymentIntentId = (session.paymentIntentId || session.payment_intent) as string | undefined;
+                    stripePaymentIntentId = session.paymentIntentId || (session as { payment_intent?: string }).payment_intent;
                 }
             } catch (error) {
                 logger.error('Stripe session verification failed', { sessionId, error });
@@ -103,15 +103,6 @@ export async function POST(req: NextRequest) {
 
             // First check: Has webhook already processed for this user recently?
             // We check by looking at the reference_id stored during credit addition
-            const { data: recentWebhookCredit } = await supabase
-                .from('credit_audit_log')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('source', 'stripe')
-                .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
-                .limit(1)
-                .single();
-
             // Second check: Is this specific payment already in webhook_events?
             // Check by looking for events that mention this session or its payment intent
             const { data: webhookProcessed } = await supabase
@@ -289,7 +280,7 @@ export async function POST(req: NextRequest) {
                 event_type: 'payment.verified',
                 user_id: user.id,
                 credits_added: credits,
-            }).catch(err => {
+            }).catch((err: unknown) => {
                 // Don't fail if insert fails (might be duplicate), just log
                 logger.warn('Failed to insert verify event (may be duplicate)', { error: err });
             });
