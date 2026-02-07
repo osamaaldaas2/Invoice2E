@@ -109,8 +109,10 @@ export async function POST(req: NextRequest) {
             message: `Batch job created with ${job.totalFiles} files. Processing will begin shortly.`,
         }, { status: 202 });
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to process upload';
-        return handleApiError(error, 'Failed to create batch job', { message });
+        logger.error('Failed to process bulk upload', error);
+        return handleApiError(error, 'Failed to create batch job', {
+            message: 'Failed to process upload'
+        });
     }
 }
 

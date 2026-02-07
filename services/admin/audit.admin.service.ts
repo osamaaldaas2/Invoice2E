@@ -119,35 +119,6 @@ class AdminAuditService {
         query = query.range(from, to);
 
         const { data, error, count } = await query;
-
-        if (error) {
-            logger.error('Failed to fetch audit logs', { error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch audit logs', 500);
-        }
-
-        // Transform data
-        const logs: AdminAuditLog[] = (data || []).map((row: any) => ({
-            id: row.id,
-            adminUserId: row.admin_user_id,
-            adminEmail: row.admin?.email,
-            adminName: row.admin
-                ? [row.admin.first_name, row.admin.last_name].filter(Boolean).join(' ') || undefined
-                : undefined, targetUserId: row.target_user_id,
-            targetEmail: row.target?.email,
-            action: row.action,
-            resourceType: row.resource_type,
-            resourceId: row.resource_id,
-            oldValues: row.old_values,
-            newValues: row.new_values,
-            ipAddress: row.ip_address,
-            userAgent: row.user_agent,
-            createdAt: new Date(row.created_at),
-        }));
-
-        return {
-            logs,
-            total: count || 0,
-        };
     }
 
     /**

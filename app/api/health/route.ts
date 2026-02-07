@@ -48,7 +48,7 @@ export async function GET(): Promise<NextResponse> {
             status: allHealthy ? 200 : 503,
         });
     } catch (error) {
-        logger.error('Health check failed', { error });
+        logger.error('Health check failed', error);
         const errorResponse: HealthCheckResponse = {
             status: 'error',
             timestamp: new Date().toISOString(),

@@ -5,11 +5,13 @@
 
 // Allowed origins for CORS
 const getAllowedOrigins = (): string[] => {
-    const origins = process.env.CORS_ALLOWED_ORIGINS?.split(',') || [];
+    const origins = (process.env.CORS_ALLOWED_ORIGINS?.split(',') || [])
+        .map(origin => origin.trim())
+        .filter(Boolean);
 
     // Always allow the app's own origin in production
     if (process.env.NEXT_PUBLIC_APP_URL) {
-        origins.push(process.env.NEXT_PUBLIC_APP_URL);
+        origins.push(process.env.NEXT_PUBLIC_APP_URL.trim());
     }
 
     // In development, allow localhost

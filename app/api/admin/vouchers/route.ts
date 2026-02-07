@@ -7,6 +7,7 @@ import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
+import { UserInputError } from '@/lib/user-input-error';
 
 const VoucherSchema = z.object({
     code: z.string().min(3).max(50),
@@ -63,7 +64,7 @@ const parseAllowedUsers = async (raw: string | null | undefined, supabase: Retur
                 .single();
 
             if (error || !data?.id) {
-                throw new Error(`User not found for email: ${token}`);
+                throw new UserInputError(`User not found for email: ${token}`);
             }
 
             ids.push(data.id);
@@ -71,7 +72,7 @@ const parseAllowedUsers = async (raw: string | null | undefined, supabase: Retur
         }
 
         if (!isValidUUID(token)) {
-            throw new Error(`Invalid user identifier: ${token}`);
+            throw new UserInputError(`Invalid user identifier: ${token}`);
         }
 
         ids.push(token);
@@ -203,13 +204,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: true, data: { voucher: newVoucher } }, { status: 201 });
     } catch (error) {
         const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
-        const isPlainError = error instanceof Error && !(error instanceof z.ZodError);
+        const isUserError = error instanceof z.ZodError || error instanceof UserInputError;
 
         return handleApiError(error, 'Admin create voucher error', {
             includeSuccess: true,
             extra,
-            status: isPlainError ? 400 : undefined,
-            message: isPlainError ? error.message : 'Internal server error'
+            status: isUserError ? 400 : undefined,
+            message: isUserError && error instanceof Error ? error.message : undefined
         });
     }
 }

@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
     } catch (error) {
         return handleApiError(error, 'Failed to list templates', {
             message: 'Failed to list templates',
+            includeSuccess: true
         });
     }
 }
