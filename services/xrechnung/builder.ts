@@ -308,14 +308,14 @@ export class XRechnungBuilder {
 
             ${this.buildPaymentMeans(data)}
 
+            const categoryCode = taxRate === 0 ? 'Z' : 'S';
             <ram:ApplicableTradeTax>
                 <ram:CalculatedAmount>${taxAmount.toFixed(2)}</ram:CalculatedAmount>
                 <ram:TypeCode>VAT</ram:TypeCode>
                 <ram:BasisAmount>${subtotal.toFixed(2)}</ram:BasisAmount>
-                <ram:CategoryCode>S</ram:CategoryCode>
+                <ram:CategoryCode>${categoryCode}</ram:CategoryCode>
                 <ram:RateApplicablePercent>${taxRate.toFixed(2)}</ram:RateApplicablePercent>
             </ram:ApplicableTradeTax>
-
             ${this.buildPaymentTerms(data)}
 
             <ram:SpecifiedTradeSettlementHeaderMonetarySummation>

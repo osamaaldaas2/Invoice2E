@@ -4,12 +4,15 @@ import { logger } from '@/lib/logger';
 import { ValidationError, AppError } from '@/lib/errors';
 import { setSessionCookie } from '@/lib/session';
 import { ZodError } from 'zod';
+import { SignupSchema } from '@/lib/validators';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const body = await request.json();
+        const validatedData = SignupSchema.parse(body);
+        const signupInput = { ...validatedData, email: validatedData.email.toLowerCase() };
 
-        const user = await authService.signup(body);
+        const user = await authService.signup(signupInput);
 
         logger.info('Signup successful', { userId: user.id });
 

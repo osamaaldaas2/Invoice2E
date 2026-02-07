@@ -25,7 +25,6 @@ export async function POST(
         const admin = await requireAdmin(request);
 
         const { id: userId } = await context.params;
-        const body = await request.json();
 
         const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
         const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
@@ -38,6 +37,8 @@ export async function POST(
                 }
             );
         }
+
+        const body = await request.json();
 
         // Validate input
         const { amount, reason } = ModifyCreditsSchema.parse(body);

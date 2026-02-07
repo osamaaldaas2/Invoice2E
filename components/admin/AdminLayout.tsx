@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 // Admin navigation items
 const adminNavItems = [
@@ -194,7 +195,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </header>
 
                 {/* Page content */}
-                <main className="p-6">{children}</main>
+                <main className="p-6">
+                    <ErrorBoundary>
+                        {children}
+                    </ErrorBoundary>
+                </main>
             </div>
         </div>
     );

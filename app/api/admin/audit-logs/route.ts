@@ -6,10 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authorization';
 import { adminAuditService } from '@/services/admin';
-import { logger } from '@/lib/logger';
 import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { AdminAuditLogsFilter, AdminAction } from '@/types/admin';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { PaginationSchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -30,8 +31,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         // Parse query parameters
         const { searchParams } = new URL(request.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+        const pagination = PaginationSchema.safeParse({
+            page: searchParams.get('page') ?? '1',
+            limit: searchParams.get('limit') ?? '50',
+        });
+
+        if (!pagination.success) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid pagination parameters' },
+                { status: 400 }
+            );
+        }
+
+        const { page, limit } = pagination.data;
         const adminUserId = searchParams.get('adminUserId') || undefined;
         const targetUserId = searchParams.get('targetUserId') || undefined;
         const action = searchParams.get('action') as AdminAction | undefined;
@@ -77,11 +89,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        logger.error('Admin audit logs error', { error });
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch audit logs' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin audit logs error', {
+            message: 'Failed to fetch audit logs',
+            includeSuccess: true,
+        });
     }
 }
 

@@ -6,11 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
-import { logger } from '@/lib/logger';
-import { UnauthorizedError, ForbiddenError, AppError } from '@/lib/errors';
+import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { AdminUsersFilter } from '@/types/admin';
 import { UserRole } from '@/types/index';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { PaginationSchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -31,8 +32,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         // Parse query parameters
         const { searchParams } = new URL(request.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+        const pagination = PaginationSchema.safeParse({
+            page: searchParams.get('page') ?? '1',
+            limit: searchParams.get('limit') ?? '20',
+        });
+
+        if (!pagination.success) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid pagination parameters' },
+                { status: 400 }
+            );
+        }
+
+        const { page, limit } = pagination.data;
         const search = searchParams.get('search') || undefined;
         const role = searchParams.get('role') as UserRole | undefined;
         const isBanned = searchParams.get('isBanned');
@@ -76,11 +88,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        logger.error('Admin users list error', { error });
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch users' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin users list error', {
+            message: 'Failed to fetch users',
+            includeSuccess: true,
+        });
     }
 }
 

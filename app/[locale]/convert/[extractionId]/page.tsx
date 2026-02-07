@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { fetchSessionUser } from '@/lib/client-auth';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 type User = {
     id: string;
@@ -125,7 +126,8 @@ export default function ConvertPage() {
 
     return (
         <ProtectedRoute fallbackUrl="/login">
-            <div className="min-h-screen">
+            <ErrorBoundary>
+                <div className="min-h-screen">
                 {/* Progress Steps */}
                 <div className="bg-slate-950/70 border-b border-white/10 backdrop-blur-xl mb-8">
                     <div className="container mx-auto px-4 py-4">
@@ -236,7 +238,8 @@ export default function ConvertPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </ErrorBoundary>
         </ProtectedRoute>
     );
 }

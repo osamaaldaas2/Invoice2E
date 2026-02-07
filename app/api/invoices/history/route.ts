@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyticsService } from '@/services/analytics.service';
 
-import { logger } from '@/lib/logger';
+import { PaginationSchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * GET /api/invoices/history
@@ -33,8 +34,19 @@ export async function GET(req: NextRequest) {
 
         // Parse query parameters
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+        const pagination = PaginationSchema.safeParse({
+            page: searchParams.get('page') ?? '1',
+            limit: searchParams.get('limit') ?? '20',
+        });
+
+        if (!pagination.success) {
+            return NextResponse.json(
+                { error: 'Invalid pagination parameters' },
+                { status: 400 }
+            );
+        }
+
+        const { page, limit } = pagination.data;
         const format = searchParams.get('format') as 'CII' | 'UBL' | null;
         const status = searchParams.get('status') as 'valid' | 'invalid' | 'draft' | 'completed' | null;
         const startDate = searchParams.get('startDate');
@@ -67,10 +79,8 @@ export async function GET(req: NextRequest) {
             ...history,
         });
     } catch (error) {
-        logger.error('Failed to get history', { error });
-        return NextResponse.json(
-            { error: 'Failed to get conversion history' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to get conversion history', {
+            message: 'Failed to get conversion history',
+        });
     }
 }

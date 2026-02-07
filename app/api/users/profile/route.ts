@@ -3,9 +3,9 @@ import { ZodError } from 'zod';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { getSessionFromCookie, setSessionCookie } from '@/lib/session';
 import { UpdateProfileSchema } from '@/lib/validators';
-import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { userService } from '@/services/user.service';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
     try {
@@ -17,8 +17,9 @@ export async function GET(request: NextRequest) {
         const profile = await userService.getProfile(user.id);
         return NextResponse.json({ success: true, data: profile }, { status: 200 });
     } catch (error) {
-        logger.error('Failed to get profile', { error });
-        return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 });
+        return handleApiError(error, 'Failed to get profile', {
+            message: 'Failed to load profile',
+        });
     }
 }
 
@@ -46,8 +47,6 @@ export async function PUT(request: NextRequest) {
 
         return NextResponse.json({ success: true, data: profile }, { status: 200 });
     } catch (error) {
-        logger.error('Failed to update profile', { error });
-
         if (error instanceof ZodError) {
             return NextResponse.json(
                 { error: error.errors[0]?.message || 'Validation failed' },
@@ -59,6 +58,8 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: error.statusCode });
         }
 
-        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+        return handleApiError(error, 'Failed to update profile', {
+            message: 'Failed to update profile',
+        });
     }
 }

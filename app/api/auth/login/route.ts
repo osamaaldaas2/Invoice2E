@@ -5,6 +5,7 @@ import { ValidationError, AppError, UnauthorizedError, ForbiddenError } from '@/
 import { ZodError } from 'zod';
 import { setSessionCookie } from '@/lib/session';
 import { checkRateLimit, resetRateLimit, getRequestIdentifier } from '@/lib/rate-limiter';
+import { LoginSchema } from '@/lib/validators';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     // FIX (BUG-019): Rate limiting to prevent brute force attacks
@@ -12,7 +13,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
         const body = await request.json();
-        const email = body.email?.toLowerCase();
+        const validatedData = LoginSchema.parse(body);
+        const email = validatedData.email.toLowerCase();
+        const loginInput = { ...validatedData, email };
 
         // Check rate limit before processing
         rateLimitId = getRequestIdentifier(request, email);
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const user = await authService.login(body);
+        const user = await authService.login(loginInput);
 
         logger.info('Login successful', { userId: user.id });
 

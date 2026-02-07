@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 interface CreditPackage {
@@ -21,12 +21,34 @@ export default function CreditPurchaseForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useState(() => {
-        fetch('/api/payments/create-checkout')
-            .then(res => res.json())
-            .then(data => setPackages(data.packages || []))
-            .catch(() => setError('Failed to load packages'));
-    });
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadPackages = async () => {
+            try {
+                const response = await fetch('/api/payments/create-checkout');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data?.error || 'Failed to load packages');
+                }
+
+                if (!cancelled) {
+                    setPackages(data.packages || []);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Failed to load packages');
+                }
+            }
+        };
+
+        void loadPackages();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handlePurchase = async () => {
         if (!selectedPackage) return;

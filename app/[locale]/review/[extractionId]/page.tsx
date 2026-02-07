@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import InvoiceReviewForm from '@/components/forms/InvoiceReviewForm';
 import { fetchSessionUser } from '@/lib/client-auth';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 type User = {
     id: string;
@@ -118,7 +119,8 @@ export default function ReviewPage() {
     }
 
     return (
-        <div className="min-h-screen">
+        <ErrorBoundary>
+            <div className="min-h-screen">
             <div className="container mx-auto px-4 pt-6 flex items-center justify-between">
                 <span className="text-faded font-medium">Reviewing Invoice</span>
                 <Link
@@ -183,7 +185,8 @@ export default function ReviewPage() {
                     />
                 </div>
             </main>
-        </div>
+            </div>
+        </ErrorBoundary>
     );
 }
 

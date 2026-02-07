@@ -47,7 +47,7 @@ export const UpdateProfileSchema = z.object({
 // Pagination query params schema
 export const PaginationSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(50).default(10),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
 });

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import FileUploadForm from '@/components/forms/FileUploadForm';
 import { fetchSessionUser } from '@/lib/client-auth';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 type User = {
     id: string;
@@ -61,6 +62,7 @@ export default function DashboardPage() {
     const [draftsLoading, setDraftsLoading] = useState(true);
     const [conversions, setConversions] = useState<ConversionItem[]>([]);
     const [conversionsLoading, setConversionsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const locale = useMemo(() => {
         const parts = pathname?.split('/') || [];
@@ -92,34 +94,49 @@ export default function DashboardPage() {
                 }
 
                 setUser(sessionUser);
+                setError(null);
 
                 // Fetch stats
-                fetch('/api/invoices/analytics?type=stats', { cache: 'no-store' })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.statistics) {
-                            setStats(data.statistics);
-                        }
-                    })
-                    .catch(console.error);
+                try {
+                    const response = await fetch('/api/invoices/analytics?type=stats', { cache: 'no-store' });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data?.error || 'Failed to load stats');
+                    }
+                    if (data.statistics) {
+                        setStats(data.statistics);
+                    }
+                } catch (err) {
+                    setError(prev => prev ?? (err instanceof Error ? err.message : 'Failed to load stats'));
+                }
 
                 // Fetch drafts
-                fetch('/api/invoices/history?status=draft&limit=5', { cache: 'no-store' })
-                    .then(res => res.json())
-                    .then(data => {
-                        setDrafts(data.items || []);
-                    })
-                    .catch(console.error)
-                    .finally(() => setDraftsLoading(false));
+                try {
+                    const response = await fetch('/api/invoices/history?status=draft&limit=5', { cache: 'no-store' });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data?.error || 'Failed to load drafts');
+                    }
+                    setDrafts(data.items || []);
+                } catch (err) {
+                    setError(prev => prev ?? (err instanceof Error ? err.message : 'Failed to load drafts'));
+                } finally {
+                    setDraftsLoading(false);
+                }
 
                 // Fetch recent conversions
-                fetch('/api/invoices/history?status=completed&limit=5', { cache: 'no-store' })
-                    .then(res => res.json())
-                    .then(data => {
-                        setConversions(data.items || []);
-                    })
-                    .catch(console.error)
-                    .finally(() => setConversionsLoading(false));
+                try {
+                    const response = await fetch('/api/invoices/history?status=completed&limit=5', { cache: 'no-store' });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data?.error || 'Failed to load conversions');
+                    }
+                    setConversions(data.items || []);
+                } catch (err) {
+                    setError(prev => prev ?? (err instanceof Error ? err.message : 'Failed to load conversions'));
+                } finally {
+                    setConversionsLoading(false);
+                }
             } catch {
                 router.push(withLocale('/login'));
             } finally {
@@ -143,8 +160,9 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen">
-            <div className="flex">
+        <ErrorBoundary>
+            <div className="min-h-screen">
+                <div className="flex">
                 {/* Sidebar Navigation */}
                 <aside className="hidden md:block w-64 bg-slate-950/70 border-r border-white/10 backdrop-blur-xl min-h-screen fixed left-0 top-16">
                     <div className="p-4">
@@ -178,6 +196,11 @@ export default function DashboardPage() {
                 {/* Main Content */}
                 <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8">
                     <div className="max-w-6xl mx-auto">
+                        {error && (
+                            <div className="mb-6 glass-panel border border-rose-400/30 text-rose-200 px-4 py-3 rounded-xl">
+                                {error}
+                            </div>
+                        )}
                         <div className="md:hidden mb-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <span className="chip">{user.firstName}</span>
@@ -358,7 +381,8 @@ export default function DashboardPage() {
 
                     </div>
                 </main>
+                </div>
             </div>
-        </div>
+        </ErrorBoundary>
     );
 }

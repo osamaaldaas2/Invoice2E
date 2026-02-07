@@ -9,7 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { paymentProcessor } from '@/services/payment-processor';
 import { createServerClient } from '@/lib/supabase.server';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
+import { PaginationSchema } from '@/lib/validators';
 
 /**
  * GET /api/payments/history
@@ -31,8 +32,19 @@ export async function GET(req: NextRequest) {
 
         // Parse query parameters
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+        const pagination = PaginationSchema.safeParse({
+            page: searchParams.get('page') ?? '1',
+            limit: searchParams.get('limit') ?? '20',
+        });
+
+        if (!pagination.success) {
+            return NextResponse.json(
+                { error: 'Invalid pagination parameters' },
+                { status: 400 }
+            );
+        }
+
+        const { page, limit } = pagination.data;
 
         const history = await paymentProcessor.getPaymentHistory(user.id, page, limit);
 
@@ -50,10 +62,6 @@ export async function GET(req: NextRequest) {
             usedCredits: credits?.used_credits || 0,
         });
     } catch (error) {
-        logger.error('Failed to get payment history', { error });
-        return NextResponse.json(
-            { error: 'Failed to get payment history' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to get payment history');
     }
 }

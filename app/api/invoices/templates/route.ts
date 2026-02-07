@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { templateDBService, TemplateData } from '@/services/template.db.service';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * GET /api/invoices/templates
@@ -33,11 +33,9 @@ export async function GET(req: NextRequest) {
             templates,
         });
     } catch (error) {
-        logger.error('Failed to list templates', { error });
-        return NextResponse.json(
-            { error: 'Failed to list templates' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to list templates', {
+            message: 'Failed to list templates',
+        });
     }
 }
 
@@ -99,10 +97,8 @@ export async function POST(req: NextRequest) {
             template,
         }, { status: 201 });
     } catch (error) {
-        logger.error('Failed to create template', { error });
-        return NextResponse.json(
-            { error: 'Failed to create template' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to create template', {
+            message: 'Failed to create template',
+        });
     }
 }

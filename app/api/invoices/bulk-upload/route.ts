@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createSignedDownloadToken } from '@/lib/session';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { PaginationSchema } from '@/lib/validators';
 
 /**
  * POST /api/invoices/bulk-upload
@@ -149,10 +150,20 @@ export async function GET(req: NextRequest) {
 
         // List all batch jobs
         if (listAll) {
-            const page = parseInt(searchParams.get('page') || '1');
-            const limit = parseInt(searchParams.get('limit') || '10');
-            const { jobs, total } = await batchService.listBatchJobs(user.id, page, limit);
+            const pagination = PaginationSchema.safeParse({
+                page: searchParams.get('page') ?? '1',
+                limit: searchParams.get('limit') ?? '10',
+            });
 
+            if (!pagination.success) {
+                return NextResponse.json(
+                    { error: 'Invalid pagination parameters' },
+                    { status: 400 }
+                );
+            }
+
+            const { page, limit } = pagination.data;
+            const { jobs, total } = await batchService.listBatchJobs(user.id, page, limit);
             return NextResponse.json({
                 success: true,
                 jobs,
