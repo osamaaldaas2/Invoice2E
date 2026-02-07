@@ -5,7 +5,6 @@
 
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
-import { AppError } from '@/lib/errors';
 import {
     AdminDashboardStats,
     RevenueDataPoint,
@@ -116,9 +115,9 @@ class AdminStatsService {
 
         // Calculate totals
         const totalRevenue =
-            revenueResult.data?.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0) || 0;
+            revenueResult.data?.reduce((sum: number, tx: { amount: string }) => sum + (parseFloat(tx.amount) || 0), 0) || 0;
         const revenue30d =
-            revenue30dResult.data?.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0) ||
+            revenue30dResult.data?.reduce((sum: number, tx: { amount: string }) => sum + (parseFloat(tx.amount) || 0), 0) ||
             0;
 
         return {
@@ -242,7 +241,7 @@ class AdminStatsService {
         // Group by period and status
         const result: Record<string, { total: number; successful: number; failed: number }> = {};
 
-        (data || []).forEach((row) => {
+        (data || []).forEach((row: { created_at: string; validation_status: string }) => {
             const date = this.getDateKey(new Date(row.created_at), period);
             if (!result[date]) {
                 result[date] = { total: 0, successful: 0, failed: 0 };
