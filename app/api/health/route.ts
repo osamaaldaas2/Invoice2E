@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { APP_VERSION } from '@/lib/constants';
 import { createServerClient } from '@/lib/supabase.server';
+import { handleApiError } from '@/lib/api-helpers';
 
 interface HealthCheckResponse {
     status: 'ok' | 'degraded' | 'error';
@@ -49,7 +50,6 @@ export async function GET(): Promise<NextResponse<HealthCheckResponse>> {
         });
     } catch (error) {
         logger.error('Health check failed', { error });
-
         const errorResponse: HealthCheckResponse = {
             status: 'error',
             timestamp: new Date().toISOString(),
@@ -60,6 +60,10 @@ export async function GET(): Promise<NextResponse<HealthCheckResponse>> {
             },
         };
 
-        return NextResponse.json(errorResponse, { status: 500 });
+        return handleApiError(error, 'Health check failed', {
+            status: 500,
+            message: 'Health check failed',
+            extra: errorResponse
+        });
     }
 }
