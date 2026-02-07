@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 const RedeemSchema = z.object({
     code: z.string().min(3),
@@ -61,7 +62,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ success: false, error: 'Invalid voucher code' }, { status: 400 });
         }
 
-        logger.error('Voucher redeem error', { error });
-        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error, 'Voucher redeem error', {
+            includeSuccess: true,
+            message: 'Internal server error'
+        });
     }
 }

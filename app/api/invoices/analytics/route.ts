@@ -7,8 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { analyticsService } from '@/services/analytics.service';
-
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * GET /api/invoices/analytics
@@ -52,10 +51,6 @@ export async function GET(req: NextRequest) {
             ...(chartsData && { charts: chartsData }),
         });
     } catch (error) {
-        logger.error('Failed to get analytics', { error });
-        return NextResponse.json(
-            { error: 'Failed to get analytics' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to get analytics', { message: 'Failed to get analytics' });
     }
 }

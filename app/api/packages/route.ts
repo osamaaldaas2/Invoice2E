@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { packageService } from '@/services/package.service';
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET() {
     try {
@@ -19,15 +19,10 @@ export async function GET() {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        logger.error('Failed to fetch packages', { error });
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Failed to load pricing packages',
-                timestamp: new Date().toISOString(),
-            },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to fetch packages', {
+            includeSuccess: true,
+            message: 'Failed to load pricing packages',
+            extra: { timestamp: new Date().toISOString() }
+        });
     }
 }

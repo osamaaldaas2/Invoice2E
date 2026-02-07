@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/services/auth.service';
 import { logger } from '@/lib/logger';
-import { ValidationError, AppError, UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { ZodError } from 'zod';
 import { setSessionCookie } from '@/lib/session';
 import { checkRateLimit, resetRateLimit, getRequestIdentifier } from '@/lib/rate-limiter';
 import { LoginSchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     // FIX (BUG-019): Rate limiting to prevent brute force attacks
@@ -59,66 +59,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Login route error', error instanceof Error ? error : undefined);
-
-        if (error instanceof ZodError) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: error.errors[0]?.message || 'Validation failed',
-                },
-                { status: 400 }
-            );
-        }
-
-        if (error instanceof UnauthorizedError) {
-            // Don't reset rate limit on failed auth - this counts as an attempt
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: error.message,
-                },
-                { status: 401 }
-            );
-        }
-
-        if (error instanceof ForbiddenError) {
-            // User is banned
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: error.message,
-                },
-                { status: 403 }
-            );
-        }
-
-        if (error instanceof ValidationError) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: error.message,
-                },
-                { status: error.statusCode }
-            );
-        }
-
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: error.message,
-                },
-                { status: error.statusCode }
-            );
-        }
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Internal server error',
-            },
-            { status: 500 }
-        );
+        const extra = error instanceof ZodError ? { details: error.errors } : undefined;
+        return handleApiError(error, 'Login route error', {
+            includeSuccess: true,
+            extra
+        });
     }
 }

@@ -4,11 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, getClientIp, getUserAgent } from '@/lib/authorization';
+import { requireAdmin } from '@/lib/authorization';
 import { adminStatsService } from '@/services/admin';
-import { logger } from '@/lib/logger';
-import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
@@ -35,24 +34,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             data: stats,
         });
     } catch (error) {
-        if (error instanceof UnauthorizedError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 401 }
-            );
-        }
-        if (error instanceof ForbiddenError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 403 }
-            );
-        }
-
-        logger.error('Admin stats error', { error });
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch stats' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin stats error', {
+            includeSuccess: true,
+            message: 'Failed to fetch stats'
+        });
     }
 }
 

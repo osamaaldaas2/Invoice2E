@@ -6,10 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getClientIp, getUserAgent } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
-import { logger } from '@/lib/logger';
-import { UnauthorizedError, ForbiddenError, NotFoundError, AppError } from '@/lib/errors';
 import { z } from 'zod';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 const BanUserSchema = z.object({
     action: z.enum(['ban', 'unban']),
@@ -84,43 +83,17 @@ export async function POST(
             message: action === 'ban' ? 'User banned successfully' : 'User unbanned successfully',
         });
     } catch (error) {
-        if (error instanceof z.ZodError) {
-            return NextResponse.json(
-                { success: false, error: error.errors[0]?.message || 'Validation failed' },
-                { status: 400 }
-            );
-        }
-        if (error instanceof UnauthorizedError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 401 }
-            );
-        }
-        if (error instanceof ForbiddenError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 403 }
-            );
-        }
-        if (error instanceof NotFoundError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 404 }
-            );
-        }
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
         const { id: userId } = await context.params;
-        logger.error('Admin ban user error', { error, userId });
-        return NextResponse.json(
-            { success: false, error: 'Failed to process ban/unban' },
-            { status: 500 }
-        );
+        const extra = {
+            userId,
+            ...(error instanceof z.ZodError ? { details: error.errors } : {})
+        };
+
+        return handleApiError(error, 'Admin ban user error', {
+            includeSuccess: true,
+            message: 'Failed to process ban/unban',
+            extra
+        });
     }
 }
 

@@ -13,6 +13,7 @@ import { paypalAdapter } from '@/adapters/paypal.adapter';
 import { createUserClient, createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { CreditPackage } from '@/types/credit-package';
+import { handleApiError } from '@/lib/api-helpers';
 
 type PaymentMethod = 'stripe' | 'paypal';
 
@@ -188,9 +189,8 @@ export async function POST(req: NextRequest) {
         }
 
     } catch (error) {
-        logger.error('Failed to create checkout session', { error });
         const message = error instanceof Error ? error.message : 'Failed to create checkout';
-        return NextResponse.json({ error: message }, { status: 500 });
+        return handleApiError(error, 'Failed to create checkout session', { message });
     }
 }
 
@@ -213,7 +213,6 @@ export async function GET() {
             packages: enrichedPackages,
         });
     } catch (error) {
-        logger.error('Failed to get packages', { error });
-        return NextResponse.json({ error: 'Failed to get packages' }, { status: 500 });
+        return handleApiError(error, 'Failed to get packages', { message: 'Failed to get packages' });
     }
 }

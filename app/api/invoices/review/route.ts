@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { reviewService } from '@/services/review.service';
 import { logger } from '@/lib/logger';
-import { AppError, ValidationError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -92,26 +92,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Review error', error);
-
-        if (error instanceof ValidationError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Review error', {
+            includeSuccess: true,
+            message: 'Internal server error'
+        });
     }
 }
 

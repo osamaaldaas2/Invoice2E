@@ -3,6 +3,7 @@ import { invoiceDbService } from '@/services/invoice.db.service';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { handleApiError } from '@/lib/api-helpers';
 
 type RouteParams = {
     params: Promise<{ id: string }>;
@@ -48,18 +49,11 @@ export async function GET(
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Fetch extraction error', error);
-
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        const { id } = await params;
+        return handleApiError(error, 'Fetch extraction error', {
+            includeSuccess: true,
+            message: 'Internal server error',
+            extra: { extractionId: id }
+        });
     }
 }

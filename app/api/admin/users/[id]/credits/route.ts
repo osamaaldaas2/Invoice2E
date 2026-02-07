@@ -6,10 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getClientIp, getUserAgent } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
-import { logger } from '@/lib/logger';
-import { UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { z } from 'zod';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 const ModifyCreditsSchema = z.object({
     amount: z.number().int().refine((n) => n !== 0, 'Amount cannot be zero'),
@@ -93,11 +92,11 @@ export async function POST(
             );
         }
 
-        logger.error('Admin modify credits error', { error, userId });
-        return NextResponse.json(
-            { success: false, error: 'Failed to modify credits' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin modify credits error', {
+            message: 'Failed to modify credits',
+            includeSuccess: true,
+            extra: userId ? { userId } : undefined,
+        });
     }
 }
 

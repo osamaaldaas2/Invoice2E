@@ -12,6 +12,7 @@ import { batchService } from '@/services/batch.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { verifySignedDownloadToken } from '@/lib/session';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * GET /api/invoices/bulk-upload/download
@@ -113,10 +114,8 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (error) {
-        logger.error('Failed to download batch results', { error });
-        return NextResponse.json(
-            { error: 'Failed to download batch results' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to download batch results', {
+            message: 'Failed to download batch results'
+        });
     }
 }

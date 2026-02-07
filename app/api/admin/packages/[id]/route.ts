@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 const UpdatePackageSchema = z.object({
     name: z.string().min(1).max(100).optional(),
@@ -77,27 +78,7 @@ export async function GET(
             },
         });
     } catch (error) {
-        logger.error('Admin get package error', { error });
-
-        if (error instanceof Error) {
-            if (error.message === 'Authentication required') {
-                return NextResponse.json(
-                    { success: false, error: 'Authentication required' },
-                    { status: 401 }
-                );
-            }
-            if (error.message === 'Admin access required') {
-                return NextResponse.json(
-                    { success: false, error: 'Admin access required' },
-                    { status: 403 }
-                );
-            }
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin get package error', { includeSuccess: true });
     }
 }
 
@@ -212,34 +193,11 @@ export async function PUT(
             },
         });
     } catch (error) {
-        logger.error('Admin update package error', { error });
-
-        if (error instanceof z.ZodError) {
-            return NextResponse.json(
-                { success: false, error: 'Invalid input', details: error.errors },
-                { status: 400 }
-            );
-        }
-
-        if (error instanceof Error) {
-            if (error.message === 'Authentication required') {
-                return NextResponse.json(
-                    { success: false, error: 'Authentication required' },
-                    { status: 401 }
-                );
-            }
-            if (error.message === 'Admin access required') {
-                return NextResponse.json(
-                    { success: false, error: 'Admin access required' },
-                    { status: 403 }
-                );
-            }
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
+        return handleApiError(error, 'Admin update package error', {
+            includeSuccess: true,
+            extra
+        });
     }
 }
 
@@ -360,26 +318,6 @@ export async function DELETE(
             data: { message: 'Package deleted successfully' },
         });
     } catch (error) {
-        logger.error('Admin delete package error', { error });
-
-        if (error instanceof Error) {
-            if (error.message === 'Authentication required') {
-                return NextResponse.json(
-                    { success: false, error: 'Authentication required' },
-                    { status: 401 }
-                );
-            }
-            if (error.message === 'Admin access required' || error.message === 'Super admin access required') {
-                return NextResponse.json(
-                    { success: false, error: 'Super admin access required' },
-                    { status: 403 }
-                );
-            }
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin delete package error', { includeSuccess: true });
     }
 }

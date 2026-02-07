@@ -3,10 +3,11 @@ import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { creditsDbService } from '@/services/credits.db.service';
 import { logger } from '@/lib/logger';
-import { AppError, ValidationError } from '@/lib/errors';
+import { AppError } from '@/lib/errors';
 import { FILE_LIMITS } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
 export const maxDuration = 60; // Set max duration to 60 seconds for AI processing
@@ -200,24 +201,10 @@ export async function POST(request: NextRequest) {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Extraction route error', {
-            errorType: error instanceof Error ? error.constructor.name : typeof error,
-            errorMessage: error instanceof Error ? error.message : String(error),
-            errorStack: error instanceof Error ? error.stack : undefined,
+        return handleApiError(error, 'Extraction route error', {
+            includeSuccess: true,
+            message: 'Internal server error during extraction'
         });
-
-        if (error instanceof ValidationError) {
-            return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
-        }
-
-        if (error instanceof AppError) {
-            return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error during extraction' },
-            { status: 500 }
-        );
     }
 }
 

@@ -6,9 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authorization';
 import { adminUserService } from '@/services/admin';
-import { logger } from '@/lib/logger';
-import { UnauthorizedError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function GET(
     request: NextRequest,
@@ -40,31 +39,12 @@ export async function GET(
             data: user,
         });
     } catch (error) {
-        if (error instanceof UnauthorizedError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 401 }
-            );
-        }
-        if (error instanceof ForbiddenError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 403 }
-            );
-        }
-        if (error instanceof NotFoundError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: 404 }
-            );
-        }
-
         const { id: userId } = await context.params;
-        logger.error('Admin user detail error', { error, userId });
-        return NextResponse.json(
-            { success: false, error: 'Failed to fetch user' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Admin user detail error', {
+            includeSuccess: true,
+            message: 'Failed to fetch user',
+            extra: { userId }
+        });
     }
 }
 

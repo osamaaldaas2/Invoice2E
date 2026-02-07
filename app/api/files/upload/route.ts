@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fileService } from '@/services/file.service';
 import { logger } from '@/lib/logger';
-import { ValidationError, AppError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * FIX (BUG-034): Added authentication requirement for file uploads
@@ -76,28 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('File upload error', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        if (error instanceof ValidationError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'File upload error', { includeSuccess: true });
     }
 }
 

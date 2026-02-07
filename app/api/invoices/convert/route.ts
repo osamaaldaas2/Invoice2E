@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 export type ConversionFormat = 'CII' | 'UBL';
 
@@ -283,34 +284,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Convert route error', {
-            errorType: error instanceof Error ? error.constructor.name : typeof error,
-            errorMessage: error instanceof Error ? error.message : String(error),
-            errorStack: error instanceof Error ? error.stack : undefined,
+        return handleApiError(error, 'Convert route error', {
+            includeSuccess: true,
+            message: 'Internal server error during conversion. Please try again or contact support.'
         });
-
-        if (error instanceof ValidationError) {
-            return NextResponse.json(
-                { success: false, error: `Validation error: ${error.message}` },
-                { status: error.statusCode }
-            );
-        }
-
-        if (error instanceof AppError) {
-            return NextResponse.json(
-                { success: false, error: error.message },
-                { status: error.statusCode }
-            );
-        }
-
-        // FIX (BUG-052): Removed internal reference to server logs
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Internal server error during conversion. Please try again or contact support.',
-            },
-            { status: 500 }
-        );
     }
 }
 

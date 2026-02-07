@@ -10,6 +10,7 @@ import { paymentProcessor } from '@/services/payment-processor';
 import { stripeService } from '@/services/stripe.service';
 import { paypalService } from '@/services/paypal.service';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * POST /api/payments/webhook
@@ -99,10 +100,8 @@ export async function POST(req: NextRequest) {
             { status: 400 }
         );
     } catch (error) {
-        logger.error('Webhook processing error', { error });
-        return NextResponse.json(
-            { error: 'Webhook processing failed' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Webhook processing error', {
+            message: 'Webhook processing failed'
+        });
     }
 }

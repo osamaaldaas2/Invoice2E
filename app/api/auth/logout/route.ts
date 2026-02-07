@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { clearSessionCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 export async function POST(): Promise<NextResponse> {
     try {
@@ -17,14 +18,9 @@ export async function POST(): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        logger.error('Logout route error', { error });
-
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Failed to logout',
-            },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Logout route error', {
+            includeSuccess: true,
+            message: 'Failed to logout'
+        });
     }
 }

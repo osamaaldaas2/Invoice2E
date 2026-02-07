@@ -13,6 +13,7 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { createSignedDownloadToken } from '@/lib/session';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { PaginationSchema } from '@/lib/validators';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * POST /api/invoices/bulk-upload
@@ -108,12 +109,8 @@ export async function POST(req: NextRequest) {
             message: `Batch job created with ${job.totalFiles} files. Processing will begin shortly.`,
         }, { status: 202 });
     } catch (error) {
-        logger.error('Failed to create batch job', { error });
         const message = error instanceof Error ? error.message : 'Failed to process upload';
-        return NextResponse.json(
-            { error: message },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to create batch job', { message });
     }
 }
 
@@ -205,11 +202,9 @@ export async function GET(req: NextRequest) {
             downloadUrl,
         });
     } catch (error) {
-        logger.error('Failed to get batch status', { error });
-        return NextResponse.json(
-            { error: 'Failed to get batch status' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to get batch status', {
+            message: 'Failed to get batch status'
+        });
     }
 }
 
@@ -265,10 +260,8 @@ export async function DELETE(req: NextRequest) {
             message: 'Batch job cancelled',
         });
     } catch (error) {
-        logger.error('Failed to cancel batch job', { error });
-        return NextResponse.json(
-            { error: 'Failed to cancel batch job' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to cancel batch job', {
+            message: 'Failed to cancel batch job'
+        });
     }
 }

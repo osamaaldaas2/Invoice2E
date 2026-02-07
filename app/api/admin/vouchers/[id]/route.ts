@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 const UpdateVoucherSchema = z.object({
     code: z.string().min(3).max(50),
@@ -138,20 +139,19 @@ export async function PUT(
 
         return NextResponse.json({ success: true, data: { voucher: updatedVoucher } });
     } catch (error) {
-        logger.error('Admin update voucher error', { error });
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ success: false, error: 'Invalid input', details: error.errors }, { status: 400 });
-        }
-        if (error instanceof Error && error.message === 'Authentication required') {
-            return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
-        }
-        if (error instanceof Error && error.message === 'Super admin access required') {
-            return NextResponse.json({ success: false, error: 'Super admin access required' }, { status: 403 });
-        }
-        if (error instanceof Error) {
-            return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-        }
-        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+        const { id } = await context.params;
+        const extra = {
+            voucherId: id,
+            ...(error instanceof z.ZodError ? { details: error.errors } : {})
+        };
+        const isPlainError = error instanceof Error && !(error instanceof z.ZodError);
+
+        return handleApiError(error, 'Admin update voucher error', {
+            includeSuccess: true,
+            extra,
+            status: isPlainError ? 400 : undefined,
+            message: isPlainError ? error.message : 'Internal server error'
+        });
     }
 }
 
@@ -199,13 +199,10 @@ export async function DELETE(
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        logger.error('Admin delete voucher error', { error });
-        if (error instanceof Error && error.message === 'Authentication required') {
-            return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
-        }
-        if (error instanceof Error && error.message === 'Super admin access required') {
-            return NextResponse.json({ success: false, error: 'Super admin access required' }, { status: 403 });
-        }
-        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+        const { id } = await context.params;
+        return handleApiError(error, 'Admin delete voucher error', {
+            includeSuccess: true,
+            extra: { voucherId: id }
+        });
     }
 }

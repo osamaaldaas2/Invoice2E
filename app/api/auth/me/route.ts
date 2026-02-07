@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookie } from '@/lib/session';
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * GET /api/auth/me
@@ -32,10 +32,9 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
             },
         });
     } catch (error) {
-        logger.error('Auth me error', { error });
-        return NextResponse.json(
-            { success: false, error: 'Authentication check failed' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Auth me error', {
+            includeSuccess: true,
+            message: 'Authentication check failed'
+        });
     }
 }

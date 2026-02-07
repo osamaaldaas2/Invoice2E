@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { handleApiError } from '@/lib/api-helpers';
 
 const VoucherSchema = z.object({
     code: z.string().min(3).max(50),
@@ -107,14 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({ success: true, data: { vouchers: formatted } });
     } catch (error) {
-        logger.error('Admin vouchers list error', { error });
-        if (error instanceof Error && error.message === 'Authentication required') {
-            return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
-        }
-        if (error instanceof Error && error.message === 'Super admin access required') {
-            return NextResponse.json({ success: false, error: 'Super admin access required' }, { status: 403 });
-        }
-        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+        return handleApiError(error, 'Admin vouchers list error', { includeSuccess: true });
     }
 }
 
@@ -191,19 +185,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return NextResponse.json({ success: true, data: { voucher: newVoucher } }, { status: 201 });
     } catch (error) {
-        logger.error('Admin create voucher error', { error });
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ success: false, error: 'Invalid input', details: error.errors }, { status: 400 });
-        }
-        if (error instanceof Error && error.message === 'Authentication required') {
-            return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
-        }
-        if (error instanceof Error && error.message === 'Super admin access required') {
-            return NextResponse.json({ success: false, error: 'Super admin access required' }, { status: 403 });
-        }
-        if (error instanceof Error) {
-            return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-        }
-        return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+        const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
+        const isPlainError = error instanceof Error && !(error instanceof z.ZodError);
+
+        return handleApiError(error, 'Admin create voucher error', {
+            includeSuccess: true,
+            extra,
+            status: isPlainError ? 400 : undefined,
+            message: isPlainError ? error.message : 'Internal server error'
+        });
     }
 }

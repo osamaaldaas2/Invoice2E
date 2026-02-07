@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { templateDBService } from '@/services/template.db.service';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -46,11 +46,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             template,
         });
     } catch (error) {
-        logger.error('Failed to get template', { error });
-        return NextResponse.json(
-            { error: 'Failed to get template' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to get template', {
+            message: 'Failed to get template'
+        });
     }
 }
 
@@ -80,11 +78,9 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
             template,
         });
     } catch (error) {
-        logger.error('Failed to update template', { error });
-        return NextResponse.json(
-            { error: 'Failed to update template' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to update template', {
+            message: 'Failed to update template'
+        });
     }
 }
 
@@ -113,10 +109,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
             message: 'Template deleted',
         });
     } catch (error) {
-        logger.error('Failed to delete template', { error });
-        return NextResponse.json(
-            { error: 'Failed to delete template' },
-            { status: 500 }
-        );
+        return handleApiError(error, 'Failed to delete template', {
+            message: 'Failed to delete template'
+        });
     }
 }

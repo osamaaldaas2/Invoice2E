@@ -12,6 +12,7 @@ import { paypalAdapter } from '@/adapters/paypal.adapter';
 import { createServerClient } from '@/lib/supabase.server';
 import { getSessionFromCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 /**
  * POST /api/payments/verify
@@ -295,7 +296,8 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error) {
-        logger.error('Payment verification failed', { error });
-        return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
+        return handleApiError(error, 'Payment verification failed', {
+            message: 'Verification failed'
+        });
     }
 }

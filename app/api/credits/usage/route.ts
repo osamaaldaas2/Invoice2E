@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase.server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api-helpers';
 
 type CreditUsageResponse = {
     availableCredits: number;
@@ -101,8 +102,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             source,
         } satisfies CreditUsageResponse);
     } catch (error) {
-        logger.error('Credit usage endpoint failed', { error });
-        return NextResponse.json({ error: 'Failed to fetch credit usage' }, { status: 500 });
+        return handleApiError(error, 'Credit usage endpoint failed', {
+            message: 'Failed to fetch credit usage'
+        });
     }
 }
-

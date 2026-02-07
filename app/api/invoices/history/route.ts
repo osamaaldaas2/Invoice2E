@@ -43,9 +43,15 @@ export async function GET(req: NextRequest) {
         }
 
         const { page, limit } = pagination.data;
-        const format = searchParams.get('format') as 'CII' | 'UBL' | null;
-        const status = searchParams.get('status') as 'valid' | 'invalid' | 'draft' | 'completed' | null;
-        const startDate = searchParams.get('startDate');
+        const formatParam = searchParams.get('format');
+        const format = formatParam && ['CII', 'UBL'].includes(formatParam)
+            ? (formatParam as 'CII' | 'UBL')
+            : null;
+
+        const statusParam = searchParams.get('status');
+        const status = statusParam && ['valid', 'invalid', 'draft', 'completed'].includes(statusParam)
+            ? (statusParam as 'valid' | 'invalid' | 'draft' | 'completed')
+            : null; const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const exportType = searchParams.get('export');
 
