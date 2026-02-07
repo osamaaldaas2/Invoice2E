@@ -301,6 +301,7 @@ export class XRechnungBuilder {
         const currency = this.normalizeCurrency(data.currency);
         // FIX: Use actual tax rate from data, calculate from amounts if not provided
         const taxRate = this.safeNumber(data.taxRate || data.vatRate) || this.calculateTaxRate(subtotal, taxAmount);
+        const categoryCode = taxRate === 0 ? 'Z' : 'S';
 
         return `
         <ram:ApplicableHeaderTradeSettlement>
@@ -308,7 +309,6 @@ export class XRechnungBuilder {
 
             ${this.buildPaymentMeans(data)}
 
-            const categoryCode = taxRate === 0 ? 'Z' : 'S';
             <ram:ApplicableTradeTax>
                 <ram:CalculatedAmount>${taxAmount.toFixed(2)}</ram:CalculatedAmount>
                 <ram:TypeCode>VAT</ram:TypeCode>

@@ -32,6 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     render() {
         if (this.state.hasError) {
+            const isDev = process.env.NODE_ENV !== 'production';
             return this.props.fallback || (
                 <div className="min-h-screen flex items-center justify-center bg-slate-950">
                     <div className="text-center glass-card p-8 max-w-md">
@@ -39,7 +40,9 @@ export class ErrorBoundary extends Component<Props, State> {
                             Something went wrong
                         </h1>
                         <p className="text-slate-300 mb-6">
-                            {this.state.error?.message || 'An unexpected error occurred'}
+                            {isDev
+                                ? (this.state.error?.message || 'An unexpected error occurred')
+                                : 'An unexpected error occurred. Please try again.'}
                         </p>
                         <button
                             onClick={() => window.location.reload()}

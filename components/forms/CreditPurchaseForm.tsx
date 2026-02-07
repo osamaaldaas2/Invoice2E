@@ -20,6 +20,7 @@ export default function CreditPurchaseForm() {
     const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [packagesLoading, setPackagesLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
@@ -35,10 +36,12 @@ export default function CreditPurchaseForm() {
 
                 if (!cancelled) {
                     setPackages(data.packages || []);
+                    setPackagesLoading(false);
                 }
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Failed to load packages');
+                    setPackagesLoading(false);
                 }
             }
         };
@@ -96,35 +99,44 @@ export default function CreditPurchaseForm() {
 
             {/* Package Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {packages.map((pkg) => (
-                    <button
-                        key={pkg.id}
-                        onClick={() => setSelectedPackage(pkg.id)}
-                        className={`relative p-4 rounded-2xl border transition-all text-left ${
-                            selectedPackage === pkg.id
-                                ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 via-blue-500/5 to-transparent shadow-[0_0_24px_rgba(56,189,248,0.2)]'
-                                : 'border-white/10 bg-white/5 hover:border-white/20'
-                        }`}
-                    >
-                        {pkg.discount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">
-                                -{pkg.discount}%
-                            </span>
-                        )}
-                        <div className="text-2xl font-bold text-white font-display">
-                            {pkg.credits}
-                        </div>
-                        <div className="text-sm text-faded mb-2">
-                            {t('credits')}
-                        </div>
-                        <div className="text-lg font-semibold text-sky-200">
-                            €{pkg.price.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-faded">
-                            €{pkg.pricePerCredit.toFixed(2)} / {t('credit')}
-                        </div>
-                    </button>
-                ))}
+                {packagesLoading ? (
+                    [...Array(4)].map((_, index) => (
+                        <div
+                            key={`pkg-skeleton-${index}`}
+                            className="p-4 rounded-2xl border border-white/10 bg-white/5 animate-pulse h-32"
+                        />
+                    ))
+                ) : (
+                    packages.map((pkg) => (
+                        <button
+                            key={pkg.id}
+                            onClick={() => setSelectedPackage(pkg.id)}
+                            className={`relative p-4 rounded-2xl border transition-all text-left ${
+                                selectedPackage === pkg.id
+                                    ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 via-blue-500/5 to-transparent shadow-[0_0_24px_rgba(56,189,248,0.2)]'
+                                    : 'border-white/10 bg-white/5 hover:border-white/20'
+                            }`}
+                        >
+                            {pkg.discount > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">
+                                    -{pkg.discount}%
+                                </span>
+                            )}
+                            <div className="text-2xl font-bold text-white font-display">
+                                {pkg.credits}
+                            </div>
+                            <div className="text-sm text-faded mb-2">
+                                {t('credits')}
+                            </div>
+                            <div className="text-lg font-semibold text-sky-200">
+                                €{pkg.price.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-faded">
+                                €{pkg.pricePerCredit.toFixed(2)} / {t('credit')}
+                            </div>
+                        </button>
+                    ))
+                )}
             </div>
 
             {/* Payment Method Selection */}
@@ -165,7 +177,7 @@ export default function CreditPurchaseForm() {
             {/* Purchase Button */}
             <button
                 onClick={handlePurchase}
-                disabled={!selectedPackage || loading}
+                disabled={!selectedPackage || loading || packagesLoading}
                 className="w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {loading ? (
@@ -183,3 +195,4 @@ export default function CreditPurchaseForm() {
         </div>
     );
 }
+

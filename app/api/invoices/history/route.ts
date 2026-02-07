@@ -11,10 +11,6 @@ import { analyticsService } from '@/services/analytics.service';
 import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
-/**
- * GET /api/invoices/history
- * Get paginated conversion history with filters
- */
 import { getAuthenticatedUser } from '@/lib/auth';
 
 /**

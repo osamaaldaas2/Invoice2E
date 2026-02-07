@@ -11,7 +11,7 @@ const adminNavItems = [
     { href: '/admin', label: 'Dashboard', icon: '📊' },
     { href: '/admin/users', label: 'Users', icon: '👥' },
     { href: '/admin/packages', label: 'Packages', icon: '📦' },
-    { href: '/admin/vouchers', label: 'Vouchers', icon: '???' },
+    { href: '/admin/vouchers', label: 'Vouchers', icon: '🎟️' },
     { href: '/admin/transactions', label: 'Transactions', icon: '💳' },
     { href: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
 ];
@@ -79,9 +79,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="min-h-screen">
             {/* Sidebar */}
             <aside
-                className={`fixed left-0 top-0 z-40 h-screen transition-transform ${
-                    sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-                } bg-slate-950/85 border-r border-white/10 backdrop-blur-xl w-64`}
+                className={`fixed left-0 top-0 z-40 h-screen transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                    } bg-slate-950/85 border-r border-white/10 backdrop-blur-xl w-64`}
             >
                 {/* Logo / Header */}
                 <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
@@ -109,11 +108,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <Link
                                 key={item.href}
                                 href={fullHref}
-                                className={`flex items-center px-4 py-3 rounded-xl transition-all border ${
-                                    isActive
+                                className={`flex items-center px-4 py-3 rounded-xl transition-all border ${isActive
                                         ? 'bg-gradient-to-r from-sky-400/20 via-blue-500/10 to-transparent text-sky-100 border-sky-300/30 shadow-[0_0_24px_rgba(56,189,248,0.2)]'
                                         : 'text-slate-300 border-transparent hover:bg-white/5 hover:text-white'
-                                }`}
+                                    }`}
                             >
                                 <span className="mr-3">{item.icon}</span>
                                 {item.label}
@@ -152,9 +150,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Mobile sidebar toggle */}
             <button
                 onClick={() => setSidebarOpen(true)}
-                className={`fixed top-4 left-4 z-30 lg:hidden p-2 rounded-xl bg-slate-950/80 text-white border border-white/10 ${
-                    sidebarOpen ? 'hidden' : ''
-                }`}
+                className={`fixed top-4 left-4 z-30 lg:hidden p-2 rounded-xl bg-slate-950/80 text-white border border-white/10 ${sidebarOpen ? 'hidden' : ''
+                    }`}
             >
                 ☰
             </button>
@@ -204,3 +201,4 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
     );
 }
+

@@ -20,11 +20,13 @@ export async function POST(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
+    let userId: string | undefined;
     try {
         // Require admin role
         const admin = await requireAdmin(request);
 
-        const { id: userId } = await context.params;
+        const { id } = await context.params;
+        userId = id;
 
         const rateLimitId = getRequestIdentifier(request) + ':admin:' + admin.id;
         const rateLimit = await checkRateLimitAsync(rateLimitId, 'admin');
@@ -91,7 +93,6 @@ export async function POST(
             );
         }
 
-        const { id: userId } = await context.params;
         logger.error('Admin modify credits error', { error, userId });
         return NextResponse.json(
             { success: false, error: 'Failed to modify credits' },
