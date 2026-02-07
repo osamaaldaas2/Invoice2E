@@ -21,7 +21,9 @@ function getSessionSecret(): string {
     if (!secret) {
         // SECURITY: Fail hard in production if SESSION_SECRET is not set
         if (process.env.NODE_ENV === 'production') {
-            throw new Error('CRITICAL: SESSION_SECRET must be set in production environment');
+            throw new Error(
+                'CRITICAL: SESSION_SECRET environment variable must be set in production. Generate one with: openssl rand -hex 32'
+            );
         }
         logger.warn('SESSION_SECRET not set - using fallback for development only');
         const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'DEV_ONLY_INSECURE_KEY';

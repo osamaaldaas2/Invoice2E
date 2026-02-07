@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authService } from '@/services/auth.service';
-import { logger } from '@/lib/logger';
-import { ZodError } from 'zod';
-import { setSessionCookie } from '@/lib/session';
-import { checkRateLimit, resetRateLimit, getRequestIdentifier } from '@/lib/rate-limiter';
-import { LoginSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
+import { logger } from '@/lib/logger';
+import { checkRateLimit, getRequestIdentifier, resetRateLimit } from '@/lib/rate-limiter';
+import { setSessionCookie } from '@/lib/session';
+import { LoginSchema } from '@/lib/validators';
+import { authService } from '@/services/auth.service';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     // FIX (BUG-019): Rate limiting to prevent brute force attacks
@@ -13,7 +12,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
         const body = await request.json();
-        const validatedData = LoginSchema.parse(body);
+        const validationResult = LoginSchema.safeParse(body);
+        if (!validationResult.success) {
+            const message = validationResult.error.errors[0]?.message || 'Invalid login data';
+            return NextResponse.json({ success: false, error: message }, { status: 400 });
+        }
+        const validatedData = validationResult.data;
         const email = validatedData.email.toLowerCase();
         const loginInput = { ...validatedData, email };
 
@@ -59,10 +63,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 }
         );
     } catch (error) {
-        const extra = error instanceof ZodError ? { details: error.errors } : undefined;
-        return handleApiError(error, 'Login route error', {
-            includeSuccess: true,
-            extra
-        });
+        return handleApiError(error, 'Login route error', { includeSuccess: true });
     }
 }

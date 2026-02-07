@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authService } from '@/services/auth.service';
+import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
 import { setSessionCookie } from '@/lib/session';
-import { ZodError } from 'zod';
 import { SignupSchema } from '@/lib/validators';
-import { handleApiError } from '@/lib/api-helpers';
+import { authService } from '@/services/auth.service';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const body = await request.json();
-        const validatedData = SignupSchema.parse(body);
+        const validationResult = SignupSchema.safeParse(body);
+        if (!validationResult.success) {
+            const message = validationResult.error.errors[0]?.message || 'Invalid signup data';
+            return NextResponse.json({ success: false, error: message }, { status: 400 });
+        }
+        const validatedData = validationResult.data;
         const signupInput = { ...validatedData, email: validatedData.email.toLowerCase() };
 
         const user = await authService.signup(signupInput);
@@ -28,10 +32,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 201 }
         );
     } catch (error) {
-        const extra = error instanceof ZodError ? { details: error.errors } : undefined;
-        return handleApiError(error, 'Signup route error', {
-            includeSuccess: true,
-            extra
-        });
+        return handleApiError(error, 'Signup route error', { includeSuccess: true });
     }
 }
