@@ -49,8 +49,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
             const allowedSources = new Set(['extraction', 'batch_extraction', 'conversion']);
             usedCreditsThisMonth = (txData || [])
-                .filter((row) => allowedSources.has(row.source))
-                .reduce((sum, row) => sum + Math.abs(Number(row.amount || 0)), 0);
+                .filter((row: any) => allowedSources.has(row.source))
+                .reduce((sum: number, row: any) => sum + Math.abs(Number(row.amount || 0)), 0);
         } catch (txError) {
             source = 'fallback';
 

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const formattedPackages = packages.map((pkg) => ({
+        const formattedPackages = packages.map((pkg: any) => ({
             id: pkg.id,
             name: pkg.name,
             description: pkg.description,
