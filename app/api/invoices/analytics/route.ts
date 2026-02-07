@@ -30,9 +30,12 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Parse query parameters
         const { searchParams } = new URL(req.url);
-        const period = (searchParams.get('period') || 'month') as 'week' | 'month' | 'year';
+        const periodParam = searchParams.get('period') || 'month';
+        const validPeriods = ['week', 'month', 'year'] as const;
+        const period = validPeriods.includes(periodParam as any)
+            ? (periodParam as 'week' | 'month' | 'year')
+            : 'month';
         const type = searchParams.get('type'); // 'stats', 'charts', or both
 
         // Get statistics
