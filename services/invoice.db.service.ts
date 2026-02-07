@@ -185,7 +185,7 @@ export class InvoiceDatabaseService {
                 errorHint: error.hint,
                 fullError: JSON.stringify(error)
             });
-            throw new AppError('DB_ERROR', `Failed to update conversion: ${error.message || JSON.stringify(error)}`, 500);
+            throw new AppError('DB_ERROR', 'Failed to update conversion', 500);
         }
 
         if (!conversion) {
@@ -207,10 +207,12 @@ export class InvoiceDatabaseService {
             .single();
 
         if (error) {
+            if (error.code === 'PGRST116') {
+                throw new NotFoundError('Conversion not found');
+            }
             logger.error('Failed to get conversion', { conversionId, error: error.message });
-            throw new NotFoundError('Conversion not found');
+            throw new AppError('DB_ERROR', 'Failed to fetch conversion', 500);
         }
-
         return snakeToCamelKeys(data) as InvoiceConversion;
     }
 

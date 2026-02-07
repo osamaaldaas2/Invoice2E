@@ -37,19 +37,13 @@ describe('GeminiAdapter', () => {
 
     it('should validate configuration correctly', () => {
         expect(adapter.validateConfiguration()).toBe(true);
-
-        vi.stubEnv('GEMINI_API_KEY', '');
-        // We need to re-instantiate or check how validate works. 
-        // Logic in adapter: checks process.env.GEMINI_API_KEY inside validateConfiguration? 
-        // Or checks private property set in constructor?
-        // Let's check adapter implementation. The adapter sets apiKey in constructor.
-        // So checking validateConfiguration() usually checks the internal property.
-        // But if we want to test false, we need to init with empty env.
-
-        // Since constructor throws if no key? No, adapter constructor usually guarded?
-        // Let's verify adapter source logic soon. Assuming it throws if no key in constructor.
     });
 
+    it('should return false when API key is missing', () => {
+        vi.stubEnv('GEMINI_API_KEY', '');
+        const adapterWithoutKey = new GeminiAdapter();
+        expect(adapterWithoutKey.validateConfiguration()).toBe(false);
+    });
     it('should extract invoice data successfully', async () => {
         const mockData = {
             invoiceNumber: 'INV-001',
