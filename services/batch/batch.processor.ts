@@ -54,6 +54,25 @@ export class BatchProcessor {
                 const file = files[index];
                 if (!file) {
                     logger.warn('Skipping missing file entry', { jobId, index });
+
+                    // Record as failed so progress counts align
+                    const result: BatchResult = {
+                        filename: `file_${index}`,
+                        status: 'failed' as const,
+                        error: 'Missing file entry',
+                    };
+                    results.push(result);
+
+                    // Update progress
+                    const failCount = results.filter(r => r.status === 'failed').length;
+                    await supabase
+                        .from('batch_jobs')
+                        .update({
+                            failed_files: failCount,
+                            results: results,
+                        })
+                        .eq('id', jobId);
+
                     continue;
                 }
                 logger.info('Processing file', { jobId, filename: file.name, index: index + 1, total: files.length });

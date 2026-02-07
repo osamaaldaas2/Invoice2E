@@ -73,8 +73,7 @@ export class XRechnungBuilder {
                     // Validate required fields - unit price is critical
                     if (unitPriceRaw === undefined) {
                         logger.warn('XRechnung: Line item missing unit price, using 0', {
-                            lineIndex: index,
-                            item
+                            lineIndex: index
                         });
                     }
 
@@ -174,13 +173,13 @@ export class XRechnungBuilder {
 
         // Log warnings for missing required contact fields (but don't fail - validation handles this)
         if (!contactName) {
-            logger.warn('XRechnung: Missing seller contact name', { invoiceData: data });
+            logger.warn('XRechnung: Missing seller contact name');
         }
         if (!phone) {
-            logger.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)', { invoiceData: data });
+            logger.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)');
         }
         if (!email) {
-            logger.warn('XRechnung: Missing seller email (BR-DE-2 requires this)', { invoiceData: data });
+            logger.warn('XRechnung: Missing seller email (BR-DE-2 requires this)');
         }
 
         return `
@@ -223,7 +222,7 @@ export class XRechnungBuilder {
         const buyerEmail = data.buyerEmail;
 
         if (!buyerEmail) {
-            logger.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)', { invoiceData: data });
+            logger.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)');
         }
 
         return `
@@ -263,9 +262,7 @@ export class XRechnungBuilder {
         const bic = data.sellerBic || data.bic || '';
 
         if (!iban) {
-            logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)', {
-                invoiceData: data
-            });
+            logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)');
             // Return empty payment means - validation should catch this
             return `
             <ram:SpecifiedTradeSettlementPaymentMeans>

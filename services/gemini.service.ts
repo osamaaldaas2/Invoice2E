@@ -312,8 +312,11 @@ export class GeminiService {
             const taxAmount = hasTaxAmount && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
                 ? rawTaxAmount
                 : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) * 100) / 100 : 0);
-            const hasTaxRate = data.taxRate !== null && data.taxRate !== undefined;
-            const parsedTaxRate = hasTaxRate ? Number(data.taxRate) : NaN;
+
+            // Normalize empty string to undefined for tax rate
+            const normalizedTaxRate = (typeof data.taxRate === 'string' && data.taxRate === '') ? undefined : data.taxRate;
+            const hasTaxRate = normalizedTaxRate !== null && normalizedTaxRate !== undefined;
+            const parsedTaxRate = hasTaxRate ? Number(normalizedTaxRate) : NaN;
             const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
 
             const normalizeIban = (value: unknown) => {
