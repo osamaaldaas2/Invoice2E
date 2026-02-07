@@ -31,3 +31,6 @@ yarn-debug.log*
 
 # Vercel
 .vercel
+
+# TypeScript build cache
+*.tsbuildinfo

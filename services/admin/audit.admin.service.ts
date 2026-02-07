@@ -66,7 +66,7 @@ class AdminAuditService {
         } catch (error) {
             // Don't fail the operation if audit logging fails, but log the error
             logger.error('Audit logging error', { error, params });
-            throw error;
+            return ''; // Return empty string to indicate logging failed
         }
     }
 
@@ -131,9 +131,8 @@ class AdminAuditService {
             adminUserId: row.admin_user_id,
             adminEmail: row.admin?.email,
             adminName: row.admin
-                ? `${row.admin.first_name} ${row.admin.last_name}`
-                : undefined,
-            targetUserId: row.target_user_id,
+                ? [row.admin.first_name, row.admin.last_name].filter(Boolean).join(' ') || undefined
+                : undefined, targetUserId: row.target_user_id,
             targetEmail: row.target?.email,
             action: row.action,
             resourceType: row.resource_type,
