@@ -126,7 +126,7 @@ class AdminAuditService {
         }
 
         // Transform data
-        const logs: AdminAuditLog[] = (data || []).map((row) => ({
+        const logs: AdminAuditLog[] = (data || []).map((row: any) => ({
             id: row.id,
             adminUserId: row.admin_user_id,
             adminEmail: row.admin?.email,
