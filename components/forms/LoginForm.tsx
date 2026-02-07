@@ -68,7 +68,7 @@ export default function LoginForm() {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" aria-label="Login form">
             <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
                     Email
@@ -79,9 +79,13 @@ export default function LoginForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    aria-required="true"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "login-error" : undefined}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-white/10 text-white focus:ring-2 focus:ring-sky-400/60 focus:border-sky-400/60 transition-colors"
                     placeholder="you@example.com"
                     disabled={loading}
+                    autoComplete="email"
                 />
             </div>
 
@@ -95,14 +99,23 @@ export default function LoginForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    aria-required="true"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "login-error" : undefined}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-white/10 text-white focus:ring-2 focus:ring-sky-400/60 focus:border-sky-400/60 transition-colors"
                     placeholder="********"
                     disabled={loading}
+                    autoComplete="current-password"
                 />
             </div>
 
             {error && (
-                <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm">
+                <div
+                    id="login-error"
+                    role="alert"
+                    aria-live="polite"
+                    className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm"
+                >
                     {error}
                 </div>
             )}
@@ -110,12 +123,13 @@ export default function LoginForm() {
             <button
                 type="submit"
                 disabled={loading}
+                aria-busy={loading}
                 className="w-full px-4 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
                 {loading ? (
                     <span className="flex items-center justify-center gap-2">
-                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        Logging in...
+                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" aria-hidden="true" />
+                        <span>Logging in...</span>
                     </span>
                 ) : (
                     'Login'
