@@ -1,13 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-// Mock NextRequest
-const mockRequest = vi.hoisted(() => ({
-    headers: {
-        get: vi.fn(),
-    },
-    ip: undefined,
-}));
-
 import {
     checkRateLimit,
     getRequestIdentifier,
@@ -16,17 +8,18 @@ import {
 } from '@/lib/rate-limiter';
 
 describe('Rate Limiter', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
         // Reset rate limiter state between tests
-        resetRateLimit('test-id');
+        await resetRateLimit('test-id');
     });
 
     describe('RATE_LIMIT_PRESETS', () => {
-        it('should have auth preset', () => {
-            expect(RATE_LIMIT_PRESETS.auth).toBeDefined();
-            expect(RATE_LIMIT_PRESETS.auth.limit).toBeDefined();
-            expect(RATE_LIMIT_PRESETS.auth.windowInSeconds).toBeDefined();
+        it('should have login preset', () => {
+            expect(RATE_LIMIT_PRESETS.login).toBeDefined();
+            expect(RATE_LIMIT_PRESETS.login.maxAttempts).toBeDefined();
+            expect(RATE_LIMIT_PRESETS.login.windowMs).toBeDefined();
+            expect(RATE_LIMIT_PRESETS.login.blockDurationMs).toBeDefined();
         });
 
         it('should have api preset', () => {
@@ -43,6 +36,8 @@ describe('Rate Limiter', () => {
             const result = checkRateLimit('unique-test-id-1');
 
             expect(result.allowed).toBe(true);
+            expect(result.remainingAttempts).toBeTypeOf('number');
+            expect(result.resetInSeconds).toBeTypeOf('number');
         });
 
         it('should track remaining requests', () => {
@@ -51,36 +46,39 @@ describe('Rate Limiter', () => {
             const result2 = checkRateLimit(id);
 
             expect(result1.allowed).toBe(true);
-            expect(result2.remaining).toBeLessThan(result1.remaining!);
+            expect(result2.remainingAttempts).toBeLessThan(result1.remainingAttempts);
         });
 
         it('should block after limit exceeded', () => {
             const id = 'spam-test-id';
 
-            // Exhaust the limit
-            for (let i = 0; i < 10; i++) {
-                checkRateLimit(id, { limit: 5, windowInSeconds: 60 });
+            // Login preset allows 5 attempts before blocking
+            for (let i = 0; i < 6; i++) {
+                checkRateLimit(id);
             }
 
-            const result = checkRateLimit(id, { limit: 5, windowInSeconds: 60 });
+            const result = checkRateLimit(id);
             expect(result.allowed).toBe(false);
+            expect(result.remainingAttempts).toBe(0);
+            expect(result.blockedForSeconds).toBeGreaterThan(0);
         });
     });
 
     describe('resetRateLimit', () => {
-        it('should reset rate limit for identifier', () => {
+        it('should reset rate limit for identifier', async () => {
             const id = 'reset-test-id';
 
             // Use some requests
-            checkRateLimit(id, { limit: 3, windowInSeconds: 60 });
-            checkRateLimit(id, { limit: 3, windowInSeconds: 60 });
+            checkRateLimit(id);
+            checkRateLimit(id);
 
             // Reset
-            resetRateLimit(id);
+            await resetRateLimit(id);
 
             // Should have full limit again
-            const result = checkRateLimit(id, { limit: 3, windowInSeconds: 60 });
+            const result = checkRateLimit(id);
             expect(result.allowed).toBe(true);
+            expect(result.remainingAttempts).toBe(RATE_LIMIT_PRESETS.login.maxAttempts - 1);
         });
     });
 

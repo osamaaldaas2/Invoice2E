@@ -58,7 +58,12 @@ export async function POST(
             message: 'Transaction refunded successfully',
         });
     } catch (error) {
-        const { id: transactionId } = await context.params;
+        let transactionId: string | undefined;
+        try {
+            transactionId = (await context.params).id;
+        } catch {
+            // params resolution failed, proceed without transactionId
+        }
         const extra = {
             transactionId,
             ...(error instanceof z.ZodError ? { details: error.errors } : {})

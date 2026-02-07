@@ -90,22 +90,33 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
     }, [locale]);
 
     // helper to parse address
-    const parseAddress = (address: string) => {
-        const lines = (address || '').split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length === 0) return { street: '', postalCode: '', city: '', country: 'DE' };
-
-        const lastLine = lines[lines.length - 1];
-        if (!lastLine) {
+    const parseAddress = (address?: string) => {
+        if (!address || address.trim() === '') {
             return { street: '', postalCode: '', city: '', country: 'DE' };
         }
-        const postalCodeMatch = lastLine.match(/^(\d{4,6})\s+(.+)$/);
 
+        const lines = address.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) {
+            return { street: '', postalCode: '', city: '', country: 'DE' };
+        }
+
+        const lastLine = lines[lines.length - 1];
+        if (!lastLine || lastLine.trim() === '') {
+            return {
+                street: lines.slice(0, -1).join(', '),
+                postalCode: '',
+                city: '',
+                country: 'DE',
+            };
+        }
+
+        const postalCodeMatch = lastLine.match(/^(\d{4,6})\s+(.+)$/);
         if (postalCodeMatch) {
             return {
                 street: lines.slice(0, -1).join(', '),
-                postalCode: postalCodeMatch[1],
-                city: postalCodeMatch[2],
-                country: 'DE' // Defaulting, logic could be smarter
+                postalCode: postalCodeMatch[1] || '',
+                city: postalCodeMatch[2] || '',
+                country: 'DE', // Defaulting, logic could be smarter
             };
         }
 
@@ -113,7 +124,7 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             street: lines.slice(0, -1).join(', '),
             postalCode: '',
             city: lastLine,
-            country: 'DE'
+            country: 'DE',
         };
     };
 

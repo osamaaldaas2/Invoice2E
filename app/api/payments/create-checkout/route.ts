@@ -14,6 +14,7 @@ import { createUserClient, createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { CreditPackage } from '@/types/credit-package';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 type PaymentMethod = 'stripe' | 'paypal';
 
@@ -34,6 +35,18 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const rateLimitId = `${getRequestIdentifier(req)}:payments-checkout:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
+            );
         }
 
         const body = await req.json();

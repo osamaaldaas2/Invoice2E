@@ -118,17 +118,38 @@ export default function AdminVouchersPage() {
                 ? `/api/admin/vouchers/${editingVoucher.id}`
                 : '/api/admin/vouchers';
 
+            const parsedCredits = Number(formData.credits);
+            if (!Number.isInteger(parsedCredits) || parsedCredits < 1) {
+                throw new Error('Credits must be a positive integer');
+            }
+
+            const parsedMaxRedemptions = formData.maxRedemptions ? Number(formData.maxRedemptions) : null;
+            if (
+                parsedMaxRedemptions !== null &&
+                (!Number.isInteger(parsedMaxRedemptions) || parsedMaxRedemptions < 1)
+            ) {
+                throw new Error('Max redemptions must be a positive integer');
+            }
+
+            const parsedMaxRedemptionsPerUser = formData.maxRedemptionsPerUser
+                ? Number(formData.maxRedemptionsPerUser)
+                : null;
+            if (
+                parsedMaxRedemptionsPerUser !== null &&
+                (!Number.isInteger(parsedMaxRedemptionsPerUser) || parsedMaxRedemptionsPerUser < 1)
+            ) {
+                throw new Error('Max redemptions per user must be a positive integer');
+            }
+
             const payload = {
                 code: formData.code,
                 description: formData.description || null,
-                credits: Number(formData.credits),
+                credits: parsedCredits,
                 isActive: formData.isActive,
                 appliesToAll: formData.appliesToAll,
                 allowedUsers: formData.allowedUsers,
-                maxRedemptions: formData.maxRedemptions ? Number(formData.maxRedemptions) : null,
-                maxRedemptionsPerUser: formData.maxRedemptionsPerUser
-                    ? Number(formData.maxRedemptionsPerUser)
-                    : null,
+                maxRedemptions: parsedMaxRedemptions,
+                maxRedemptionsPerUser: parsedMaxRedemptionsPerUser,
                 validFrom: formData.validFrom || null,
                 validUntil: formData.validUntil || null,
             };

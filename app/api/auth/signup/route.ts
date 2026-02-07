@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { setSessionCookie } from '@/lib/session';
 import { SignupSchema } from '@/lib/validators';
 import { authService } from '@/services/auth.service';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -15,6 +16,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
         const validatedData = validationResult.data;
         const signupInput = { ...validatedData, email: validatedData.email.toLowerCase() };
+
+        const rateLimitId = `${getRequestIdentifier(request, signupInput.email)}:auth-signup`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
+            );
+        }
 
         const user = await authService.signup(signupInput);
 

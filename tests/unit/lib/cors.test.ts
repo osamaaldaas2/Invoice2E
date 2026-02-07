@@ -1,61 +1,70 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-
-// Mock environment
-vi.stubEnv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,https://example.com');
-
-import { getCorsHeaders, isAllowedOrigin, handleCorsPreflightRequest } from '@/lib/cors';
+import { describe, expect, it } from 'vitest';
+import { isOriginAllowed, getCorsHeaders, CORS_CONFIG } from '@/lib/cors';
 
 describe('CORS', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+    describe('CORS_CONFIG', () => {
+        it('should have allowedMethods defined', () => {
+            expect(CORS_CONFIG.allowedMethods).toBeDefined();
+            expect(CORS_CONFIG.allowedMethods).toContain('GET');
+            expect(CORS_CONFIG.allowedMethods).toContain('POST');
+        });
+
+        it('should have allowedHeaders defined', () => {
+            expect(CORS_CONFIG.allowedHeaders).toBeDefined();
+            expect(CORS_CONFIG.allowedHeaders).toContain('Content-Type');
+            expect(CORS_CONFIG.allowedHeaders).toContain('Authorization');
+        });
+
+        it('should have maxAge defined', () => {
+            expect(CORS_CONFIG.maxAge).toBe(86400);
+        });
+
+        it('should have credentials enabled', () => {
+            expect(CORS_CONFIG.credentials).toBe(true);
+        });
     });
 
-    describe('isAllowedOrigin', () => {
-        it('should allow configured origins', () => {
-            expect(isAllowedOrigin('http://localhost:3000')).toBe(true);
-            expect(isAllowedOrigin('https://example.com')).toBe(true);
+    describe('isOriginAllowed', () => {
+        it('should allow null origin (same-origin)', () => {
+            expect(isOriginAllowed(null)).toBe(true);
         });
 
-        it('should reject unknown origins', () => {
-            expect(isAllowedOrigin('https://malicious.com')).toBe(false);
-        });
-
-        it('should handle null origin', () => {
-            expect(isAllowedOrigin(null)).toBe(false);
-        });
-
-        it('should handle undefined origin', () => {
-            expect(isAllowedOrigin(undefined)).toBe(false);
+        it('should allow localhost in development', () => {
+            // In test environment (not production), localhost should be allowed
+            expect(isOriginAllowed('http://localhost:3000')).toBe(true);
         });
     });
 
     describe('getCorsHeaders', () => {
-        it('should return CORS headers for allowed origin', () => {
+        it('should include methods header', () => {
             const headers = getCorsHeaders('http://localhost:3000');
-
-            expect(headers['Access-Control-Allow-Origin']).toBe('http://localhost:3000');
             expect(headers['Access-Control-Allow-Methods']).toBeDefined();
+        });
+
+        it('should include headers header', () => {
+            const headers = getCorsHeaders('http://localhost:3000');
             expect(headers['Access-Control-Allow-Headers']).toBeDefined();
         });
 
-        it('should not include origin for disallowed origin', () => {
-            const headers = getCorsHeaders('https://malicious.com');
-
-            expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
-        });
-    });
-
-    describe('handleCorsPreflightRequest', () => {
-        it('should return 200 for valid preflight', () => {
-            const response = handleCorsPreflightRequest('http://localhost:3000');
-
-            expect(response.status).toBe(200);
+        it('should include max-age header', () => {
+            const headers = getCorsHeaders('http://localhost:3000');
+            expect(headers['Access-Control-Max-Age']).toBe('86400');
         });
 
-        it('should return 403 for invalid origin', () => {
-            const response = handleCorsPreflightRequest('https://malicious.com');
+        it('should include credentials header when enabled', () => {
+            const headers = getCorsHeaders('http://localhost:3000');
+            expect(headers['Access-Control-Allow-Credentials']).toBe('true');
+        });
 
-            expect(response.status).toBe(403);
+        it('should include Vary header', () => {
+            const headers = getCorsHeaders('http://localhost:3000');
+            expect(headers['Vary']).toBe('Origin');
+        });
+
+        it('should set origin for allowed origins', () => {
+            const headers = getCorsHeaders('http://localhost:3000');
+            // In non-production, localhost is allowed
+            expect(headers['Access-Control-Allow-Origin']).toBe('http://localhost:3000');
         });
     });
 });

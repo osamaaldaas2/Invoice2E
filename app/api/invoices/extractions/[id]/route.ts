@@ -47,11 +47,16 @@ export async function GET(
             { status: 200 }
         );
     } catch (error) {
-        const { id } = await params;
+        let extractionId: string | undefined;
+        try {
+            extractionId = (await params).id;
+        } catch {
+            // params resolution failed
+        }
         return handleApiError(error, 'Fetch extraction error', {
             includeSuccess: true,
             message: 'Internal server error',
-            extra: { extractionId: id }
+            extra: { extractionId }
         });
     }
 }

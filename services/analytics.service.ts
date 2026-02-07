@@ -7,6 +7,7 @@
 
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
+import { API_TIMEOUTS } from '@/lib/constants';
 
 export interface ConversionHistoryItem {
     id: string;
@@ -61,6 +62,24 @@ export interface ChartsData {
 }
 
 export class AnalyticsService {
+    private async queryWithTimeout<T>(
+        query: PromiseLike<T>,
+        timeoutMs: number = API_TIMEOUTS.DATABASE_QUERY
+    ): Promise<T> {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+            const queryPromise = Promise.resolve(query);
+            return await Promise.race([
+                queryPromise,
+                new Promise<T>((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error('Query timeout')), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+        }
+    }
+
     /**
      * Get paginated conversion history
      */
@@ -138,9 +157,13 @@ export class AnalyticsService {
                 }
 
                 const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
-                const { data, count, error } = await conversionQuery
-                    .order('created_at', { ascending: false })
-                    .range(range.start, range.end);
+                const conversionResponse: any = await this.queryWithTimeout(
+                    conversionQuery
+                        .order('created_at', { ascending: false })
+                        .range(range.start, range.end),
+                    API_TIMEOUTS.DATABASE_QUERY
+                );
+                const { data, count, error } = conversionResponse;
 
                 if (error) {
                     logger.error('Failed to get conversion history', {
@@ -170,9 +193,13 @@ export class AnalyticsService {
                 }
 
                 const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
-                const { data, count, error } = await extractionQuery
-                    .order('created_at', { ascending: false })
-                    .range(range.start, range.end);
+                const extractionResponse: any = await this.queryWithTimeout(
+                    extractionQuery
+                        .order('created_at', { ascending: false })
+                        .range(range.start, range.end),
+                    API_TIMEOUTS.DATABASE_QUERY
+                );
+                const { data, count, error } = extractionResponse;
 
                 if (error) {
                     logger.error('Failed to get draft history', {
@@ -228,11 +255,15 @@ export class AnalyticsService {
         const supabase = createServerClient();
 
         // Get credits
-        const { data: creditData, error: creditError } = await supabase
-            .from('user_credits')
-            .select('available_credits, used_credits')
-            .eq('user_id', userId)
-            .single();
+        const creditResponse: any = await this.queryWithTimeout(
+            supabase
+                .from('user_credits')
+                .select('available_credits, used_credits')
+                .eq('user_id', userId)
+                .single(),
+            API_TIMEOUTS.DATABASE_QUERY
+        );
+        const { data: creditData, error: creditError } = creditResponse;
 
         if (creditError) {
             logger.warn('Failed to get user credits', { error: creditError, userId });
@@ -253,10 +284,14 @@ export class AnalyticsService {
         }> = [];
 
         try {
-            const { data, error } = await supabase
-                .from('invoice_conversions')
-                .select('validation_status, credits_used, processing_time_ms, conversion_format')
-                .eq('user_id', userId);
+            const conversionsResponse: any = await this.queryWithTimeout(
+                supabase
+                    .from('invoice_conversions')
+                    .select('validation_status, credits_used, processing_time_ms, conversion_format')
+                    .eq('user_id', userId),
+                API_TIMEOUTS.DATABASE_QUERY
+            );
+            const { data, error } = conversionsResponse;
 
             if (error) {
                 logger.warn('Failed to get conversions, returning zero stats', { error: error.message, userId });
@@ -325,11 +360,15 @@ export class AnalyticsService {
                 startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
 
-        const { data, error } = await supabase
-            .from('invoice_conversions')
-            .select('created_at, validation_status, conversion_format')
-            .eq('user_id', userId)
-            .gte('created_at', startDate.toISOString());
+        const chartsResponse: any = await this.queryWithTimeout(
+            supabase
+                .from('invoice_conversions')
+                .select('created_at, validation_status, conversion_format')
+                .eq('user_id', userId)
+                .gte('created_at', startDate.toISOString()),
+            API_TIMEOUTS.DATABASE_QUERY
+        );
+        const { data, error } = chartsResponse;
 
         if (error) {
             logger.error('Failed to get charts data', { error });

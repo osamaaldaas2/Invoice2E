@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { templateDBService, TemplateData } from '@/services/template.db.service';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 /**
  * GET /api/invoices/templates
@@ -53,6 +54,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = `${getRequestIdentifier(req)}:invoices-templates:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
             );
         }
 

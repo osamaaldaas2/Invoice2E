@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
 import { batchGenerator } from './batch.generator';
+import { ValidationError } from '@/lib/errors';
 
 type BatchJobRow = {
     id: string;
@@ -30,7 +31,7 @@ export class BatchService {
     async estimateFileCount(zipBuffer: Buffer): Promise<number> {
         // Check ZIP size before processing
         if (zipBuffer.length > this.MAX_TOTAL_SIZE) {
-            throw new Error(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
+            throw new ValidationError(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
         }
 
         const zip = await JSZip.loadAsync(zipBuffer);
@@ -40,13 +41,13 @@ export class BatchService {
             if (!file.dir && filename.toLowerCase().endsWith('.pdf')) {
                 pdfCount++;
                 if (pdfCount > this.MAX_FILES) {
-                    throw new Error(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
+                    throw new ValidationError(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
                 }
             }
         }
 
         if (pdfCount === 0) {
-            throw new Error('No PDF files found in ZIP archive');
+            throw new ValidationError('No PDF files found in ZIP archive');
         }
 
         return pdfCount;
@@ -61,7 +62,7 @@ export class BatchService {
 
         // FIX: Check ZIP size before processing
         if (zipBuffer.length > this.MAX_TOTAL_SIZE) {
-            throw new Error(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
+            throw new ValidationError(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
         }
 
         // Parse ZIP
@@ -74,14 +75,14 @@ export class BatchService {
             if (!file.dir && filename.toLowerCase().endsWith('.pdf')) {
                 // FIX (BUG-013): Check file count BEFORE extracting more
                 if (pdfFiles.length >= this.MAX_FILES) {
-                    throw new Error(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
+                    throw new ValidationError(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
                 }
 
                 const content = await file.async('nodebuffer');
 
                 // FIX (BUG-013): Validate individual file size
                 if (content.length > this.MAX_FILE_SIZE) {
-                    throw new Error(
+                    throw new ValidationError(
                         `File "${filename}" (${Math.round(content.length / 1024 / 1024)}MB) exceeds maximum of ${this.MAX_FILE_SIZE / 1024 / 1024}MB`
                     );
                 }
@@ -89,7 +90,7 @@ export class BatchService {
                 // FIX (BUG-012): Track total size to prevent memory exhaustion
                 totalExtractedSize += content.length;
                 if (totalExtractedSize > this.MAX_TOTAL_SIZE) {
-                    throw new Error(
+                    throw new ValidationError(
                         `Total batch size exceeds ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB limit`
                     );
                 }
@@ -99,7 +100,7 @@ export class BatchService {
         }
 
         if (pdfFiles.length === 0) {
-            throw new Error('No PDF files found in ZIP archive');
+            throw new ValidationError('No PDF files found in ZIP archive');
         }
 
         logger.info('PDF files validated', {

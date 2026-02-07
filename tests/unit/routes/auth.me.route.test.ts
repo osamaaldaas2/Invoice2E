@@ -9,7 +9,7 @@ const sessionMock = vi.hoisted(() => ({
 vi.mock('@/lib/session', () => sessionMock);
 
 vi.mock('@/lib/api-helpers', () => ({
-    handleApiError: vi.fn((error) => {
+    handleApiError: vi.fn((_error) => {
         const { NextResponse } = require('next/server');
         return NextResponse.json({
             success: false,
@@ -96,9 +96,9 @@ describe('Auth Me API Route', () => {
             const response = await GET(request);
             const data = await response.json();
 
+            expect(response.status).toBe(200);
             expect(data.data.role).toBe('user');
         });
-
         it('should handle session errors', async () => {
             sessionMock.getSessionFromCookie.mockRejectedValue(new Error('Session error'));
 

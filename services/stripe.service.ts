@@ -127,7 +127,7 @@ export class StripeService {
                 return { success: false, error: 'Payment not completed' };
             }
 
-            const credits = parseInt(session.metadata?.credits || '0');
+            const credits = parseInt(session.metadata?.credits || '0', 10);
 
             return {
                 success: true,

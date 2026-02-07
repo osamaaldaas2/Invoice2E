@@ -79,9 +79,11 @@ export class XRechnungBuilder {
 
                     const unitPrice = unitPriceRaw ?? 0;
                     const quantity = quantityRaw ?? 1; // Default to 1 if not specified
-                    const totalPrice = this.safeNumber(item.totalPrice || item.lineTotal) || (unitPrice * quantity);
+                    const totalPriceRaw = this.safeNumberOrUndefined(item.totalPrice ?? item.lineTotal);
+                    const totalPrice = totalPriceRaw ?? (unitPrice * quantity);
                     // FIX (QA-BUG-4): Use configurable DEFAULT_VAT_RATE instead of hardcoded 19
-                    const taxRate = this.safeNumber(item.taxRate || item.vatRate) || DEFAULT_VAT_RATE;
+                    const taxRateRaw = this.safeNumberOrUndefined(item.taxRate ?? item.vatRate);
+                    const taxRate = taxRateRaw ?? DEFAULT_VAT_RATE;
 
                     return `
         <ram:IncludedSupplyChainTradeLineItem>
@@ -173,13 +175,13 @@ export class XRechnungBuilder {
 
         // Log warnings for missing required contact fields (but don't fail - validation handles this)
         if (!contactName) {
-            logger.warn('XRechnung: Missing seller contact name');
+            logger.warn('XRechnung: Missing seller contact name', { seller: data.sellerName });
         }
         if (!phone) {
-            logger.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)');
+            logger.warn('XRechnung: Missing seller phone number (BR-DE-2 requires this)', { seller: data.sellerName });
         }
         if (!email) {
-            logger.warn('XRechnung: Missing seller email (BR-DE-2 requires this)');
+            logger.warn('XRechnung: Missing seller email (BR-DE-2 requires this)', { seller: data.sellerName });
         }
 
         return `
@@ -222,7 +224,7 @@ export class XRechnungBuilder {
         const buyerEmail = data.buyerEmail;
 
         if (!buyerEmail) {
-            logger.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)');
+            logger.warn('XRechnung: Missing buyer email (PEPPOL-EN16931-R010 requires this)', { buyer: data.buyerName });
         }
 
         return `
@@ -262,7 +264,7 @@ export class XRechnungBuilder {
         const bic = data.sellerBic || data.bic || '';
 
         if (!iban) {
-            logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)');
+            logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)', { seller: data.sellerName });
             // Return empty payment means - validation should catch this
             return `
             <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -302,7 +304,8 @@ export class XRechnungBuilder {
         const total = this.safeNumber(data.totalAmount);
         const currency = this.normalizeCurrency(data.currency);
         // FIX: Use actual tax rate from data, calculate from amounts if not provided
-        const taxRate = this.safeNumber(data.taxRate || data.vatRate) || this.calculateTaxRate(subtotal, taxAmount);
+        const taxRateRaw = this.safeNumberOrUndefined(data.taxRate ?? data.vatRate);
+        const taxRate = taxRateRaw ?? this.calculateTaxRate(subtotal, taxAmount);
         const categoryCode = taxRate === 0 ? 'Z' : 'S';
 
         return `
@@ -379,9 +382,9 @@ export class XRechnungBuilder {
      * FIX (BUG-027): Safely convert value to number, preventing null/undefined/NaN in XML
      */
     private safeNumber(value: unknown): number {
-        if (value === null || value === undefined) return 0;
+        if (value === null || value === undefined || value === '') return 0;
         const num = Number(value);
-        return isNaN(num) ? 0 : num;
+        return Number.isNaN(num) ? 0 : num;
     }
 
     /**
@@ -427,9 +430,9 @@ export class XRechnungBuilder {
      * Use this for required fields where 0 vs undefined matters
      */
     private safeNumberOrUndefined(value: unknown): number | undefined {
-        if (value === null || value === undefined) return undefined;
+        if (value === null || value === undefined || value === '') return undefined;
         const num = Number(value);
-        return isNaN(num) ? undefined : num;
+        return Number.isNaN(num) ? undefined : num;
     }
 
     /**
@@ -460,6 +463,8 @@ export class XRechnungBuilder {
             if (day && month && year) {
                 return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
             }
+            logger.warn('XRechnung: Invalid German date format - missing components', { dateString });
+            return new Date().toISOString().slice(0, 10).replace(/-/g, '');
         }
 
         // FIX (QA-BUG-3): Reject ambiguous slash formats like MM/DD/YYYY or DD/MM/YYYY

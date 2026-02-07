@@ -4,7 +4,7 @@ import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from './lib/constants';
 import { getCorsHeaders, isOriginAllowed } from './lib/cors';
 
 const intlMiddleware = createMiddleware({
-    locales: SUPPORTED_LOCALES as unknown as string[],
+    locales: [...SUPPORTED_LOCALES],
     defaultLocale: DEFAULT_LOCALE,
     localePrefix: 'always',
 });

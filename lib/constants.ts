@@ -40,6 +40,7 @@ export const REDUCED_VAT_RATE = 7;  // Reduced German VAT rate
 
 // Internationalization
 export const SUPPORTED_LOCALES = ['en', 'de'] as const;
+export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 export const DEFAULT_LOCALE = 'en';
 
 // Pagination defaults

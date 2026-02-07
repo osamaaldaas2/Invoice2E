@@ -3,12 +3,15 @@ import { NextRequest } from 'next/server';
 
 // Mock dependencies before imports
 const getAuthenticatedUserMock = vi.hoisted(() => vi.fn());
-const stripeServiceMock = vi.hoisted(() => ({
-    isConfigured: vi.fn(),
+const packageServiceMock = vi.hoisted(() => ({
+    getPackageBySlug: vi.fn(),
+    getPackageById: vi.fn(),
+    getActivePackages: vi.fn(),
+}));
+const stripeAdapterMock = vi.hoisted(() => ({
     createCheckoutSession: vi.fn(),
 }));
-const paypalServiceMock = vi.hoisted(() => ({
-    isConfigured: vi.fn(),
+const paypalAdapterMock = vi.hoisted(() => ({
     createOrder: vi.fn(),
 }));
 const createServerClientMock = vi.hoisted(() => vi.fn());
@@ -24,12 +27,16 @@ vi.mock('@/lib/auth', () => ({
     getAuthenticatedUser: getAuthenticatedUserMock,
 }));
 
-vi.mock('@/services/stripe.service', () => ({
-    stripeService: stripeServiceMock,
+vi.mock('@/services/package.service', () => ({
+    packageService: packageServiceMock,
 }));
 
-vi.mock('@/services/paypal.service', () => ({
-    paypalService: paypalServiceMock,
+vi.mock('@/adapters/stripe.adapter', () => ({
+    stripeAdapter: stripeAdapterMock,
+}));
+
+vi.mock('@/adapters/paypal.adapter', () => ({
+    paypalAdapter: paypalAdapterMock,
 }));
 
 vi.mock('@/lib/supabase.server', () => ({
@@ -45,7 +52,7 @@ vi.mock('@/lib/api-helpers', () => ({
     handleApiError: vi.fn((error) => {
         const { NextResponse } = require('next/server');
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return NextResponse.json({ success: false, error: message }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }),
 }));
 
@@ -55,6 +62,26 @@ describe('Payment Checkout API Route', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
+
+    const activePackage = {
+        id: 'pkg-123',
+        slug: 'basic',
+        name: 'Basic',
+        name_de: null,
+        description: 'Basic package',
+        description_de: null,
+        credits: 10,
+        price: 10,
+        currency: 'EUR',
+        is_popular: false,
+        savings_percent: null,
+        sort_order: 1,
+        is_active: true,
+        stripe_price_id: null,
+        paypal_plan_id: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+    };
 
     const createRequest = (body: object) => {
         return new NextRequest('http://localhost:3000/api/payments/create-checkout', {
@@ -77,7 +104,7 @@ describe('Payment Checkout API Route', () => {
             const data = await response.json();
 
             expect(response.status).toBe(401);
-            expect(data.success).toBe(false);
+            expect(data.error).toBe('Unauthorized');
         });
 
         it('should return 400 for invalid payment method', async () => {
@@ -85,6 +112,7 @@ describe('Payment Checkout API Route', () => {
                 id: 'user-123',
                 email: 'test@example.com',
             });
+            packageServiceMock.getPackageBySlug.mockResolvedValue(activePackage);
 
             const request = createRequest({
                 packageId: 'basic',
@@ -95,7 +123,9 @@ describe('Payment Checkout API Route', () => {
             const data = await response.json();
 
             expect(response.status).toBe(400);
-            expect(data.success).toBe(false);
+            expect(data.error).toBe('Invalid payment method');
+            expect(stripeAdapterMock.createCheckoutSession).not.toHaveBeenCalled();
+            expect(paypalAdapterMock.createOrder).not.toHaveBeenCalled();
         });
 
         it('should return 400 for missing packageId', async () => {
@@ -112,22 +142,26 @@ describe('Payment Checkout API Route', () => {
             const data = await response.json();
 
             expect(response.status).toBe(400);
-            expect(data.success).toBe(false);
+            expect(data.error).toBe('Invalid or inactive package');
         });
-    });
 
-    describe('GET /api/payments/create-checkout', () => {
-        it('should return available packages', async () => {
-            const mockPackages = [
-                { id: 'basic', name: 'Basic', credits: 10, price_cents: 1000 },
-            ];
+        it('should create a stripe checkout session and transaction record', async () => {
+            getAuthenticatedUserMock.mockResolvedValue({
+                id: 'user-123',
+                email: 'fallback@example.com',
+            });
+            packageServiceMock.getPackageBySlug.mockResolvedValue(activePackage);
+            stripeAdapterMock.createCheckoutSession.mockResolvedValue({
+                id: 'cs_test_123',
+                url: 'https://checkout.stripe.com/c/pay/cs_test_123',
+            });
 
-            createServerClientMock.mockReturnValue({
+            createUserClientMock.mockReturnValue({
                 from: vi.fn(() => ({
                     select: vi.fn(() => ({
                         eq: vi.fn(() => ({
-                            order: vi.fn(() => Promise.resolve({
-                                data: mockPackages,
+                            single: vi.fn(() => Promise.resolve({
+                                data: { email: 'db@example.com' },
                                 error: null,
                             })),
                         })),
@@ -135,11 +169,59 @@ describe('Payment Checkout API Route', () => {
                 })),
             });
 
+            createServerClientMock.mockReturnValue({
+                from: vi.fn(() => ({
+                    insert: vi.fn(() => ({
+                        select: vi.fn(() => ({
+                            single: vi.fn(() => Promise.resolve({
+                                data: { id: 'tx-123' },
+                                error: null,
+                            })),
+                        })),
+                    })),
+                })),
+            });
+
+            const request = createRequest({
+                packageId: 'basic',
+                method: 'stripe',
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+            expect(data.method).toBe('stripe');
+            expect(data.sessionId).toBe('cs_test_123');
+            expect(data.transactionId).toBe('tx-123');
+            expect(stripeAdapterMock.createCheckoutSession).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-123',
+                    packageId: 'basic',
+                    credits: 10,
+                    amount: 1000,
+                    currency: 'eur',
+                    email: 'db@example.com',
+                })
+            );
+        });
+    });
+
+    describe('GET /api/payments/create-checkout', () => {
+        it('should return available packages', async () => {
+            packageServiceMock.getActivePackages.mockResolvedValue([
+                { ...activePackage, savings_percent: 15 },
+            ]);
+
             const response = await GET();
             const data = await response.json();
 
             expect(response.status).toBe(200);
             expect(data.success).toBe(true);
+            expect(data.packages).toHaveLength(1);
+            expect(data.packages[0].pricePerCredit).toBe(1);
+            expect(data.packages[0].discount).toBe(15);
         });
     });
 });

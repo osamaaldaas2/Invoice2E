@@ -11,6 +11,7 @@ import { stripeService } from '@/services/stripe.service';
 import { paypalService } from '@/services/paypal.service';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 /**
  * POST /api/payments/webhook
@@ -18,8 +19,20 @@ import { handleApiError } from '@/lib/api-helpers';
  */
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.text();
         const provider = req.nextUrl.searchParams.get('provider') || 'stripe';
+        const rateLimitId = `${getRequestIdentifier(req)}:payments-webhook:${provider}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
+            );
+        }
+
+        const body = await req.text();
 
         logger.info('Received payment webhook', { provider });
 

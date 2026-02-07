@@ -7,6 +7,7 @@
 
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
+import { ValidationError } from '@/lib/errors';
 
 export interface TemplateData {
     name: string;
@@ -147,6 +148,10 @@ export class TemplateDBService {
      */
     async updateTemplate(userId: string, templateId: string, data: Partial<TemplateData>): Promise<Template> {
         logger.info('Updating template', { userId, templateId });
+
+        if (data.name !== undefined && data.name.trim() === '') {
+            throw new ValidationError('Template name cannot be empty');
+        }
 
         const supabase = createServerClient();
 

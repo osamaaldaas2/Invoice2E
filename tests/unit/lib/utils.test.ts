@@ -30,9 +30,9 @@ describe('Utils - cn', () => {
     it('should merge tailwind conflicts correctly', () => {
         // tw-merge should handle conflicting classes
         const result = cn('p-4', 'p-8');
+        expect(result).not.toContain('p-4');
         expect(result).toContain('p-8');
     });
-
     it('should handle array of classes', () => {
         const result = cn(['class1', 'class2']);
         expect(result).toContain('class1');

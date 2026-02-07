@@ -164,7 +164,7 @@ export class PaymentProcessor {
         const metadata = (session.metadata || {}) as Record<string, string>;
         // SECURITY FIX (BUG-032): Try both userId and user_id for backwards compatibility
         const userId = metadata.userId || metadata.user_id;
-        const credits = parseInt(metadata.credits || '0');
+        const credits = parseInt(metadata.credits || '0', 10);
         const paymentIntent = session.payment_intent as string;
 
         if (!userId || !credits) {
@@ -310,7 +310,7 @@ export class PaymentProcessor {
             userId = customData.userId;
             // Also try to get credits from custom data if not in result
             if (!credits && customData.credits) {
-                credits = parseInt(customData.credits);
+                credits = parseInt(customData.credits, 10);
             }
         } catch {
             logger.error('Failed to parse PayPal custom_id');

@@ -51,9 +51,9 @@ export async function GET(req: NextRequest) {
         const statusParam = searchParams.get('status');
         const status = statusParam && ['valid', 'invalid', 'draft', 'completed'].includes(statusParam)
             ? (statusParam as 'valid' | 'invalid' | 'draft' | 'completed')
-            : null; const startDate = searchParams.get('startDate');
-        const endDate = searchParams.get('endDate');
-        const exportType = searchParams.get('export');
+            : null;
+        const startDate = searchParams.get('startDate');
+        const endDate = searchParams.get('endDate'); const exportType = searchParams.get('export');
 
         // Handle CSV export
         if (exportType === 'csv') {

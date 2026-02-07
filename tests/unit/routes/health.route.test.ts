@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 
 // Mock dependencies before imports
 const createServerClientMock = vi.hoisted(() => vi.fn());

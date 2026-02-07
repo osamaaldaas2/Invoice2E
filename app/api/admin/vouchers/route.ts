@@ -210,7 +210,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             includeSuccess: true,
             extra,
             status: isUserError ? 400 : undefined,
-            message: isUserError && error instanceof Error ? error.message : undefined
+            message: isUserError ? 'Invalid input provided' : undefined
         });
     }
 }

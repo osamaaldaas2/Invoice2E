@@ -10,7 +10,7 @@ vi.mock('@/services/package.service', () => ({
 }));
 
 vi.mock('@/lib/api-helpers', () => ({
-    handleApiError: vi.fn((error) => {
+    handleApiError: vi.fn((_error) => {
         const { NextResponse } = require('next/server');
         return NextResponse.json({
             success: false,

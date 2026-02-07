@@ -4,6 +4,7 @@ import { reviewService } from '@/services/review.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -13,6 +14,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 { success: false, error: 'Authentication required' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = `${getRequestIdentifier(request)}:invoices-review:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
             );
         }
 

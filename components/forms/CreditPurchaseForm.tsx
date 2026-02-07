@@ -24,10 +24,13 @@ export default function CreditPurchaseForm() {
 
     useEffect(() => {
         let cancelled = false;
+        const controller = new AbortController();
 
         const loadPackages = async () => {
             try {
-                const response = await fetch('/api/payments/create-checkout');
+                const response = await fetch('/api/payments/create-checkout', {
+                    signal: controller.signal,
+                });
                 let data: { packages?: CreditPackage[]; error?: string } | null = null;
 
                 if (response.ok) {
@@ -42,6 +45,7 @@ export default function CreditPurchaseForm() {
                     setPackagesLoading(false);
                 }
             } catch (err) {
+                if (err instanceof Error && err.name === 'AbortError') return;
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Failed to load packages');
                     setPackagesLoading(false);
@@ -53,6 +57,7 @@ export default function CreditPurchaseForm() {
 
         return () => {
             cancelled = true;
+            controller.abort();
         };
     }, []);
 

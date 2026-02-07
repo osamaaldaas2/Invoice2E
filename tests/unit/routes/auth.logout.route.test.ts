@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 
 // Mock dependencies before imports
 const sessionMock = vi.hoisted(() => ({
@@ -18,7 +19,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/api-helpers', () => ({
-    handleApiError: vi.fn((error) => {
+    handleApiError: vi.fn((_error) => {
         const { NextResponse } = require('next/server');
         return NextResponse.json({
             success: false,
@@ -34,11 +35,16 @@ describe('Logout API Route', () => {
         vi.clearAllMocks();
     });
 
+    const createRequest = () =>
+        new NextRequest('http://localhost:3000/api/auth/logout', {
+            method: 'POST',
+        });
+
     describe('POST /api/auth/logout', () => {
         it('should return 200 on successful logout', async () => {
             sessionMock.clearSessionCookie.mockResolvedValue(undefined);
 
-            const response = await POST();
+            const response = await POST(createRequest());
             const data = await response.json();
 
             expect(response.status).toBe(200);
@@ -50,7 +56,7 @@ describe('Logout API Route', () => {
         it('should log logout event', async () => {
             sessionMock.clearSessionCookie.mockResolvedValue(undefined);
 
-            await POST();
+            await POST(createRequest());
 
             expect(loggerMock.info).toHaveBeenCalledWith('User logged out');
         });
@@ -58,7 +64,7 @@ describe('Logout API Route', () => {
         it('should handle errors gracefully', async () => {
             sessionMock.clearSessionCookie.mockRejectedValue(new Error('Cookie error'));
 
-            const response = await POST();
+            const response = await POST(createRequest());
             const data = await response.json();
 
             expect(response.status).toBe(500);

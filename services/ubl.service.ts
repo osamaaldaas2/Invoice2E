@@ -260,14 +260,18 @@ export class UBLService {
         const d = new Date(date);
         if (isNaN(d.getTime())) {
             // Try to parse German format DD.MM.YYYY
-            const parts = date.split('.');
-            if (parts.length === 3) {
-                const day = parts[0] ?? '';
-                const month = parts[1] ?? '';
-                const year = parts[2] ?? '';
-                if (day && month && year) {
-                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            const germanDateMatch = date.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (germanDateMatch) {
+                const day = germanDateMatch[1];
+                const month = germanDateMatch[2];
+                const year = germanDateMatch[3];
+
+                if (!day || !month || !year) {
+                    logger.warn('Invalid German date format - missing components', { dateString: date });
+                    return new Date().toISOString().split('T')[0] || '';
                 }
+
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             }
             return new Date().toISOString().split('T')[0] || '';
         }

@@ -13,6 +13,7 @@ import { createServerClient } from '@/lib/supabase.server';
 import { getSessionFromCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 /**
  * POST /api/payments/verify
@@ -30,6 +31,18 @@ export async function POST(req: NextRequest) {
 
         // Create user object from session
         const user = { id: session.userId, email: session.email };
+
+        const rateLimitId = `${getRequestIdentifier(req)}:payments-verify:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
+            );
+        }
 
         const body = await req.json();
         const { sessionId, orderId } = body;
@@ -96,49 +109,35 @@ export async function POST(req: NextRequest) {
         }
 
         if (verified && credits > 0) {
-            // IDEMPOTENCY FIX: Check by BOTH session ID AND payment intent ID
-            // Webhooks store Stripe's event.id (evt_xxx) and reference payment_intent (pi_xxx)
-            // Verify uses session ID (cs_xxx), so we need to check webhook_events by user + provider
-            // AND check the transaction status directly
+            // Idempotency guard: check transaction state and verify marker before mutating balances.
+            const [transactionResult, verifyEventResult] = await Promise.all([
+                supabase
+                    .from('payment_transactions')
+                    .select('id, payment_status, credits_purchased')
+                    .eq('user_id', user.id)
+                    .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                supabase
+                    .from('webhook_events')
+                    .select('id')
+                    .eq('event_id', `verify_${paymentId}`)
+                    .maybeSingle(),
+            ]);
 
-            // First check: Has webhook already processed for this user recently?
-            // We check by looking at the reference_id stored during credit addition
-            // Second check: Is this specific payment already in webhook_events?
-            // Check by looking for events that mention this session or its payment intent
-            const { data: webhookProcessed } = await supabase
-                .from('webhook_events')
-                .select('id, event_id')
-                .eq('provider', sessionId ? 'stripe' : 'paypal')
-                .eq('user_id', user.id)
-                .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // Last 10 minutes
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+            const transaction = transactionResult.data;
+            const verifyEvent = verifyEventResult.data;
 
-            if (webhookProcessed) {
-                logger.info('Payment likely processed by webhook, skipping verify credit addition', {
-                    paymentId,
-                    webhookEventId: webhookProcessed.event_id
-                });
+            if (verifyEvent) {
+                logger.info('Payment already processed via verify marker', { paymentId, userId: user.id });
                 return NextResponse.json({
                     success: true,
                     verified: true,
                     credits,
-                    message: 'Credits already added by webhook',
+                    message: 'Already processed',
                 });
             }
-
-            // Find transaction by provider ID (Exact match)
-            // FIX: For Stripe, lookup by stripe_session_id (where we store cs_xxx)
-            // For PayPal, lookup by paypal_order_id
-            const { data: transaction } = await supabase
-                .from('payment_transactions')
-                .select('id, payment_status, credits_purchased')
-                .eq('user_id', user.id)
-                .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
 
             if (!transaction) {
                 logger.error('Transaction not found for payment', { paymentId, userId: user.id });
@@ -152,12 +151,12 @@ export async function POST(req: NextRequest) {
             }
 
             if (transaction.payment_status === 'completed') {
-                logger.info('Payment already completed', { userId: user.id, paymentId });
+                logger.info('Payment already processed via transaction', { userId: user.id, paymentId });
                 return NextResponse.json({
                     success: true,
                     verified: true,
                     credits,
-                    message: 'Credits already added',
+                    message: 'Already processed',
                 });
             }
 

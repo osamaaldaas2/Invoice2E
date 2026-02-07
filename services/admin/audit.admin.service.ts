@@ -64,9 +64,14 @@ class AdminAuditService {
 
             return data.id;
         } catch (error) {
-            // Don't fail the operation if audit logging fails, but log the error
-            logger.error('Audit logging error', { error, params });
-            return ''; // Return empty string to indicate logging failed
+            // Don't fail the operation if audit logging fails, but log the error.
+            logger.error('Failed to log admin action - audit trail incomplete', {
+                adminUserId: params.adminUserId,
+                action: params.action,
+                resourceType: params.resourceType,
+                error: error instanceof Error ? error.message : String(error),
+            });
+            return '';
         }
     }
 
@@ -119,6 +124,39 @@ class AdminAuditService {
         query = query.range(from, to);
 
         const { data, error, count } = await query;
+        if (error) {
+            logger.error('Failed to fetch audit logs', { error: error.message, filters, page, limit });
+            throw new AppError('AUDIT_FETCH_ERROR', 'Failed to fetch audit logs', 500);
+        }
+
+        const logs: AdminAuditLog[] = (data || []).map((row: any) => {
+            const admin = Array.isArray(row.admin) ? row.admin[0] : row.admin;
+            const target = Array.isArray(row.target) ? row.target[0] : row.target;
+            const adminFirstName = admin?.first_name ? String(admin.first_name) : '';
+            const adminLastName = admin?.last_name ? String(admin.last_name) : '';
+
+            return {
+                id: row.id,
+                adminUserId: row.admin_user_id,
+                adminEmail: admin?.email || undefined,
+                adminName: `${adminFirstName} ${adminLastName}`.trim() || undefined,
+                targetUserId: row.target_user_id || undefined,
+                targetEmail: target?.email || undefined,
+                action: row.action,
+                resourceType: row.resource_type,
+                resourceId: row.resource_id || undefined,
+                oldValues: row.old_values || undefined,
+                newValues: row.new_values || undefined,
+                ipAddress: row.ip_address || undefined,
+                userAgent: row.user_agent || undefined,
+                createdAt: new Date(row.created_at),
+            };
+        });
+
+        return {
+            logs,
+            total: count || 0,
+        };
     }
 
     /**

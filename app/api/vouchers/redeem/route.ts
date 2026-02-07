@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const RedeemSchema = z.object({
     code: z.string().min(3),
@@ -14,6 +15,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const user = await getAuthenticatedUser(request);
         if (!user) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const rateLimitId = `${getRequestIdentifier(request)}:vouchers-redeem:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                {
+                    status: 429,
+                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+                }
+            );
         }
 
         const body = await request.json();

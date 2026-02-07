@@ -40,6 +40,18 @@ describe('Signup API Route', () => {
         vi.clearAllMocks();
     });
 
+    const validSignupPayload = {
+        email: 'test@example.com',
+        password: 'Password123',
+        firstName: 'John',
+        lastName: 'Doe',
+        addressLine1: '123 Main St',
+        city: 'Berlin',
+        postalCode: '10115',
+        country: 'DE',
+        phone: '+4912345678',
+    };
+
     const createRequest = (body: object) => {
         return new NextRequest('http://localhost:3000/api/auth/signup', {
             method: 'POST',
@@ -51,10 +63,8 @@ describe('Signup API Route', () => {
     describe('POST /api/auth/signup', () => {
         it('should return 400 for invalid email format', async () => {
             const request = createRequest({
+                ...validSignupPayload,
                 email: 'invalid-email',
-                password: 'password123',
-                firstName: 'John',
-                lastName: 'Doe',
             });
 
             const response = await POST(request);
@@ -78,10 +88,8 @@ describe('Signup API Route', () => {
 
         it('should return 400 for short password', async () => {
             const request = createRequest({
-                email: 'test@example.com',
+                ...validSignupPayload,
                 password: '123',
-                firstName: 'John',
-                lastName: 'Doe',
             });
 
             const response = await POST(request);
@@ -101,10 +109,7 @@ describe('Signup API Route', () => {
             authServiceMock.signup.mockResolvedValue(mockUser);
 
             const request = createRequest({
-                email: 'test@example.com',
-                password: 'password123',
-                firstName: 'John',
-                lastName: 'Doe',
+                ...validSignupPayload,
             });
 
             const response = await POST(request);
@@ -124,10 +129,8 @@ describe('Signup API Route', () => {
             });
 
             const request = createRequest({
+                ...validSignupPayload,
                 email: 'TEST@EXAMPLE.COM',
-                password: 'password123',
-                firstName: 'John',
-                lastName: 'Doe',
             });
 
             await POST(request);
@@ -144,10 +147,7 @@ describe('Signup API Route', () => {
             });
 
             const request = createRequest({
-                email: 'test@example.com',
-                password: 'password123',
-                firstName: 'John',
-                lastName: 'Doe',
+                ...validSignupPayload,
             });
 
             await POST(request);
@@ -162,10 +162,8 @@ describe('Signup API Route', () => {
             authServiceMock.signup.mockRejectedValue(new Error('Email already exists'));
 
             const request = createRequest({
+                ...validSignupPayload,
                 email: 'existing@example.com',
-                password: 'password123',
-                firstName: 'John',
-                lastName: 'Doe',
             });
 
             const response = await POST(request);

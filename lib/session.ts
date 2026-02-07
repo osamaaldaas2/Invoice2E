@@ -25,8 +25,8 @@ function getSessionSecret(): string {
                 'CRITICAL: SESSION_SECRET environment variable must be set in production. Generate one with: openssl rand -hex 32'
             );
         }
-        logger.warn('SESSION_SECRET not set - using fallback for development only');
-        const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'DEV_ONLY_INSECURE_KEY';
+        logger.warn('SESSION_SECRET not set - using fallback (DEVELOPMENT ONLY)');
+        const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'DEV_FALLBACK_KEY';
         return crypto.createHash('sha256').update(fallback).digest('hex');
     }
     return secret;
@@ -85,16 +85,21 @@ export function verifySessionToken(token: string): SessionPayload | null {
     try {
         const parts = token.split('.');
         if (parts.length !== 3) {
-            logger.warn('Invalid session token format');
+            logger.warn('Invalid session token format: incorrect part count');
             return null;
         }
 
-        const version = parts[0] ?? '';
-        const payloadBase64 = parts[1] ?? '';
-        const providedSignature = parts[2] ?? '';
+        const [version = '', payloadBase64 = '', providedSignature = ''] = parts;
 
-        if (!version || !payloadBase64 || !providedSignature) {
-            logger.warn('Invalid session token parts');
+        if (
+            !version ||
+            !payloadBase64 ||
+            !providedSignature ||
+            version.trim() === '' ||
+            payloadBase64.trim() === '' ||
+            providedSignature.trim() === ''
+        ) {
+            logger.warn('Invalid session token: empty parts detected');
             return null;
         }
 
