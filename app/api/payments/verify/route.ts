@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
         let verified = false;
         let credits = 0;
         let paymentId = '';
+        let stripePaymentIntentId: string | undefined;
 
         // Stripe verification
         if (sessionId) {
@@ -61,8 +62,9 @@ export async function POST(req: NextRequest) {
                     credits = parseInt(session.metadata.credits, 10);
                     // Use paymentIntentId if available, otherwise fallback to session ID
                     // But for lookup, we MUST use what we stored.
-                    // create-checkout stores session.id as stripe_payment_id
+                    // create-checkout stores session.id as stripe_session_id
                     paymentId = sessionId;
+                    stripePaymentIntentId = session.payment_intent as string | undefined;
                 }
             } catch (error) {
                 logger.error('Stripe session verification failed', { sessionId, error });
@@ -170,12 +172,18 @@ export async function POST(req: NextRequest) {
 
             // Update transaction status using ID if available
             if (transaction.id) {
+                const updateData: Record<string, unknown> = {
+                    payment_status: 'completed',
+                    updated_at: new Date().toISOString()
+                };
+
+                if (sessionId && stripePaymentIntentId) {
+                    updateData.stripe_payment_id = stripePaymentIntentId;
+                }
+
                 const { error: updateError } = await supabase
                     .from('payment_transactions')
-                    .update({
-                        payment_status: 'completed',
-                        updated_at: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('id', transaction.id)
                     .eq('user_id', user.id); // Security check
 
@@ -200,12 +208,18 @@ export async function POST(req: NextRequest) {
                     .single();
 
                 if (pendingTx) {
+                    const pendingUpdateData: Record<string, unknown> = {
+                        payment_status: 'completed',
+                        updated_at: new Date().toISOString()
+                    };
+
+                    if (sessionId && stripePaymentIntentId) {
+                        pendingUpdateData.stripe_payment_id = stripePaymentIntentId;
+                    }
+
                     await supabase
                         .from('payment_transactions')
-                        .update({
-                            payment_status: 'completed',
-                            updated_at: new Date().toISOString()
-                        })
+                        .update(pendingUpdateData)
                         .eq('id', pendingTx.id);
                     logger.info('Transaction updated by provider ID', { transactionId: pendingTx.id });
                 } else {
