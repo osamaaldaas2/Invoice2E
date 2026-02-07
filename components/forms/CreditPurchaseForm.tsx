@@ -28,14 +28,17 @@ export default function CreditPurchaseForm() {
         const loadPackages = async () => {
             try {
                 const response = await fetch('/api/payments/create-checkout');
-                const data = await response.json();
+                let data: { packages?: CreditPackage[]; error?: string } | null = null;
 
-                if (!response.ok) {
-                    throw new Error(data?.error || 'Failed to load packages');
+                if (response.ok) {
+                    data = await response.json();
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(errorText || `Failed to load packages (${response.status})`);
                 }
 
                 if (!cancelled) {
-                    setPackages(data.packages || []);
+                    setPackages(data?.packages || []);
                     setPackagesLoading(false);
                 }
             } catch (err) {
@@ -70,10 +73,17 @@ export default function CreditPurchaseForm() {
                 }),
             });
 
-            const data = await response.json();
+            let data: { url?: string; error?: string } | null = null;
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Payment failed');
+            if (response.ok) {
+                data = await response.json();
+            } else {
+                const errorText = await response.text();
+                throw new Error(errorText || `Payment failed (${response.status})`);
+            }
+
+            if (!data?.url) {
+                throw new Error(data?.error || 'Payment failed');
             }
 
             // Redirect to payment page
@@ -111,11 +121,10 @@ export default function CreditPurchaseForm() {
                         <button
                             key={pkg.id}
                             onClick={() => setSelectedPackage(pkg.id)}
-                            className={`relative p-4 rounded-2xl border transition-all text-left ${
-                                selectedPackage === pkg.id
+                            className={`relative p-4 rounded-2xl border transition-all text-left ${selectedPackage === pkg.id
                                     ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 via-blue-500/5 to-transparent shadow-[0_0_24px_rgba(56,189,248,0.2)]'
                                     : 'border-white/10 bg-white/5 hover:border-white/20'
-                            }`}
+                                }`}
                         >
                             {pkg.discount > 0 && (
                                 <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">
@@ -147,11 +156,10 @@ export default function CreditPurchaseForm() {
                 <div className="flex gap-4">
                     <button
                         onClick={() => setPaymentMethod('stripe')}
-                        className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${
-                            paymentMethod === 'stripe'
+                        className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${paymentMethod === 'stripe'
                                 ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 to-transparent'
                                 : 'border-white/10 bg-white/5 hover:bg-white/10'
-                        }`}
+                            }`}
                     >
                         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z" />
@@ -160,11 +168,10 @@ export default function CreditPurchaseForm() {
                     </button>
                     <button
                         onClick={() => setPaymentMethod('paypal')}
-                        className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${
-                            paymentMethod === 'paypal'
+                        className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${paymentMethod === 'paypal'
                                 ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 to-transparent'
                                 : 'border-white/10 bg-white/5 hover:bg-white/10'
-                        }`}
+                            }`}
                     >
                         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="#003087">
                             <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106z" />
@@ -195,4 +202,6 @@ export default function CreditPurchaseForm() {
         </div>
     );
 }
+
+
 
