@@ -18,7 +18,31 @@ interface RateLimitEntry {
 // For production, use Redis or similar
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Configuration
+// Rate limit configurations for different endpoints
+export const RATE_LIMIT_PRESETS = {
+    login: {
+        maxAttempts: 5,
+        windowMs: 15 * 60 * 1000,      // 15 minutes
+        blockDurationMs: 15 * 60 * 1000, // 15 minutes
+    },
+    api: {
+        maxAttempts: 100,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 60 * 1000,     // 1 minute
+    },
+    upload: {
+        maxAttempts: 10,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 5 * 60 * 1000, // 5 minutes
+    },
+    convert: {
+        maxAttempts: 20,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 2 * 60 * 1000, // 2 minutes
+    },
+};
+
+// Default configuration (for login - backward compatibility)
 const LOGIN_MAX_ATTEMPTS = 5; // Max attempts before blocking
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes window
 const LOGIN_BLOCK_DURATION_MS = 15 * 60 * 1000; // Block for 15 minutes

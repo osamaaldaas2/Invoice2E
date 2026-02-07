@@ -19,9 +19,12 @@ const TOKEN_VERSION = 'v1'; // For future token format changes
 function getSessionSecret(): string {
     const secret = process.env.SESSION_SECRET;
     if (!secret) {
-        logger.warn('SESSION_SECRET not set - using fallback. Set SESSION_SECRET in .env for production!');
-        // Use a derived key from other secrets as fallback (still better than hardcoded)
-        const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'INSECURE_FALLBACK_KEY';
+        // SECURITY: Fail hard in production if SESSION_SECRET is not set
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('CRITICAL: SESSION_SECRET must be set in production environment');
+        }
+        logger.warn('SESSION_SECRET not set - using fallback for development only');
+        const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'DEV_ONLY_INSECURE_KEY';
         return crypto.createHash('sha256').update(fallback).digest('hex');
     }
     return secret;
