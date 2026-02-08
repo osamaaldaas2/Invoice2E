@@ -85,6 +85,7 @@ export class XRechnungBuilder {
                     // FIX (QA-BUG-4): Use configurable DEFAULT_VAT_RATE instead of hardcoded 19
                     const taxRateRaw = this.safeNumberOrUndefined(item.taxRate ?? item.vatRate);
                     const taxRate = taxRateRaw ?? DEFAULT_VAT_RATE;
+                    const vatCategoryCode = this.getVatCategoryCode(taxRate);
 
                     return `
         <ram:IncludedSupplyChainTradeLineItem>
@@ -105,7 +106,7 @@ export class XRechnungBuilder {
             <ram:SpecifiedLineTradeSettlement>
                 <ram:ApplicableTradeTax>
                     <ram:TypeCode>VAT</ram:TypeCode>
-                    <ram:CategoryCode>S</ram:CategoryCode>
+                    <ram:CategoryCode>${vatCategoryCode}</ram:CategoryCode>
                     <ram:RateApplicablePercent>${taxRate.toFixed(2)}</ram:RateApplicablePercent>
                 </ram:ApplicableTradeTax>
                 <ram:SpecifiedTradeSettlementLineMonetarySummation>
@@ -290,24 +291,62 @@ export class XRechnungBuilder {
      * OFFICIAL ORDER for ApplicableHeaderTradeSettlement:
      * 1. InvoiceCurrencyCode
      * 2. SpecifiedTradeSettlementPaymentMeans
-     * 3. ApplicableTradeTax
+     * 3. ApplicableTradeTax (one per VAT rate group)
      * 4. SpecifiedTradePaymentTerms
      * 5. SpecifiedTradeSettlementHeaderMonetarySummation
      *
-     * DATA INTEGRITY FIX (BUG-025): Use actual tax rate from data instead of hardcoded 19%
-     */
-    /**
-     * FIX (BUG-027): Ensure all numeric values are properly coalesced to prevent null in XML
+     * FIX: Support multiple VAT rate groups (e.g. 19% + 0% on same invoice)
+     * Each rate group gets its own ApplicableTradeTax block with correct
+     * BasisAmount (sum of line totals at that rate) and CalculatedAmount (tax).
      */
     private buildTradeSettlement(data: XRechnungInvoiceData): string {
-        const taxAmount = this.safeNumber(data.taxAmount);
-        const subtotal = this.safeNumber(data.subtotal);
         const total = this.safeNumber(data.totalAmount);
         const currency = this.normalizeCurrency(data.currency);
-        // FIX: Use actual tax rate from data, calculate from amounts if not provided
-        const taxRateRaw = this.safeNumberOrUndefined(data.taxRate ?? data.vatRate);
-        const taxRate = taxRateRaw ?? this.calculateTaxRate(subtotal, taxAmount);
-        const categoryCode = taxRate === 0 ? 'Z' : 'S';
+        const items = data.lineItems || data.items || [];
+
+        // Group line items by tax rate to build per-rate tax breakdowns
+        const taxGroups = this.buildTaxGroups(items);
+
+        // Calculate totals from groups (more accurate than header-level fields for mixed-rate invoices)
+        let computedSubtotal = 0;
+        let computedTaxAmount = 0;
+        const taxBreakdownXml: string[] = [];
+
+        for (const group of taxGroups) {
+            const taxForGroup = Math.round(group.basisAmount * group.rate / 100 * 100) / 100;
+            computedSubtotal += group.basisAmount;
+            computedTaxAmount += taxForGroup;
+
+            taxBreakdownXml.push(`
+            <ram:ApplicableTradeTax>
+                <ram:CalculatedAmount>${taxForGroup.toFixed(2)}</ram:CalculatedAmount>
+                <ram:TypeCode>VAT</ram:TypeCode>${group.categoryCode === 'E' ? `
+                <ram:ExemptionReason>Exempt from VAT</ram:ExemptionReason>` : ''}
+                <ram:BasisAmount>${group.basisAmount.toFixed(2)}</ram:BasisAmount>
+                <ram:CategoryCode>${group.categoryCode}</ram:CategoryCode>
+                <ram:RateApplicablePercent>${group.rate.toFixed(2)}</ram:RateApplicablePercent>
+            </ram:ApplicableTradeTax>`);
+        }
+
+        // Use header subtotal/tax if no line items (fallback)
+        const subtotal = computedSubtotal > 0 ? computedSubtotal : this.safeNumber(data.subtotal);
+        const taxAmount = computedSubtotal > 0 ? computedTaxAmount : this.safeNumber(data.taxAmount);
+
+        // If no groups were built (no line items), create a single fallback group
+        if (taxBreakdownXml.length === 0) {
+            const fallbackRate = this.safeNumberOrUndefined(data.taxRate ?? data.vatRate)
+                ?? this.calculateTaxRate(subtotal, taxAmount);
+            const fallbackCategory = this.getVatCategoryCode(fallbackRate);
+            taxBreakdownXml.push(`
+            <ram:ApplicableTradeTax>
+                <ram:CalculatedAmount>${taxAmount.toFixed(2)}</ram:CalculatedAmount>
+                <ram:TypeCode>VAT</ram:TypeCode>${fallbackCategory === 'E' ? `
+                <ram:ExemptionReason>Exempt from VAT</ram:ExemptionReason>` : ''}
+                <ram:BasisAmount>${subtotal.toFixed(2)}</ram:BasisAmount>
+                <ram:CategoryCode>${fallbackCategory}</ram:CategoryCode>
+                <ram:RateApplicablePercent>${fallbackRate.toFixed(2)}</ram:RateApplicablePercent>
+            </ram:ApplicableTradeTax>`);
+        }
 
         return `
         <ram:ApplicableHeaderTradeSettlement>
@@ -315,13 +354,7 @@ export class XRechnungBuilder {
 
             ${this.buildPaymentMeans(data)}
 
-            <ram:ApplicableTradeTax>
-                <ram:CalculatedAmount>${taxAmount.toFixed(2)}</ram:CalculatedAmount>
-                <ram:TypeCode>VAT</ram:TypeCode>
-                <ram:BasisAmount>${subtotal.toFixed(2)}</ram:BasisAmount>
-                <ram:CategoryCode>${categoryCode}</ram:CategoryCode>
-                <ram:RateApplicablePercent>${taxRate.toFixed(2)}</ram:RateApplicablePercent>
-            </ram:ApplicableTradeTax>
+            ${taxBreakdownXml.join('')}
             ${this.buildPaymentTerms(data)}
 
             <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
@@ -332,6 +365,42 @@ export class XRechnungBuilder {
                 <ram:DuePayableAmount>${total.toFixed(2)}</ram:DuePayableAmount>
             </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         </ram:ApplicableHeaderTradeSettlement>`;
+    }
+
+    /**
+     * Group line items by tax rate. Returns one entry per unique rate
+     * with the sum of line totals as basisAmount.
+     */
+    private buildTaxGroups(items: XRechnungLineItem[]): { rate: number; categoryCode: string; basisAmount: number }[] {
+        const groups = new Map<number, number>();
+
+        for (const item of items) {
+            const taxRateRaw = this.safeNumberOrUndefined(item.taxRate ?? item.vatRate);
+            const taxRate = taxRateRaw ?? DEFAULT_VAT_RATE;
+            const totalPriceRaw = this.safeNumberOrUndefined(item.totalPrice ?? item.lineTotal);
+            const unitPrice = this.safeNumber(item.unitPrice);
+            const quantity = this.safeNumber(item.quantity) || 1;
+            const totalPrice = totalPriceRaw ?? (unitPrice * quantity);
+
+            groups.set(taxRate, (groups.get(taxRate) || 0) + totalPrice);
+        }
+
+        return Array.from(groups.entries())
+            .sort((a, b) => b[0] - a[0]) // Higher rates first
+            .map(([rate, basisAmount]) => ({
+                rate,
+                categoryCode: this.getVatCategoryCode(rate),
+                basisAmount: Math.round(basisAmount * 100) / 100,
+            }));
+    }
+
+    /**
+     * Map tax rate to EN16931 VAT category code:
+     * - S (Standard): rate > 0%
+     * - E (Exempt): rate === 0% (e.g. travel costs, exempt services)
+     */
+    private getVatCategoryCode(taxRate: number): string {
+        return taxRate > 0 ? 'S' : 'E';
     }
 
     /**

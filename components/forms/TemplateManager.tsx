@@ -148,6 +148,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                     {t('title')}
                 </h3>
                 <button
+                    type="button"
                     onClick={() => {
                         setShowForm(true);
                         setEditingTemplate(null);
@@ -237,12 +238,14 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
+                            type="button"
                             onClick={handleSave}
                             className="nav-pill nav-pill-active"
                         >
                             {editingTemplate ? t('update') : t('save')}
                         </button>
                         <button
+                            type="button"
                             onClick={() => {
                                 setShowForm(false);
                                 setEditingTemplate(null);
@@ -287,6 +290,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                                 <div className="flex gap-2">
                                     {onApplyTemplate && (
                                         <button
+                                            type="button"
                                             onClick={() => handleApply(template)}
                                             className="px-3 py-1.5 text-sm rounded-full border border-emerald-400/30 text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors"
                                         >
@@ -294,12 +298,14 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                                         </button>
                                     )}
                                     <button
+                                        type="button"
                                         onClick={() => handleEdit(template)}
                                         className="px-3 py-1.5 text-sm rounded-full border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10 transition-colors"
                                     >
                                         {t('edit')}
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => handleDelete(template.id)}
                                         className="px-3 py-1.5 text-sm rounded-full border border-rose-400/30 text-rose-200 bg-rose-500/15 hover:bg-rose-500/25 transition-colors"
                                     >

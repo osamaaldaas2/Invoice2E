@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger';
 import { BOUNDARY_DETECTION_PROMPT } from '@/lib/boundary-detection-prompt';
 import { MAX_PAGES_FOR_BOUNDARY_DETECTION } from '@/lib/constants';
+import { ExtractionError } from '@/lib/errors';
 import { pdfSplitterService } from './pdf-splitter.service';
 import { geminiAdapter } from '@/adapters/gemini.adapter';
 import { deepseekAdapter } from '@/adapters/deepseek.adapter';
@@ -101,13 +102,13 @@ export class BoundaryDetectionService {
 
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-            throw new Error('No JSON found in boundary detection response');
+            throw new ExtractionError('No JSON found in boundary detection response');
         }
 
         const data = JSON.parse(jsonMatch[0]);
 
         if (!data.invoices || !Array.isArray(data.invoices)) {
-            throw new Error('Missing invoices array in boundary detection response');
+            throw new ExtractionError('Missing invoices array in boundary detection response');
         }
 
         return {
@@ -131,10 +132,10 @@ export class BoundaryDetectionService {
         for (const inv of data.invoices) {
             for (const page of inv.pages) {
                 if (allPages.has(page)) {
-                    throw new Error(`Duplicate page ${page} in boundary detection`);
+                    throw new ExtractionError(`Duplicate page ${page} in boundary detection`);
                 }
                 if (page < 1 || page > actualPageCount) {
-                    throw new Error(`Page ${page} out of range (1-${actualPageCount})`);
+                    throw new ExtractionError(`Page ${page} out of range (1-${actualPageCount})`);
                 }
                 allPages.add(page);
             }
@@ -142,13 +143,13 @@ export class BoundaryDetectionService {
             // Check contiguity
             for (let i = 1; i < inv.pages.length; i++) {
                 if (inv.pages[i]! !== inv.pages[i - 1]! + 1) {
-                    throw new Error(`Non-contiguous pages in invoice ${inv.invoiceIndex}: ${inv.pages}`);
+                    throw new ExtractionError(`Non-contiguous pages in invoice ${inv.invoiceIndex}: ${inv.pages}`);
                 }
             }
         }
 
         if (allPages.size !== actualPageCount) {
-            throw new Error(`Pages covered (${allPages.size}) does not match actual page count (${actualPageCount})`);
+            throw new ExtractionError(`Pages covered (${allPages.size}) does not match actual page count (${actualPageCount})`);
         }
 
         return data;

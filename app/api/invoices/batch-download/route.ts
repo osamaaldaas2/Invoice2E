@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
                     invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
                     invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
                     sellerName: data.sellerName || 'Unknown Seller',
+                    sellerCountryCode: data.sellerCountryCode || 'DE',
+                    buyerCountryCode: data.buyerCountryCode || 'DE',
                     totalAmount: Number(data.totalAmount) || 0,
                 } as Record<string, unknown>;
 
@@ -72,6 +74,34 @@ export async function POST(request: NextRequest) {
                 const fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');
                 zip.file(fileName, result.xmlContent);
                 successCount++;
+
+                // Create conversion record if one doesn't exist, then mark both as completed
+                const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+                if (existingConversion) {
+                    await invoiceDbService.updateConversion(existingConversion.id, {
+                        conversionStatus: 'completed',
+                        validationStatus: result.validationStatus,
+                        validationErrors: result.validationErrors.length > 0
+                            ? { errors: result.validationErrors } as Record<string, unknown>
+                            : undefined,
+                    });
+                } else {
+                    const conversion = await invoiceDbService.createConversion({
+                        userId: user.id,
+                        extractionId,
+                        invoiceNumber: String(data.invoiceNumber || data.invoice_number || ''),
+                        buyerName: String(data.buyerName || data.buyer_name || ''),
+                        conversionFormat: 'XRechnung',
+                        conversionStatus: 'completed',
+                    });
+                    await invoiceDbService.updateConversion(conversion.id, {
+                        validationStatus: result.validationStatus,
+                        validationErrors: result.validationErrors.length > 0
+                            ? { errors: result.validationErrors } as Record<string, unknown>
+                            : undefined,
+                    });
+                }
+                await invoiceDbService.updateExtraction(extractionId, { status: 'completed' });
             } catch (err) {
                 const msg = err instanceof Error ? err.message : 'Generation failed';
                 errors.push({ extractionId, error: msg });

@@ -100,6 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <span className="ml-2 text-xl font-bold text-white font-display">Admin</span>
                     </Link>
                     <button
+                        type="button"
                         onClick={() => setSidebarOpen(false)}
                         className="lg:hidden text-slate-400 hover:text-white"
                     >
@@ -150,6 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </div>
                     </div>
                     <button
+                        type="button"
                         onClick={handleLogout}
                         disabled={loggingOut}
                         className="mt-3 w-full px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors border border-white/10"
@@ -164,6 +166,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Mobile sidebar toggle */}
             <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
                 className={`fixed top-4 left-4 z-30 lg:hidden p-2 rounded-xl bg-slate-950/80 text-white border border-white/10 ${sidebarOpen ? 'hidden' : ''
                     }`}
@@ -186,6 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="flex items-center justify-between px-6 py-4">
                         <div className="flex items-center">
                             <button
+                                type="button"
                                 onClick={() => setSidebarOpen(!sidebarOpen)}
                                 className="hidden lg:block p-2 rounded-xl hover:bg-white/10"
                             >

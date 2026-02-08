@@ -4,12 +4,31 @@ import { invoiceDbService } from '@/services/invoice.db.service';
 import { creditsDbService } from '@/services/credits.db.service';
 import { boundaryDetectionService } from '@/services/boundary-detection.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
+import { batchService } from '@/services/batch/batch.service';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
-import { FILE_LIMITS } from '@/lib/constants';
+import { FILE_LIMITS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
+
+const BACKGROUND_THRESHOLD = 3;
+
+const triggerBatchWorkerAsync = (req: NextRequest): void => {
+    const secret = process.env.BATCH_WORKER_SECRET;
+    const headers: Record<string, string> = {};
+    if (secret) {
+        headers['x-internal-worker-key'] = secret;
+    }
+    void fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=1`, {
+        method: 'POST',
+        headers,
+    }).catch((error) => {
+        logger.warn('Failed to trigger batch worker for multi-invoice job', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+    });
+};
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
 export const maxDuration = 60; // Set max duration to 60 seconds for AI processing
@@ -115,7 +134,7 @@ export async function POST(request: NextRequest) {
         const boundaryResult = await boundaryDetectionService.detect(buffer, file.type);
 
         if (boundaryResult.totalInvoices > 1) {
-            // Multi-invoice PDF: check credits, split, extract each
+            // Multi-invoice PDF: check credits
             const requiredCredits = boundaryResult.totalInvoices;
             try {
                 const credits = await creditsDbService.getUserCredits(userId);
@@ -133,47 +152,83 @@ export async function POST(request: NextRequest) {
                 );
             }
 
+            // >3 invoices: background processing with polling
+            if (boundaryResult.totalInvoices > BACKGROUND_THRESHOLD) {
+                logger.info('Switching to background processing for large multi-invoice PDF', {
+                    totalInvoices: boundaryResult.totalInvoices,
+                    threshold: BACKGROUND_THRESHOLD,
+                    userId,
+                });
+
+                const { jobId } = await batchService.createMultiInvoiceJob(
+                    userId,
+                    buffer,
+                    boundaryResult as unknown as Record<string, unknown>,
+                    boundaryResult.totalInvoices,
+                );
+
+                triggerBatchWorkerAsync(request);
+
+                return NextResponse.json(
+                    {
+                        success: true,
+                        data: {
+                            backgroundJob: true,
+                            jobId,
+                            totalInvoices: boundaryResult.totalInvoices,
+                            provider: extractor.getProviderName(),
+                        },
+                    },
+                    { status: 202 }
+                );
+            }
+
+            // ≤3 invoices: process inline with parallelism
             const pageGroups = boundaryResult.invoices.map(inv => inv.pages);
             const splitBuffers = await pdfSplitterService.splitByPageGroups(buffer, pageGroups);
 
-            const extractions: { extractionId: string; label: string; confidence: number }[] = [];
+            const extractions: { extractionId: string; label: string; confidence: number }[] = new Array(splitBuffers.length);
 
-            for (let i = 0; i < splitBuffers.length; i++) {
-                const invoice = boundaryResult.invoices[i]!;
-                const segmentBuffer = splitBuffers[i]!;
-                const label = invoice.label;
-                const segmentName = `${file.name} [${label}]`;
+            // Process in parallel chunks
+            const segments = splitBuffers.map((buf, i) => ({ buf, i }));
+            for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
+                const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
+                await Promise.all(chunk.map(async ({ buf, i }) => {
+                    const invoice = boundaryResult.invoices[i]!;
+                    const label = invoice.label;
+                    const segmentName = `${file.name} [${label}]`;
 
-                try {
-                    const extractedData = await extractor.extractFromFile(segmentBuffer, segmentName, file.type);
+                    try {
+                        const extractedData = await extractor.extractFromFile(buf, segmentName, file.type);
 
-                    const extraction = await invoiceDbService.createExtraction({
-                        userId,
-                        extractionData: extractedData as unknown as Record<string, unknown>,
-                        confidenceScore: extractedData.confidence,
-                        geminiResponseTimeMs: extractedData.processingTimeMs,
-                        status: 'draft',
-                    });
+                        const extraction = await invoiceDbService.createExtraction({
+                            userId,
+                            extractionData: extractedData as unknown as Record<string, unknown>,
+                            confidenceScore: extractedData.confidence,
+                            geminiResponseTimeMs: extractedData.processingTimeMs,
+                            status: 'draft',
+                        });
 
-                    await creditsDbService.deductCredits(userId, 1, 'extraction');
+                        await creditsDbService.deductCredits(userId, 1, 'extraction');
 
-                    extractions.push({
-                        extractionId: extraction.id,
-                        label,
-                        confidence: extractedData.confidence,
-                    });
-                } catch (segmentError) {
-                    logger.error('Failed to extract invoice segment', {
-                        index: i,
-                        label,
-                        error: segmentError instanceof Error ? segmentError.message : String(segmentError),
-                    });
-                    extractions.push({
-                        extractionId: '',
-                        label,
-                        confidence: 0,
-                    });
-                }
+                        extractions[i] = {
+                            extractionId: extraction.id,
+                            label,
+                            confidence: extractedData.confidence,
+                        };
+                    } catch (segmentError) {
+                        logger.error('Failed to extract invoice segment', {
+                            index: i,
+                            label,
+                            error: segmentError instanceof Error ? segmentError.message : String(segmentError),
+                        });
+                        extractions[i] = {
+                            extractionId: '',
+                            label,
+                            confidence: 0,
+                        };
+                    }
+                }));
             }
 
             logger.info('Multi-invoice extraction completed', {
@@ -288,6 +343,45 @@ export async function POST(request: NextRequest) {
         return handleApiError(error, 'Extraction route error', {
             includeSuccess: true,
             message: 'Internal server error during extraction'
+        });
+    }
+}
+
+/**
+ * GET /api/invoices/extract?jobId=X
+ * Poll background multi-invoice job status.
+ */
+export async function GET(request: NextRequest) {
+    try {
+        const user = await getAuthenticatedUser(request);
+        if (!user) {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            );
+        }
+
+        const jobId = request.nextUrl.searchParams.get('jobId');
+        if (!jobId) {
+            return NextResponse.json(
+                { success: false, error: 'jobId query parameter is required' },
+                { status: 400 }
+            );
+        }
+
+        const status = await batchService.getBatchStatus(user.id, jobId);
+        if (!status) {
+            return NextResponse.json(
+                { success: false, error: 'Job not found' },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json({ success: true, ...status });
+    } catch (error) {
+        return handleApiError(error, 'Extract poll error', {
+            includeSuccess: true,
+            message: 'Failed to fetch job status',
         });
     }
 }

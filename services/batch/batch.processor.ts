@@ -5,7 +5,8 @@ import { creditsDbService } from '@/services/credits.db.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { boundaryDetectionService } from '@/services/boundary-detection.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
-import { BATCH_EXTRACTION } from '@/lib/constants';
+import { BATCH_EXTRACTION, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
+import { NotFoundError } from '@/lib/errors';
 import { BatchResult } from './types';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -102,55 +103,57 @@ export class BatchProcessor {
                     invoiceCount: boundaryResult.totalInvoices,
                 });
 
-                // Process first segment into the current index, rest as appended results
-                for (let s = 0; s < splitBuffers.length; s++) {
-                    const invoice = boundaryResult.invoices[s]!;
-                    const segmentBuffer = splitBuffers[s]!;
-                    const segmentName = `${file.name} [${invoice.label}]`;
+                // Process segments in parallel chunks
+                const segments = splitBuffers.map((buf, s) => ({ buf, s }));
+                for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
+                    const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
+                    await Promise.all(chunk.map(async ({ buf, s }) => {
+                        const invoice = boundaryResult.invoices[s]!;
+                        const segmentName = `${file.name} [${invoice.label}]`;
 
+                        try {
+                            const extractedData = await this.extractWithRetry(extractor, buf, segmentName, jobId);
+                            const extraction = await invoiceDbService.createExtraction({
+                                userId,
+                                extractionData: extractedData as unknown as Record<string, unknown>,
+                                confidenceScore: extractedData.confidence,
+                                status: 'draft',
+                            });
+                            await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
 
-                    try {
-                        const extractedData = await this.extractWithRetry(extractor, segmentBuffer, segmentName, jobId);
-                        const extraction = await invoiceDbService.createExtraction({
-                            userId,
-                            extractionData: extractedData as unknown as Record<string, unknown>,
-                            confidenceScore: extractedData.confidence,
-                            status: 'draft',
-                        });
-                        await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
+                            const segmentResult: BatchResult = {
+                                filename: segmentName,
+                                status: 'success' as const,
+                                invoiceNumber: extractedData.invoiceNumber || undefined,
+                                extractionId: extraction.id,
+                                confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
+                                reviewStatus: 'pending_review',
+                                startedAt,
+                                completedAt: new Date().toISOString(),
+                            };
 
-                        const segmentResult: BatchResult = {
-                            filename: segmentName,
-                            status: 'success' as const,
-                            invoiceNumber: extractedData.invoiceNumber || undefined,
-                            extractionId: extraction.id,
-                            confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
-                            reviewStatus: 'pending_review',
-                            startedAt,
-                            completedAt: new Date().toISOString(),
-                        };
-
-                        if (s === 0) {
-                            results[index] = segmentResult;
-                        } else {
-                            results.push(segmentResult);
+                            if (s === 0) {
+                                results[index] = segmentResult;
+                            } else {
+                                results.push(segmentResult);
+                            }
+                        } catch (segError) {
+                            const errMsg = segError instanceof Error ? segError.message : 'Unknown error';
+                            const segmentResult: BatchResult = {
+                                filename: segmentName,
+                                status: 'failed' as const,
+                                error: errMsg,
+                                reviewStatus: 'not_available',
+                                startedAt,
+                                completedAt: new Date().toISOString(),
+                            };
+                            if (s === 0) {
+                                results[index] = segmentResult;
+                            } else {
+                                results.push(segmentResult);
+                            }
                         }
-                    } catch (segError) {
-                        const errMsg = segError instanceof Error ? segError.message : 'Unknown error';
-                        const segmentResult: BatchResult = {
-                            filename: segmentName,
-                            status: 'failed' as const,
-                            error: errMsg,
-                            reviewStatus: 'not_available',
-                            startedAt,
-                            completedAt: new Date().toISOString(),
-                        };
-                        if (s === 0) {
-                            results[index] = segmentResult;
-                        } else {
-                            results.push(segmentResult);
-                        }
-                    }
+                    }));
                 }
                 return;
             }
@@ -250,7 +253,7 @@ export class BatchProcessor {
 
             if (jobError || !job?.user_id) {
                 logger.error('Failed to resolve batch job owner', { jobId, error: jobError?.message });
-                throw new Error('Batch job not found');
+                throw new NotFoundError('Batch job not found');
             }
 
             const userId = job.user_id as string;

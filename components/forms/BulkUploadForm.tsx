@@ -561,6 +561,7 @@ export default function BulkUploadForm() {
                     />
                 </label>
                 <button
+                    type="button"
                     onClick={() => saveRowReview(extractionId)}
                     disabled={Boolean(rowSaving[extractionId])}
                     className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50"
@@ -601,6 +602,7 @@ export default function BulkUploadForm() {
                         )}
                     </div>
                     <button
+                        type="button"
                         onClick={handleUpload}
                         disabled={!file || uploading}
                         className="mt-4 w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -628,10 +630,10 @@ export default function BulkUploadForm() {
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                 <h3 className="text-white font-semibold">Per-Invoice Progress</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={openTableReview} className="px-3 py-1.5 rounded border border-white/10 bg-white/5 text-white text-sm hover:bg-white/10">
+                                    <button type="button" onClick={openTableReview} className="px-3 py-1.5 rounded border border-white/10 bg-white/5 text-white text-sm hover:bg-white/10">
                                         Table Review
                                     </button>
-                                    <button onClick={saveAllReviews} disabled={savingAll} className="px-3 py-1.5 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 disabled:opacity-50">
+                                    <button type="button" onClick={saveAllReviews} disabled={savingAll} className="px-3 py-1.5 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 disabled:opacity-50">
                                         {savingAll ? 'Saving...' : 'Save All'}
                                     </button>
                                 </div>
@@ -657,6 +659,7 @@ export default function BulkUploadForm() {
                                                 <td className="py-2">
                                                     {row.extractionId ? (
                                                         <button
+                                                            type="button"
                                                             onClick={() => openRowReview(row.extractionId as string)}
                                                             disabled={Boolean(loadingDraft[row.extractionId])}
                                                             className="px-3 py-1 rounded border border-white/10 text-white bg-white/5 hover:bg-white/10 disabled:opacity-50"
@@ -679,7 +682,7 @@ export default function BulkUploadForm() {
                         <div className="glass-panel p-4 rounded-xl border border-sky-400/30">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-white font-semibold">Row Review: {activeRow}</h3>
-                                <button onClick={() => setActiveRow(null)} className="px-3 py-1 rounded border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10">
+                                <button type="button" onClick={() => setActiveRow(null)} className="px-3 py-1 rounded border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10">
                                     Close
                                 </button>
                             </div>
@@ -691,7 +694,7 @@ export default function BulkUploadForm() {
                         <div className="glass-panel p-4 rounded-xl border border-amber-400/30">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-white font-semibold">Table Review</h3>
-                                <button onClick={() => setTableReviewOpen(false)} className="px-3 py-1 rounded border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10">
+                                <button type="button" onClick={() => setTableReviewOpen(false)} className="px-3 py-1 rounded border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10">
                                     Close
                                 </button>
                             </div>
@@ -703,6 +706,7 @@ export default function BulkUploadForm() {
                                             <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-white">{row.filename}</h4>
                                                 <button
+                                                    type="button"
                                                     onClick={() => saveRowReview(extractionId)}
                                                     disabled={Boolean(rowSaving[extractionId])}
                                                     className="px-3 py-1 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 disabled:opacity-50"
@@ -717,6 +721,7 @@ export default function BulkUploadForm() {
                             </div>
                             <div className="mt-4">
                                 <button
+                                    type="button"
                                     onClick={saveAllReviews}
                                     disabled={savingAll}
                                     className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -729,7 +734,7 @@ export default function BulkUploadForm() {
 
                     <div className="flex gap-2">
                         {polling ? (
-                            <button onClick={handleCancel} className="flex-1 py-2 px-4 rounded-full border border-rose-400/30 text-rose-200 bg-rose-500/15 hover:bg-rose-500/25">
+                            <button type="button" onClick={handleCancel} className="flex-1 py-2 px-4 rounded-full border border-rose-400/30 text-rose-200 bg-rose-500/15 hover:bg-rose-500/25">
                                 {t('cancel')}
                             </button>
                         ) : (
@@ -743,7 +748,7 @@ export default function BulkUploadForm() {
                                         Download All XML
                                     </a>
                                 )}
-                                <button onClick={handleReset} className="flex-1 py-2 px-4 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10">
+                                <button type="button" onClick={handleReset} className="flex-1 py-2 px-4 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10">
                                     {t('newUpload')}
                                 </button>
                             </>

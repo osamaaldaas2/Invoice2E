@@ -5,7 +5,11 @@ import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
 import { batchGenerator } from './batch.generator';
 import { AppError, ValidationError } from '@/lib/errors';
-import { MAX_CONCURRENT_BATCH_JOBS } from '@/lib/constants';
+import { MAX_CONCURRENT_BATCH_JOBS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
+import { ExtractorFactory } from '@/services/ai/extractor.factory';
+import { invoiceDbService } from '@/services/invoice.db.service';
+import { creditsDbService } from '@/services/credits.db.service';
+import { pdfSplitterService } from '@/services/pdf-splitter.service';
 
 type BatchJobRow = {
     id: string;
@@ -16,6 +20,8 @@ type BatchJobRow = {
     failed_files: number;
     results: BatchResult[] | null;
     input_file_path?: string | null;
+    source_type?: string | null;
+    boundary_data?: Record<string, unknown> | null;
     created_at: string;
     completed_at?: string | null;
 };
@@ -228,6 +234,196 @@ export class BatchService {
     }
 
     /**
+     * Create a background job for multi-invoice PDF splitting + extraction.
+     */
+    async createMultiInvoiceJob(
+        userId: string,
+        pdfBuffer: Buffer,
+        boundaryData: Record<string, unknown>,
+        totalInvoices: number,
+    ): Promise<{ jobId: string }> {
+        logger.info('Creating multi-invoice background job', { userId, totalInvoices });
+
+        const supabase = this.getSupabase();
+
+        const { data: job, error } = await supabase
+            .from('batch_jobs')
+            .insert({
+                user_id: userId,
+                status: 'pending',
+                total_files: totalInvoices,
+                completed_files: 0,
+                failed_files: 0,
+                results: [],
+                source_type: 'multi_invoice_split',
+                boundary_data: boundaryData,
+            })
+            .select()
+            .single();
+
+        if (error || !job) {
+            throw new AppError('DATABASE_ERROR', `Failed to create multi-invoice job: ${error?.message || 'unknown'}`, 500);
+        }
+
+        const inputPath = `${userId}/${job.id}/input.pdf`;
+        await this.uploadInputFile(inputPath, pdfBuffer, 'application/pdf');
+
+        await supabase
+            .from('batch_jobs')
+            .update({ input_file_path: inputPath })
+            .eq('id', job.id);
+
+        logger.info('Multi-invoice job created', { jobId: job.id, totalInvoices, inputPath });
+        return { jobId: job.id };
+    }
+
+    /**
+     * Process a multi-invoice split job: download PDF, split, extract in parallel.
+     */
+    async processMultiInvoiceJob(jobId: string): Promise<void> {
+        const supabase = this.getSupabase();
+
+        const { data: job, error: jobError } = await supabase
+            .from('batch_jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+
+        if (jobError || !job) {
+            throw new AppError('DATABASE_ERROR', `Multi-invoice job not found: ${jobId}`, 500);
+        }
+
+        const userId = job.user_id as string;
+        const inputPath = job.input_file_path as string;
+        const boundaryData = job.boundary_data as { invoices: { pages: number[]; label: string }[] } | null;
+
+        if (!inputPath || !boundaryData?.invoices) {
+            throw new ValidationError('Missing input path or boundary data for multi-invoice job');
+        }
+
+        // Download PDF
+        const pdfBuffer = await this.downloadInputFile(inputPath);
+
+        // Split by page groups
+        const pageGroups = boundaryData.invoices.map(inv => inv.pages);
+        const splitBuffers = await pdfSplitterService.splitByPageGroups(pdfBuffer, pageGroups);
+
+        const extractor = ExtractorFactory.create();
+        const results: BatchResult[] = [];
+        let completedFiles = 0;
+        let failedFiles = 0;
+
+        // Process segments in parallel chunks
+        const segments = splitBuffers.map((buf, i) => ({ buf, i }));
+        for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
+            const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
+
+            await Promise.all(chunk.map(async ({ buf, i }) => {
+                const invoice = boundaryData.invoices[i]!;
+                const segmentName = `Invoice [${invoice.label}]`;
+
+                try {
+                    const extractedData = await extractor.extractFromFile(buf, segmentName, 'application/pdf');
+
+                    const extraction = await invoiceDbService.createExtraction({
+                        userId,
+                        extractionData: extractedData as unknown as Record<string, unknown>,
+                        confidenceScore: extractedData.confidence,
+                        status: 'draft',
+                    });
+
+                    await creditsDbService.deductCredits(userId, 1, 'extraction');
+
+                    results.push({
+                        filename: segmentName,
+                        status: 'success',
+                        invoiceNumber: extractedData.invoiceNumber || undefined,
+                        extractionId: extraction.id,
+                        confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
+                        reviewStatus: 'pending_review',
+                        completedAt: new Date().toISOString(),
+                    });
+                    completedFiles++;
+                } catch (err) {
+                    const errMsg = err instanceof Error ? err.message : 'Unknown error';
+                    results.push({
+                        filename: segmentName,
+                        status: 'failed',
+                        error: errMsg,
+                        reviewStatus: 'not_available',
+                        completedAt: new Date().toISOString(),
+                    });
+                    failedFiles++;
+                }
+            }));
+
+            // Update progress after each chunk
+            await supabase
+                .from('batch_jobs')
+                .update({
+                    completed_files: completedFiles,
+                    failed_files: failedFiles,
+                    results,
+                })
+                .eq('id', jobId);
+        }
+
+        // Final status
+        const finalStatus = failedFiles === 0
+            ? 'completed'
+            : completedFiles === 0
+                ? 'failed'
+                : 'partial_success';
+
+        await supabase
+            .from('batch_jobs')
+            .update({
+                status: finalStatus,
+                completed_files: completedFiles,
+                failed_files: failedFiles,
+                results,
+                completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobId);
+
+        logger.info('Multi-invoice job completed', {
+            jobId,
+            status: finalStatus,
+            completed: completedFiles,
+            failed: failedFiles,
+        });
+    }
+
+    private async uploadInputFile(path: string, buffer: Buffer, contentType: string): Promise<void> {
+        await this.ensureInputBucket();
+        const supabase = this.getSupabase();
+
+        const { error } = await supabase.storage
+            .from(this.INPUT_BUCKET)
+            .upload(path, buffer, { contentType, upsert: true });
+
+        if (error) {
+            throw new AppError('STORAGE_ERROR', `Failed to upload input file: ${error.message}`, 500);
+        }
+    }
+
+    private async downloadInputFile(path: string): Promise<Buffer> {
+        await this.ensureInputBucket();
+        const supabase = this.getSupabase();
+
+        const { data, error } = await supabase.storage
+            .from(this.INPUT_BUCKET)
+            .download(path);
+
+        if (error || !data) {
+            throw new AppError('STORAGE_ERROR', `Failed to download input file: ${error?.message || 'Missing file'}`, 500);
+        }
+
+        const arrayBuffer = await data.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+    }
+
+    /**
      * Delegates to BatchProcessor.
      */
     async processBatch(
@@ -268,7 +464,7 @@ export class BatchService {
             })
             .eq('id', pending.id)
             .eq('status', 'pending')
-            .select('id, user_id, input_file_path')
+            .select('id, user_id, input_file_path, source_type')
             .maybeSingle();
 
         if (claimError) {
@@ -280,7 +476,14 @@ export class BatchService {
         }
 
         const jobId = claimed.id as string;
+        const sourceType = (claimed.source_type as string) || 'zip_upload';
         try {
+            if (sourceType === 'multi_invoice_split') {
+                await this.processMultiInvoiceJob(jobId);
+                logger.info('Worker processed multi-invoice job', { jobId, userId: claimed.user_id });
+                return true;
+            }
+
             const inputPath = claimed.input_file_path as string | null;
             if (!inputPath) {
                 throw new ValidationError('Missing input ZIP path for batch job');

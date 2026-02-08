@@ -343,7 +343,7 @@ export default function AdminPackagesPage() {
                                     <input
                                         type="number"
                                         value={formData.credits}
-                                        onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) || 0 })}
+                                        onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value, 10) || 0 })}
                                         className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                         min="1"
                                     />
@@ -386,7 +386,7 @@ export default function AdminPackagesPage() {
                                     <input
                                         type="number"
                                         value={formData.sortOrder}
-                                        onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
+                                        onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value, 10) || 0 })}
                                         className="w-full px-3 py-2 border border-white/10 rounded-xl bg-slate-950/60 text-white"
                                     />
                                 </div>

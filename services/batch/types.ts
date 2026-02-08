@@ -6,6 +6,8 @@ export interface BatchJob {
     completedFiles: number;
     failedFiles: number;
     results: BatchResult[];
+    sourceType?: string;
+    boundaryData?: Record<string, unknown>;
     createdAt: string;
     completedAt?: string;
 }

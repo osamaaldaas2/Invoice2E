@@ -124,6 +124,7 @@ export default function CreditPurchaseForm() {
                 ) : (
                     packages.map((pkg) => (
                         <button
+                            type="button"
                             key={pkg.id}
                             onClick={() => setSelectedPackage(pkg.id)}
                             className={`relative p-4 rounded-2xl border transition-all text-left ${selectedPackage === pkg.id
@@ -160,6 +161,7 @@ export default function CreditPurchaseForm() {
                 </label>
                 <div className="flex gap-4">
                     <button
+                        type="button"
                         onClick={() => setPaymentMethod('stripe')}
                         className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${paymentMethod === 'stripe'
                                 ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 to-transparent'
@@ -172,6 +174,7 @@ export default function CreditPurchaseForm() {
                         <span className="font-medium text-slate-100">Stripe</span>
                     </button>
                     <button
+                        type="button"
                         onClick={() => setPaymentMethod('paypal')}
                         className={`flex-1 p-4 rounded-2xl border flex items-center justify-center gap-2 transition-all ${paymentMethod === 'paypal'
                                 ? 'border-sky-300/40 bg-gradient-to-br from-sky-500/10 to-transparent'
@@ -188,6 +191,7 @@ export default function CreditPurchaseForm() {
 
             {/* Purchase Button */}
             <button
+                type="button"
                 onClick={handlePurchase}
                 disabled={!selectedPackage || loading || packagesLoading}
                 className="w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"

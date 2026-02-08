@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger';
 import { paypalAdapter } from '@/adapters';
 import { CREDIT_PACKAGES, CreditPackage } from './stripe.service';
+import { ValidationError } from '@/lib/errors';
 
 export interface PayPalOrder {
     orderId: string;
@@ -43,7 +44,7 @@ export class PayPalService {
 
         const pkg = this.getPackage(packageId);
         if (!pkg) {
-            throw new Error(`Invalid package ID: ${packageId}`);
+            throw new ValidationError(`Invalid package ID: ${packageId}`);
         }
 
         const order = await paypalAdapter.createOrder({

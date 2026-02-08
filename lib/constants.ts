@@ -76,6 +76,9 @@ export const INPUT_LIMITS = {
 // FIX-030: Limit concurrent batch jobs per user
 export const MAX_CONCURRENT_BATCH_JOBS = 3;
 
+// Multi-invoice parallel extraction concurrency
+export const MULTI_INVOICE_CONCURRENCY = 5;
+
 // Batch AI extraction throttling
 export const BATCH_EXTRACTION = {
     CONCURRENCY: 3,                // Process up to 3 files in parallel

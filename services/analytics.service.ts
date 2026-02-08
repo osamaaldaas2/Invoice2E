@@ -7,6 +7,7 @@
 
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
+import { AppError } from '@/lib/errors';
 import { API_TIMEOUTS } from '@/lib/constants';
 
 export interface ConversionHistoryItem {
@@ -372,7 +373,7 @@ export class AnalyticsService {
 
         if (error) {
             logger.error('Failed to get charts data', { error });
-            throw new Error(`Failed to get charts data: ${error.message}`);
+            throw new AppError('ANALYTICS_ERROR', `Failed to get charts data: ${error.message}`, 500);
         }
 
         const conversions: Array<{

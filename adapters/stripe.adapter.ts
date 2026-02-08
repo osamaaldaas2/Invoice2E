@@ -106,7 +106,7 @@ export class StripeAdapter implements IStripeAdapter {
         }
 
         // Check timestamp age (5 minutes tolerance)
-        const timestampAge = Math.floor(Date.now() / 1000) - parseInt(timestamp);
+        const timestampAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
         if (timestampAge > 300) {
             logger.warn('Stripe webhook: Timestamp too old', { age: timestampAge });
             throw new Error('Webhook timestamp too old');

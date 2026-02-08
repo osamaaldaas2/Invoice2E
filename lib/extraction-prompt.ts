@@ -54,5 +54,6 @@ IMPORTANT:
 8. CRITICAL: buyerAddress & sellerAddress must contain ONLY the street address. Extract city and postal code as SEPARATE fields in buyerCity/sellerCity and buyerPostalCode/sellerPostalCode. For example, "Herrenstr. 18d, 24768 Rendsburg" should become: sellerAddress="Herrenstr. 18d", sellerCity="Rendsburg", sellerPostalCode="24768"
 9. Extract phone numbers into sellerPhone/buyerPhone if visible on the invoice
 10. CRITICAL: All monetary values (subtotal, taxAmount, totalAmount, unitPrice, totalPrice) must be plain decimal numbers using a dot (.) as the decimal separator. Never use a comma as a decimal separator. Never omit digits. For example: 5508.99 is correct, while 5.508,99 or 5508,99 or 5.50899 are all WRONG. Double-check that totalAmount = subtotal + taxAmount.
+11. CRITICAL: Each lineItem MUST have its own correct taxRate. Do NOT assume all items share the same tax rate. Invoices often mix different VAT rates (e.g. 19% for goods, 7% for food/books, 0% for tax-exempt items like travel costs/Reisekosten, insurance, exports). Look carefully at the tax breakdown section, footnotes, annotations, and any text outside the main table that indicates a different tax rate for specific items. Items marked as "steuerfrei", "0% MwSt", "exempt", typically have taxRate 0.
 
 Extract the data now:`;

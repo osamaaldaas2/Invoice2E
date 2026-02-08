@@ -137,6 +137,7 @@ export default function Header(): React.ReactElement {
                                 Dashboard
                             </Link>
                             <button
+                                type="button"
                                 onClick={handleLogout}
                                 disabled={loggingOut}
                                 className="nav-pill"

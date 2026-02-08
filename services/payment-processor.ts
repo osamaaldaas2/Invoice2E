@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
 import { stripeService, CREDIT_PACKAGES } from './stripe.service';
 import { paypalService } from './paypal.service';
 import { emailService } from './email.service';
-import { ValidationError } from '@/lib/errors';
+import { AppError, ValidationError } from '@/lib/errors';
 
 export type PaymentMethod = 'stripe' | 'paypal';
 
@@ -84,12 +84,12 @@ export class PaymentProcessor {
                 packageId,
                 error: insertError.message
             });
-            throw new Error('Unable to start payment process. Please try again.');
+            throw new AppError('PAYMENT_ERROR', 'Unable to start payment process. Please try again.', 500);
         }
 
         if (method === 'stripe') {
             if (!stripeService.isConfigured()) {
-                throw new Error('Stripe is not configured');
+                throw new AppError('PAYMENT_CONFIG_ERROR', 'Stripe is not configured', 500);
             }
 
             const session = await stripeService.createCheckoutSession(
@@ -110,7 +110,7 @@ export class PaymentProcessor {
             };
         } else if (method === 'paypal') {
             if (!paypalService.isConfigured()) {
-                throw new Error('PayPal is not configured');
+                throw new AppError('PAYMENT_CONFIG_ERROR', 'PayPal is not configured', 500);
             }
 
             const order = await paypalService.createOrder(
@@ -130,7 +130,7 @@ export class PaymentProcessor {
             };
         }
 
-        throw new Error(`Unsupported payment method: ${method}`);
+        throw new ValidationError(`Unsupported payment method: ${method}`);
     }
 
     /**
@@ -436,7 +436,7 @@ export class PaymentProcessor {
                 source,
                 error: error.message,
             });
-            throw new Error(`Failed to add credits: ${error.message}`);
+            throw new AppError('CREDITS_ERROR', `Failed to add credits: ${error.message}`, 500);
         }
 
         logger.info('Credits added successfully via atomic operation', {
@@ -461,7 +461,7 @@ export class PaymentProcessor {
             .range(offset, offset + limit - 1);
 
         if (error) {
-            throw new Error(`Failed to get payment history: ${error.message}`);
+            throw new AppError('DB_ERROR', `Failed to get payment history: ${error.message}`, 500);
         }
 
         return {

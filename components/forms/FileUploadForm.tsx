@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { FILE_LIMITS } from '@/lib/constants';
@@ -35,6 +35,10 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
+    const [backgroundProgress, setBackgroundProgress] = useState(0);
+    const [backgroundTotal, setBackgroundTotal] = useState(0);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const locale = useMemo(() => {
@@ -58,6 +62,61 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     }, [locale]);
 
     const hasCredits = availableCredits > 0;
+
+    const completedStatuses = useMemo(() => new Set(['completed', 'failed', 'cancelled', 'partial_success']), []);
+
+    const stopPolling = useCallback(() => {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+        }
+    }, []);
+
+    const startPolling = useCallback((jobId: string) => {
+        stopPolling();
+        pollRef.current = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/invoices/extract?jobId=${jobId}`);
+                const payload = await response.json();
+                if (payload.success) {
+                    const completed = (payload.completedFiles || 0) + (payload.failedFiles || 0);
+                    const total = payload.totalFiles || 0;
+                    setBackgroundProgress(payload.progress || 0);
+                    setBackgroundTotal(total);
+                    setProgress(total > 0 ? Math.round((completed / total) * 100) : 0);
+
+                    if (payload.status && completedStatuses.has(payload.status)) {
+                        stopPolling();
+                        setBackgroundJobId(null);
+                        setState('success');
+                        setProgress(100);
+
+                        // Convert results to multiResult format
+                        const results = payload.results || [];
+                        const extractions = results
+                            .filter((r: { status: string }) => r.status === 'success' || r.status === 'failed')
+                            .map((r: { filename?: string; extractionId?: string; confidenceScore?: number; status: string }, idx: number) => ({
+                                extractionId: r.extractionId || '',
+                                label: r.filename || `Invoice ${idx + 1}`,
+                                confidence: r.confidenceScore || 0,
+                            }));
+
+                        setMultiResult({
+                            totalInvoices: total,
+                            extractions,
+                        });
+                    }
+                }
+            } catch {
+                // Silently ignore poll errors, will retry on next interval
+            }
+        }, 2000);
+    }, [stopPolling, completedStatuses]);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => stopPolling();
+    }, [stopPolling]);
 
     const validateClientSide = useCallback((file: File): string | null => {
         if (file.size > FILE_LIMITS.MAX_FILE_SIZE_BYTES) {
@@ -120,11 +179,23 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             }
 
             clearInterval(progressInterval);
+
+            if (data.data.backgroundJob) {
+                // Large multi-invoice PDF: switch to polling mode
+                setBackgroundJobId(data.data.jobId);
+                setBackgroundTotal(data.data.totalInvoices);
+                setBackgroundProgress(0);
+                setState('extracting');
+                setProgress(0);
+                startPolling(data.data.jobId);
+                return;
+            }
+
             setProgress(100);
             setState('success');
 
             if (data.data.multiInvoice) {
-                // Multi-invoice PDF result
+                // Multi-invoice PDF result (inline, ≤3)
                 setMultiResult({
                     totalInvoices: data.data.totalInvoices,
                     extractions: data.data.extractions,
@@ -187,11 +258,15 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     };
 
     const resetForm = () => {
+        stopPolling();
         setState('idle');
         setError('');
         setResult(null);
         setMultiResult(null);
         setProgress(0);
+        setBackgroundJobId(null);
+        setBackgroundProgress(0);
+        setBackgroundTotal(0);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -298,6 +373,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                                 You need at least 1 credit to upload.
                             </p>
                             <button
+                                type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(withLocale('/dashboard/credits'));
@@ -321,11 +397,15 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     <div className="w-full bg-white/10 rounded-full h-2.5">
                         <div
                             className="bg-gradient-to-r from-sky-400 to-blue-500 h-2.5 rounded-full transition-all duration-300"
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${backgroundJobId ? backgroundProgress : progress}%` }}
                         />
                     </div>
                     <p className="text-sm text-faded mt-2 text-center">
-                        {state === 'uploading' ? 'Uploading...' : '🤖 AI extracting invoice data...'}
+                        {backgroundJobId
+                            ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
+                            : state === 'uploading'
+                                ? 'Uploading...'
+                                : 'AI extracting invoice data...'}
                     </p>
                 </div>
             )}
@@ -334,6 +414,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 <div className="mt-4 p-4 glass-panel border border-rose-400/30 rounded-xl">
                     <p className="text-rose-200 font-medium">❌ {error}</p>
                     <button
+                        type="button"
                         onClick={resetForm}
                         className="mt-2 text-sm text-rose-200/80 hover:text-rose-100 underline"
                     >
@@ -357,12 +438,14 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
+                            type="button"
                             onClick={() => router.push(withLocale(`/review/${result.extractionId}`))}
                             className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 text-white font-semibold hover:brightness-110 transition-colors"
                         >
                             Review & Edit Data
                         </button>
                         <button
+                            type="button"
                             onClick={resetForm}
                             className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
@@ -395,6 +478,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                                 </div>
                                 {ext.extractionId ? (
                                     <button
+                                        type="button"
                                         onClick={() => router.push(withLocale(`/review/${ext.extractionId}`))}
                                         className="px-3 py-1 text-sm rounded-full bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition-colors"
                                     >
@@ -408,6 +492,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
+                            type="button"
                             onClick={handleDownloadZip}
                             disabled={isDownloading}
                             className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors disabled:opacity-50"
@@ -415,6 +500,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                             {isDownloading ? 'Generating ZIP...' : 'Download All as ZIP'}
                         </button>
                         <button
+                            type="button"
                             onClick={resetForm}
                             className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
