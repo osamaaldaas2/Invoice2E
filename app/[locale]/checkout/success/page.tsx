@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
 
 export default function CheckoutSuccessPage() {
     const routeParams = useParams();
@@ -16,6 +17,7 @@ export default function CheckoutSuccessPage() {
 
     const [verifying, setVerifying] = useState(true);
     const [credits, setCredits] = useState<number | null>(null);
+    const [verificationError, setVerificationError] = useState<string | null>(null);
 
     useEffect(() => {
         const verifyPayment = async () => {
@@ -31,9 +33,13 @@ export default function CheckoutSuccessPage() {
 
                 if (data.success) {
                     setCredits(data.credits);
+                    setVerificationError(null);
+                } else {
+                    setVerificationError(data.error || 'Payment verification could not be completed');
                 }
             } catch (error) {
-                console.error('Verification failed:', error);
+                logger.error('Payment verification failed', error);
+                setVerificationError('Payment verification failed. Your credits may still be added shortly.');
             } finally {
                 setVerifying(false);
             }
@@ -73,6 +79,12 @@ export default function CheckoutSuccessPage() {
                         : `${credits} credits have been added to your account.`}
                 </p>
             )}
+
+            {verificationError ? (
+                <div className="mb-6 glass-panel border border-rose-400/30 rounded-xl p-3 text-rose-200" role="alert">
+                    {verificationError}
+                </div>
+            ) : null}
 
             <div className="space-y-4">
                 <Button

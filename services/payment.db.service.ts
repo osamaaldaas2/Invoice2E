@@ -72,6 +72,32 @@ export class PaymentDatabaseService {
 
         return snakeToCamelKeys(data) as PaymentTransaction;
     }
+    /**
+     * Expire pending payment transactions older than specified minutes.
+     * FIX-011: Prevents abandoned checkout sessions from remaining permanent.
+     */
+    async expirePendingTransactions(olderThanMinutes: number = 60): Promise<number> {
+        const supabase = this.getSupabase();
+        const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000).toISOString();
+
+        const { data, error } = await supabase
+            .from('payment_transactions')
+            .update({ payment_status: 'expired' })
+            .eq('payment_status', 'pending')
+            .lt('created_at', cutoff)
+            .select('id');
+
+        if (error) {
+            logger.error('Failed to expire pending transactions', { error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to expire transactions', 500);
+        }
+
+        const count = data?.length || 0;
+        if (count > 0) {
+            logger.info('Expired pending transactions', { count, olderThanMinutes });
+        }
+        return count;
+    }
 }
 
 export const paymentDbService = new PaymentDatabaseService();

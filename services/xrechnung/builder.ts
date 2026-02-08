@@ -1,5 +1,6 @@
 import { DEFAULT_VAT_RATE, REDUCED_VAT_RATE } from '@/lib/constants';
 import { logger } from '@/lib/logger';
+import { XRechnungInvoiceData, XRechnungLineItem } from './types';
 
 export class XRechnungBuilder {
     private readonly xmlns = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
@@ -7,7 +8,7 @@ export class XRechnungBuilder {
     // BR-DE-21: Specification identifier MUST match XRechnung standard syntax exactly
     private readonly xrechnungVersion = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
 
-    buildXml(data: any): string {
+    buildXml(data: XRechnungInvoiceData): string {
         const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
 
         const rootElement = `
@@ -35,7 +36,7 @@ export class XRechnungBuilder {
     </rsm:ExchangedDocumentContext>`;
     }
 
-    private buildExchangedDocument(data: any): string {
+    private buildExchangedDocument(data: XRechnungInvoiceData): string {
         return `
     <rsm:ExchangedDocument>
         <ram:ID>${this.escapeXml(data.invoiceNumber)}</ram:ID>
@@ -46,7 +47,7 @@ export class XRechnungBuilder {
     </rsm:ExchangedDocument>`;
     }
 
-    private buildSupplyChainTradeTransaction(data: any): string {
+    private buildSupplyChainTradeTransaction(data: XRechnungInvoiceData): string {
         const items = data.lineItems || data.items || [];
 
         return `
@@ -62,7 +63,7 @@ export class XRechnungBuilder {
      * FIX (BUG-025/027): Use actual tax rate per line item, ensure no null values
      * FIX (QA-BUG-2): Validate required fields, use configurable VAT rate
      */
-    private buildLineItems(items: any[]): string {
+    private buildLineItems(items: XRechnungLineItem[]): string {
         return items
             .map(
                 (item, index) => {
@@ -117,7 +118,7 @@ export class XRechnungBuilder {
             .join('');
     }
 
-    private buildTradeAgreement(data: any): string {
+    private buildTradeAgreement(data: XRechnungInvoiceData): string {
         // BR-DE-15: BuyerReference (BT-10) is MANDATORY - use invoice number as fallback
         const buyerRef = data.buyerReference || data.invoiceNumber || 'LEITWEG-ID';
 
@@ -168,7 +169,7 @@ export class XRechnungBuilder {
      * DATA INTEGRITY FIX (BUG-024): Removed hardcoded fake phone/email defaults
      * Now uses actual data or logs warning if missing required fields
      */
-    private buildSellerContact(data: any): string {
+    private buildSellerContact(data: XRechnungInvoiceData): string {
         const contactName = data.sellerContactName || data.sellerContact || data.sellerName;
         const phone = data.sellerPhoneNumber || data.sellerPhone;
         const email = data.sellerEmail;
@@ -196,7 +197,7 @@ export class XRechnungBuilder {
             </ram:DefinedTradeContact>`;
     }
 
-    private buildSellerTradeParty(data: any): string {
+    private buildSellerTradeParty(data: XRechnungInvoiceData): string {
         return `
         <ram:SellerTradeParty>
             <ram:Name>${this.escapeXml(data.sellerName)}</ram:Name>
@@ -207,9 +208,9 @@ export class XRechnungBuilder {
             data.sellerCity || '',
             data.sellerCountryCode || 'DE'
         )}
-            ${this.buildURICommunication(data.sellerEmail)}
+            ${this.buildURICommunication(data.sellerEmail || '')}
             <ram:SpecifiedTaxRegistration>
-                <ram:ID schemeID="VA">${this.escapeXml(data.sellerTaxId)}</ram:ID>
+                <ram:ID schemeID="VA">${this.escapeXml(data.sellerTaxId || '')}</ram:ID>
             </ram:SpecifiedTaxRegistration>
         </ram:SellerTradeParty>`;
     }
@@ -218,7 +219,7 @@ export class XRechnungBuilder {
      * DATA INTEGRITY FIX (BUG-023): Removed hardcoded 'buyer@example.de' default
      * Buyer email is now optional - if not provided, URICommunication is omitted
      */
-    private buildBuyerTradeParty(data: any): string {
+    private buildBuyerTradeParty(data: XRechnungInvoiceData): string {
         // PEPPOL-EN16931-R010: Buyer electronic address is MANDATORY
         // However, we should not use fake defaults - let validation handle this
         const buyerEmail = data.buyerEmail;
@@ -240,7 +241,7 @@ export class XRechnungBuilder {
         </ram:BuyerTradeParty>`;
     }
 
-    private buildTradeDelivery(data: any): string {
+    private buildTradeDelivery(data: XRechnungInvoiceData): string {
         return `
     <ram:ApplicableHeaderTradeDelivery>
         <ram:ActualDeliverySupplyChainEvent>
@@ -259,7 +260,7 @@ export class XRechnungBuilder {
      * This was a real German tutorial IBAN that could cause payments to go to wrong account!
      * IBAN is now required - if missing, payment means section is omitted with warning
      */
-    private buildPaymentMeans(data: any): string {
+    private buildPaymentMeans(data: XRechnungInvoiceData): string {
         const iban = data.sellerIban || data.iban;
         const bic = data.sellerBic || data.bic || '';
 
@@ -298,7 +299,7 @@ export class XRechnungBuilder {
     /**
      * FIX (BUG-027): Ensure all numeric values are properly coalesced to prevent null in XML
      */
-    private buildTradeSettlement(data: any): string {
+    private buildTradeSettlement(data: XRechnungInvoiceData): string {
         const taxAmount = this.safeNumber(data.taxAmount);
         const subtotal = this.safeNumber(data.subtotal);
         const total = this.safeNumber(data.totalAmount);
@@ -350,7 +351,7 @@ export class XRechnungBuilder {
         return DEFAULT_VAT_RATE;
     }
 
-    private buildPaymentTerms(data: any): string {
+    private buildPaymentTerms(data: XRechnungInvoiceData): string {
         let xml = '<ram:SpecifiedTradePaymentTerms>';
 
         if (data.paymentTerms) {
@@ -375,7 +376,8 @@ export class XRechnungBuilder {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
-            .replace(/'/g, '&apos;');
+            .replace(/'/g, '&apos;')
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''); // FIX-020: Strip XML-invalid control chars
     }
 
     /**

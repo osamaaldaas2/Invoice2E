@@ -307,14 +307,32 @@ export class PaymentProcessor {
         try {
             const purchaseUnits = event.resource.purchase_units as Array<{ custom_id?: string }> | undefined;
             const customId = purchaseUnits?.[0]?.custom_id;
-            const customData = JSON.parse(customId || '{}');
-            userId = customData.userId;
-            // Also try to get credits from custom data if not in result
-            if (!credits && customData.credits) {
-                credits = parseInt(customData.credits, 10);
+
+            // FIX-037: Better error reporting for custom_id parsing
+            if (!customId) {
+                logger.error('PayPal custom_id is missing', { orderId });
+                return { success: false, message: 'Missing custom data' };
             }
-        } catch {
-            logger.error('Failed to parse PayPal custom_id');
+
+            let customData: Record<string, unknown>;
+            try {
+                customData = JSON.parse(customId);
+            } catch (parseError) {
+                logger.error('Failed to parse PayPal custom_id as JSON', {
+                    rawCustomId: customId.substring(0, 100),
+                    error: parseError instanceof Error ? parseError.message : String(parseError),
+                });
+                return { success: false, message: 'Invalid custom data format' };
+            }
+
+            userId = String(customData.userId || '');
+            if (!credits && customData.credits) {
+                credits = parseInt(String(customData.credits), 10);
+            }
+        } catch (outerError) {
+            logger.error('Failed to extract PayPal custom data', {
+                error: outerError instanceof Error ? outerError.message : String(outerError),
+            });
             return { success: false, message: 'Invalid custom data' };
         }
 

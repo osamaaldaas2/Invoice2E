@@ -1,7 +1,7 @@
 export interface BatchJob {
     id: string;
     userId: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'partial_success';
     totalFiles: number;
     completedFiles: number;
     failedFiles: number;
@@ -16,6 +16,11 @@ export interface BatchResult {
     invoiceNumber?: string;
     error?: string;
     xmlContent?: string;
+    extractionId?: string;
+    confidenceScore?: number;
+    reviewStatus?: 'pending_review' | 'reviewed' | 'not_available';
+    startedAt?: string;
+    completedAt?: string;
 }
 
 export interface BatchProgress {

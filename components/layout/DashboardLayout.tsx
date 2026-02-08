@@ -56,12 +56,14 @@ export default function DashboardLayout({ children }: Props) {
             try {
                 const sessionUser = await fetchSessionUser();
                 if (!sessionUser) {
-                    router.push(withLocale('/login'));
+                    setUser(null);
+                    router.replace(withLocale('/login'));
                     return;
                 }
                 setUser(sessionUser);
             } catch {
-                router.push(withLocale('/login'));
+                setUser(null);
+                router.replace(withLocale('/login'));
             } finally {
                 setLoading(false);
             }

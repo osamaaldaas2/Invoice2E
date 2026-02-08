@@ -42,12 +42,34 @@ export default function InvoiceReviewForm({
     return (
         <form onSubmit={onSubmit} className="space-y-6 max-w-4xl">
             {/* Confidence Alert */}
-            <div className={`p-4 rounded-2xl border ${confidence >= 0.8 ? 'bg-emerald-500/15 border-emerald-400/30' : 'bg-amber-500/15 border-amber-400/30'}`}>
-                <p className={confidence >= 0.8 ? 'text-emerald-200' : 'text-amber-200'}>
-                    Extraction Confidence: <strong>{(confidence * 100).toFixed(0)}%</strong>
-                    {confidence < 0.8 && ' - Please review carefully'}
-                </p>
-            </div>
+            {(() => {
+                const missingFields: string[] = [];
+                if (!initialData?.invoiceNumber) missingFields.push('Invoice Number');
+                if (!initialData?.invoiceDate) missingFields.push('Invoice Date');
+                if (!initialData?.sellerName) missingFields.push('Seller Name');
+                if (!initialData?.sellerEmail) missingFields.push('Seller Email');
+                if (!initialData?.sellerAddress) missingFields.push('Seller Address');
+                if (!initialData?.sellerTaxId) missingFields.push('Seller Tax ID');
+                if (!initialData?.buyerName) missingFields.push('Buyer Name');
+                if (!initialData?.buyerEmail) missingFields.push('Buyer Email');
+                if (!initialData?.buyerAddress) missingFields.push('Buyer Address');
+                if (!initialData?.buyerTaxId) missingFields.push('Buyer Tax ID');
+                const pct = (confidence * 100).toFixed(0);
+                const isHigh = confidence >= 0.8;
+                return (
+                    <div className={`p-4 rounded-2xl border ${isHigh ? 'bg-emerald-500/15 border-emerald-400/30' : 'bg-amber-500/15 border-amber-400/30'}`}>
+                        <p className={isHigh ? 'text-emerald-200' : 'text-amber-200'}>
+                            Extraction Confidence: <strong>{pct}%</strong>
+                            {!isHigh && ' — Please review carefully'}
+                        </p>
+                        {missingFields.length > 0 && (
+                            <p className="text-sm text-slate-400 mt-1">
+                                Missing: {missingFields.join(', ')}
+                            </p>
+                        )}
+                    </div>
+                );
+            })()}
 
             <InvoiceDetailsSection register={register} errors={errors} />
 

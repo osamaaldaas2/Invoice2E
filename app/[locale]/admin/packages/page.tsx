@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { logger } from '@/lib/logger';
 
 interface CreditPackage {
     id: string;
@@ -66,7 +67,7 @@ export default function AdminPackagesPage() {
             const data = await response.json();
             setPackages(data.data.packages);
         } catch (err) {
-            console.error('Failed to fetch packages:', err);
+            logger.error('Failed to fetch packages', err);
             setError('Failed to load packages');
         } finally {
             setLoading(false);
@@ -118,7 +119,7 @@ export default function AdminPackagesPage() {
             setShowModal(false);
             fetchPackages();
         } catch (err) {
-            console.error('Save failed:', err);
+            logger.error('Package save failed', err);
             setError(err instanceof Error ? err.message : 'Failed to save package');
         } finally {
             setSaving(false);
@@ -144,7 +145,7 @@ export default function AdminPackagesPage() {
 
             fetchPackages();
         } catch (err) {
-            console.error('Delete failed:', err);
+            logger.error('Package delete failed', err);
             setError(err instanceof Error ? err.message : 'Failed to delete package');
         } finally {
             setDeleting(null);

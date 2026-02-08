@@ -39,32 +39,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const body = await request.json();
-        const { conversionId, invoiceData, format = 'CII' } = body;
-        // REMOVED: userId from body destructuring - Security vulnerability
+        // FIX-024: Rename to extractionId for clarity (body field kept as conversionId for backward compat)
+        const { conversionId: extractionId, invoiceData, format = 'CII' } = body;
         const outputFormat = (format as ConversionFormat) || 'CII';
 
         logger.info('Parsing request body', {
-            hasConversionId: !!conversionId,
-            userId, // From authenticated session
+            hasExtractionId: !!extractionId,
+            userId,
             hasInvoiceData: !!invoiceData,
         });
 
-        if (!conversionId || !invoiceData) {
+        if (!extractionId || !invoiceData) {
             logger.warn('Missing required fields', {
-                conversionId: !!conversionId,
+                extractionId: !!extractionId,
                 invoiceData: !!invoiceData,
             });
             return NextResponse.json(
                 {
                     success: false,
-                    error: 'Missing required fields: conversionId or invoiceData',
+                    error: 'Missing required fields: extractionId or invoiceData',
                 },
                 { status: 400 }
             );
         }
 
         logger.info('Starting XRechnung conversion', {
-            conversionId,
+            extractionId,
             invoiceNumber: invoiceData?.invoiceNumber,
             userId,
         });
@@ -221,10 +221,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // Update conversion status after successful generation
         try {
             // conversionId from frontend is actually extractionId, resolve to actual conversion ID
-            const conversion = await invoiceDbService.getConversionByExtractionId(conversionId);
+            const conversion = await invoiceDbService.getConversionByExtractionId(extractionId);
 
             if (!conversion) {
-                logger.error('Conversion not found for extraction', { extractionId: conversionId, userId });
+                logger.error('Conversion not found for extraction', { extractionId, userId });
                 return NextResponse.json(
                     { success: false, error: 'Conversion record not found. Please review the invoice again.' },
                     { status: 404 }
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
             const actualConversionId = conversion.id;
             logger.info('Updating conversion record', {
-                extractionId: conversionId,
+                extractionId,
                 conversionId: actualConversionId,
                 userId
             });
@@ -248,11 +248,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
 
             // Mark extraction as completed
-            await invoiceDbService.updateExtraction(conversionId, { status: 'completed' });
+            await invoiceDbService.updateExtraction(extractionId, { status: 'completed' });
         } catch (txError) {
             logger.error('Failed to update conversion status', {
                 userId,
-                conversionId,
+                extractionId,
                 errorMessage: txError instanceof Error ? txError.message : String(txError),
                 errorStack: txError instanceof Error ? txError.stack : undefined,
                 errorType: txError instanceof Error ? txError.constructor.name : typeof txError
@@ -264,7 +264,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         logger.info('XRechnung conversion completed successfully', {
-            conversionId,
+            extractionId,
             fileName: result.fileName,
             validationStatus: result.validationStatus,
         });

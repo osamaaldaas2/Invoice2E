@@ -297,11 +297,23 @@ export async function resetRateLimit(identifier: string): Promise<void> {
  * Get identifier from request (IP address)
  */
 export function getRequestIdentifier(request: Request, email?: string): string {
+    const cfConnectingIp = request.headers.get('cf-connecting-ip');
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
-    const cfConnectingIp = request.headers.get('cf-connecting-ip');
 
-    let ip = cfConnectingIp || realIp || forwardedFor?.split(',')[0]?.trim() || 'unknown';
+    let ip: string;
+
+    if (cfConnectingIp) {
+        // FIX-002: Cloudflare provides verified client IP
+        ip = cfConnectingIp.trim();
+    } else if (process.env.TRUSTED_PROXY === 'true' && forwardedFor) {
+        // FIX-002: When behind a trusted proxy, use the rightmost IP (last hop before proxy)
+        const ips = forwardedFor.split(',').map(s => s.trim());
+        ip = ips[ips.length - 1] || 'unknown';
+    } else {
+        // FIX-002: Don't trust forwarded headers by default
+        ip = realIp?.trim() || 'unknown';
+    }
 
     if (email) {
         return `login:${ip}:${email.toLowerCase()}`;

@@ -198,11 +198,11 @@ type InitialData = {
     buyerEmail?: string;
     buyerAddress?: string;
     buyerTaxId?: string;
-    supplierName?: string;
-    supplierEmail?: string;
-    supplierAddress?: string;
-    supplierTaxId?: string;
-    items?: Array<{
+    sellerName?: string;
+    sellerEmail?: string;
+    sellerAddress?: string;
+    sellerTaxId?: string;
+    lineItems?: Array<{
         description: string;
         quantity: number;
         unitPrice: number;

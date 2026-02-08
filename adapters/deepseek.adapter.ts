@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { IDeepSeekAdapter, DeepSeekExtractionResult } from './interfaces';
 import { ExtractedInvoiceData } from '@/types';
+import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
 
 export class DeepSeekAdapter implements IDeepSeekAdapter {
     private readonly configApiKey?: string;
@@ -127,49 +128,56 @@ export class DeepSeekAdapter implements IDeepSeekAdapter {
         return !!this.apiKey && this.apiKey.length > 0;
     }
 
-    private getExtractionPrompt(): string {
-        return `You are an expert invoice extraction system. Extract invoice data from the provided base64-encoded image and return ONLY valid JSON.
+    async sendPrompt(fileBuffer: Buffer, mimeType: string, prompt: string): Promise<string> {
+        if (!this.apiKey) {
+            throw new AppError('CONFIG_ERROR', 'DeepSeek API not configured', 500);
+        }
 
-Return this exact JSON structure (fill with empty strings/0 if not found):
-{
-  "invoiceNumber": "string",
-  "invoiceDate": "YYYY-MM-DD or empty",
-  "buyerName": "string",
-  "buyerEmail": "string",
-  "buyerAddress": "string",
-  "buyerTaxId": "string",
-  "sellerName": "string",
-  "sellerEmail": "string",
-  "sellerAddress": "string",
-  "sellerTaxId": "string",
-  "sellerIban": "string",
-  "sellerBic": "string",
-  "bankName": "string",
-  "lineItems": [
-    {
-      "description": "string",
-      "quantity": number,
-      "unitPrice": number,
-      "totalPrice": number,
-      "taxRate": number or null
+        if (!fileBuffer || fileBuffer.length === 0) {
+            throw new ValidationError('Empty file buffer');
+        }
+
+        const base64Data = fileBuffer.toString('base64');
+        const payload = {
+            model: 'deepseek-vision',
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: prompt },
+                        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } },
+                    ],
+                },
+            ],
+            max_tokens: 2000,
+            temperature: 0.3,
+        };
+
+        try {
+            const response = await axios.post(this.apiUrl, payload, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.apiKey}`,
+                },
+                timeout: this.timeout,
+            });
+
+            const content = response.data?.choices?.[0]?.message?.content;
+            if (!content) {
+                throw new AppError('DEEPSEEK_ERROR', 'Empty response from DeepSeek API', 500);
+            }
+            return content;
+        } catch (error) {
+            if (axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.message?.includes('timeout'))) {
+                throw new AppError('DEEPSEEK_TIMEOUT', 'DeepSeek API request timed out', 504);
+            }
+            if (error instanceof AppError) throw error;
+            throw new AppError('DEEPSEEK_ERROR', `DeepSeek sendPrompt failed: ${error instanceof Error ? error.message : String(error)}`, 500);
+        }
     }
-  ],
-  "subtotal": number,
-  "taxRate": number,
-  "taxAmount": number,
-  "totalAmount": number,
-  "currency": "string",
-  "paymentTerms": "string",
-  "notes": "string",
-  "confidence": number between 0 and 1
-}
 
-CRITICAL:
-1. Extract ALL visible information from the invoice
-2. Return ONLY valid JSON, no markdown, no explanation
-3. Use null for missing fields, empty string for text, 0 for numbers
-4. Accuracy is critical - double-check totals and calculations
-5. Confidence score: 1.0 = perfect extraction, 0.5 = partial, 0.0 = failed`;
+    private getExtractionPrompt(): string {
+        return EXTRACTION_PROMPT;
     }
 
     private parseResponse(content: string): any {
@@ -217,13 +225,19 @@ CRITICAL:
             buyerName: data.buyerName || null,
             buyerEmail: data.buyerEmail || null,
             buyerAddress: data.buyerAddress || null,
+            buyerCity: data.buyerCity || null,
+            buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
             buyerTaxId: data.buyerTaxId || null,
+            buyerPhone: data.buyerPhone || null,
             sellerName: data.sellerName || null,
             sellerEmail: data.sellerEmail || null,
             sellerAddress: data.sellerAddress || null,
+            sellerCity: data.sellerCity || null,
+            sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
             sellerTaxId: data.sellerTaxId || null,
             sellerIban: normalizeIban(data.sellerIban),
             sellerBic: data.sellerBic || null,
+            sellerPhone: data.sellerPhone || null,
             bankName: data.bankName || null,
             lineItems: rawItems.map((item: any) => {
                 const itemHasTaxRate = item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';

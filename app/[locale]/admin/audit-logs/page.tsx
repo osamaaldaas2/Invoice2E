@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AdminAuditLog } from '@/types/admin';
+import { logger } from '@/lib/logger';
 
 export default function AdminAuditLogsPage() {
     const [logs, setLogs] = useState<AdminAuditLog[]>([]);
@@ -26,7 +27,7 @@ export default function AdminAuditLogsPage() {
                 setLogs(data.data.logs);
                 setTotalPages(data.data.pagination.pages);
             } catch (err) {
-                console.error('Failed to fetch audit logs:', err);
+                logger.error('Failed to fetch audit logs', err);
                 setError('Failed to load audit logs');
             } finally {
                 setLoading(false);

@@ -65,18 +65,6 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
                     )}
                 </div>
 
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Address
-                    </label>
-                    <input
-                        type="text"
-                        {...register('sellerAddress')}
-                        className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white mb-2"
-                        placeholder="Full Address String"
-                    />
-                </div>
-
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
                         Street

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CreditPackage } from '@/types/credit-package';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface PricingCardsProps {
     locale?: string;
@@ -15,6 +16,7 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
     const [packages, setPackages] = useState<CreditPackage[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchPackages = async () => {
@@ -23,9 +25,14 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                 const data = await response.json();
                 if (data.success) {
                     setPackages(data.packages || []);
+                    setError(null);
+                } else {
+                    setError(data.error || 'Failed to load packages');
                 }
             } catch (error) {
-                console.error('Failed to load packages:', error);
+                const message = error instanceof Error ? error.message : 'Failed to load packages';
+                setError(message);
+                logger.error('Failed to load packages', error);
             } finally {
                 setLoading(false);
             }
@@ -65,8 +72,14 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
     }
 
     return (
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {packages.map((pkg) => (
+        <div className="space-y-4">
+            {error ? (
+                <div className="glass-panel text-rose-200 p-4 rounded-xl border border-rose-400/30 text-center" role="alert">
+                    {error}
+                </div>
+            ) : null}
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                {packages.map((pkg) => (
                 <div
                     key={pkg.id}
                     className={cn(
@@ -125,7 +138,8 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                         {locale === 'de' ? 'Paket wählen' : 'Select Package'}
                     </Button>
                 </div>
-            ))}
+                ))}
+            </div>
         </div>
     );
 }

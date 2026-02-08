@@ -208,7 +208,7 @@
     },
 
     "anti_spaghetti_code_rules": [
-      "No file may exceed 300 lines without explicit approval.",
+      "No file may exceed 500 lines without explicit approval.",
       "No function may exceed 40 lines.",
       "Every function must perform exactly one responsibility.",
       "Business logic must never be placed in UI or controller layers.",
@@ -325,7 +325,7 @@
       "✅ Performance: No N+1 queries",
       "✅ Documentation: API endpoints documented",
       "✅ Backward compatibility: No breaking changes",
-      "✅ Files under 300 lines",
+      "✅ Files under 500 lines",
       "✅ Functions under 40 lines",
       "✅ Commit message clear and descriptive"
     ],

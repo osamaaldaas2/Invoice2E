@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import AdminProtectedRoute from '@/components/admin/AdminProtectedRoute';
+import { logger } from '@/lib/logger';
 
 interface Voucher {
     id: string;
@@ -79,7 +80,7 @@ export default function AdminVouchersPage() {
             const data = await response.json();
             setVouchers(data.data.vouchers);
         } catch (err) {
-            console.error('Failed to fetch vouchers:', err);
+            logger.error('Failed to fetch vouchers', err);
             setError(err instanceof Error ? err.message : 'Failed to load vouchers');
         } finally {
             setLoading(false);
@@ -169,7 +170,7 @@ export default function AdminVouchersPage() {
             setShowModal(false);
             fetchVouchers();
         } catch (err) {
-            console.error('Save failed:', err);
+            logger.error('Voucher save failed', err);
             setError(err instanceof Error ? err.message : 'Failed to save voucher');
         } finally {
             setSaving(false);
@@ -195,7 +196,7 @@ export default function AdminVouchersPage() {
 
             fetchVouchers();
         } catch (err) {
-            console.error('Delete failed:', err);
+            logger.error('Voucher delete failed', err);
             setError(err instanceof Error ? err.message : 'Failed to delete voucher');
         } finally {
             setDeleting(null);

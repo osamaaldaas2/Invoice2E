@@ -121,12 +121,12 @@ export class ReviewService {
         if (original.invoiceNumber !== reviewed.invoiceNumber) changes.push('Invoice number');
         if (original.invoiceDate !== reviewed.invoiceDate) changes.push('Invoice date');
         if (original.buyerName !== reviewed.buyerName) changes.push('Buyer name');
-        if (original.supplierName !== reviewed.sellerName) changes.push('Seller name');
+        if (original.sellerName !== reviewed.sellerName) changes.push('Seller name');
 
         const originalTotal = Number(original.totalAmount) || 0;
         if (Math.abs(originalTotal - reviewed.totalAmount) > 0.01) changes.push('Total amount');
 
-        const originalItems = Array.isArray(original.items) ? original.items : [];
+        const originalItems = Array.isArray(original.lineItems) ? original.lineItems : (Array.isArray(original.items) ? original.items : []);
         if (originalItems.length !== reviewed.lineItems.length) changes.push('Line items count');
 
         // Track new fields if they differ from original (assuming original might have them if revisited)

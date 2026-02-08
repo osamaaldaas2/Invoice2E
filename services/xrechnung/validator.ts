@@ -1,7 +1,8 @@
 import { ValidationError } from '@/lib/errors';
+import { XRechnungInvoiceData } from './types';
 
 export class XRechnungValidator {
-    validateInvoiceData(data: any): void {
+    validateInvoiceData(data: XRechnungInvoiceData): void {
         const errors: string[] = [];
 
         // EN16931 Required fields

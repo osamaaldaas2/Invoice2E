@@ -7,6 +7,7 @@ export const APP_VERSION = '1.0.0';
 export const API_TIMEOUTS = {
     GEMINI_EXTRACTION: 60000,    // 60 seconds (AI processing)
     DEEPSEEK_EXTRACTION: 60000,  // 60 seconds (AI processing)
+    BOUNDARY_DETECTION: 30000,   // 30 seconds (lighter AI call)
     STRIPE_API: 30000,           // 30 seconds (payment processing)
     PAYPAL_API: 30000,           // 30 seconds (payment processing)
     SENDGRID_API: 10000,         // 10 seconds (email sending)
@@ -33,6 +34,9 @@ export const FILE_LIMITS = {
 export const CREDITS_PER_CONVERSION = 1;
 export const DEFAULT_CREDITS_ON_SIGNUP = 0;
 
+// PDF boundary detection
+export const MAX_PAGES_FOR_BOUNDARY_DETECTION = 50;
+
 // Tax configuration (German VAT rates)
 // FIX (QA-BUG-4): Centralized VAT rate configuration
 export const DEFAULT_VAT_RATE = 19; // Standard German VAT rate
@@ -53,3 +57,30 @@ export const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 
 // File download
 export const DOWNLOAD_URL_EXPIRY = 24 * 60 * 60; // 24 hours in seconds
+
+// Input validation limits
+// FIX-012: Prevent DoS/DB bloat from extremely long strings
+export const INPUT_LIMITS = {
+    EMAIL_MAX: 320,
+    PASSWORD_MAX: 128,
+    NAME_MAX: 100,
+    ADDRESS_MAX: 255,
+    CITY_MAX: 100,
+    POSTAL_CODE_MAX: 10,
+    PHONE_MAX: 20,
+    TAX_ID_MAX: 50,
+    SEARCH_MAX: 100,
+} as const;
+
+// Batch processing limits
+// FIX-030: Limit concurrent batch jobs per user
+export const MAX_CONCURRENT_BATCH_JOBS = 3;
+
+// Batch AI extraction throttling
+export const BATCH_EXTRACTION = {
+    CONCURRENCY: 3,                // Process up to 3 files in parallel
+    MAX_RETRIES: 3,                // Max retries on 429/transient errors
+    INITIAL_BACKOFF_MS: 5000,      // 5s initial backoff
+    BACKOFF_MULTIPLIER: 2,         // Exponential backoff multiplier
+    MAX_BACKOFF_MS: 60000,         // 60s max backoff
+} as const;

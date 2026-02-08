@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { IGeminiAdapter, GeminiExtractionResult } from './interfaces';
 import { ExtractedInvoiceData } from '@/types';
+import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
 
 export class GeminiAdapter implements IGeminiAdapter {
     private readonly configApiKey?: string;
@@ -128,32 +129,41 @@ export class GeminiAdapter implements IGeminiAdapter {
         return !!this.apiKey && this.apiKey.length > 0;
     }
 
+    async sendPrompt(fileBuffer: Buffer, mimeType: string, prompt: string): Promise<string> {
+        const model = this.getModel();
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+            throw new ValidationError('Empty file buffer');
+        }
+
+        const imagePart = {
+            inlineData: {
+                data: fileBuffer.toString('base64'),
+                mimeType,
+            },
+        };
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout')), this.timeout)
+        );
+
+        try {
+            const result = await Promise.race([
+                model.generateContent([prompt, imagePart]),
+                timeoutPromise,
+            ]);
+            // @ts-ignore
+            return result.response.text();
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('timeout')) {
+                throw new AppError('GEMINI_TIMEOUT', 'Gemini API request timed out', 504);
+            }
+            throw new AppError('GEMINI_ERROR', `Gemini sendPrompt failed: ${error instanceof Error ? error.message : String(error)}`, 500);
+        }
+    }
+
     private getExtractionPrompt(): string {
-        return `Extract invoice data from the provided image and return valid JSON matching the following structure:
-        {
-            "invoiceNumber": "string or null",
-            "invoiceDate": "YYYY-MM-DD or null",
-            "buyerName": "string or null",
-            "buyerEmail": "string or null",
-            "buyerAddress": "string or null",
-            "buyerTaxId": "string or null",
-            "sellerName": "string or null",
-            "sellerEmail": "string or null",
-            "sellerAddress": "string or null",
-            "sellerTaxId": "string or null",
-            "sellerIban": "string or null",
-            "sellerBic": "string or null",
-            "bankName": "string or null",
-            "lineItems": [{ "description": "string", "quantity": number, "unitPrice": number, "totalPrice": number, "taxRate": number }],
-            "subtotal": number,
-            "taxRate": number or null,
-            "taxAmount": number,
-            "totalAmount": number,
-            "currency": "string",
-            "paymentTerms": "string or null",
-            "notes": "string or null",
-            "confidence": number (0-1)
-        }`;
+        return EXTRACTION_PROMPT;
     }
 
     private parseResponse(textContent: string): Omit<ExtractedInvoiceData, 'processingTimeMs'> {
@@ -192,13 +202,19 @@ export class GeminiAdapter implements IGeminiAdapter {
                 buyerName: data.buyerName || null,
                 buyerEmail: data.buyerEmail || null,
                 buyerAddress: data.buyerAddress || null,
+                buyerCity: data.buyerCity || null,
+                buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
                 buyerTaxId: data.buyerTaxId || null,
+                buyerPhone: data.buyerPhone || null,
                 sellerName: data.sellerName || null,
                 sellerEmail: data.sellerEmail || null,
                 sellerAddress: data.sellerAddress || null,
+                sellerCity: data.sellerCity || null,
+                sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
                 sellerTaxId: data.sellerTaxId || null,
                 sellerIban: normalizeIban(data.sellerIban),
                 sellerBic: data.sellerBic || null,
+                sellerPhone: data.sellerPhone || null,
                 bankName: data.bankName || null,
                 lineItems: rawItems.map((item: any) => {
                     const itemHasTaxRate = item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';

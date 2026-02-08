@@ -15,6 +15,50 @@ import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
+const resolveActiveUserId = async (
+    supabase: ReturnType<typeof createServerClient>,
+    user: { id: string; email?: string }
+): Promise<string | null> => {
+    const { data: byId } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (byId?.id) {
+        return byId.id as string;
+    }
+
+    if (!user.email) {
+        return null;
+    }
+
+    const { data: byEmail } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', user.email.toLowerCase())
+        .maybeSingle();
+
+    return (byEmail?.id as string | undefined) || null;
+};
+
+const triggerBatchWorkerAsync = (req: NextRequest): void => {
+    const secret = process.env.BATCH_WORKER_SECRET;
+    const headers: Record<string, string> = {};
+    if (secret) {
+        headers['x-internal-worker-key'] = secret;
+    }
+
+    void fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=3`, {
+        method: 'POST',
+        headers,
+    }).catch((error) => {
+        logger.warn('Failed to trigger internal batch worker', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+    });
+};
+
 /**
  * POST /api/invoices/bulk-upload
  * Upload ZIP file for batch processing
@@ -78,10 +122,18 @@ export async function POST(req: NextRequest) {
 
         // Check user credits BEFORE creating job
         const supabase = createServerClient();
+        const activeUserId = await resolveActiveUserId(supabase, user);
+        if (!activeUserId) {
+            return NextResponse.json(
+                { error: 'User account not found. Please login again.' },
+                { status: 401 }
+            );
+        }
+
         const { data: credits } = await supabase
             .from('user_credits')
             .select('available_credits')
-            .eq('user_id', user.id)
+            .eq('user_id', activeUserId)
             .single();
 
         const availableCredits = credits?.available_credits || 0;
@@ -97,7 +149,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Create batch job only after credit check passes
-        const job = await batchService.createBatchJob(user.id, buffer);
+        const job = await batchService.createBatchJob(activeUserId, buffer);
+
+        // Fire-and-forget queue processing trigger
+        triggerBatchWorkerAsync(req);
 
         logger.info('Batch job created', { jobId: job.id, totalFiles: job.totalFiles, userId: user.id });
 
@@ -131,8 +186,18 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const rateLimitId = getRequestIdentifier(req) + ':bulk:' + user.id;
-        const rateLimit = await checkRateLimitAsync(rateLimitId, 'bulk');
+        const supabase = createServerClient();
+        const activeUserId = await resolveActiveUserId(supabase, user);
+        if (!activeUserId) {
+            return NextResponse.json(
+                { error: 'User account not found. Please login again.' },
+                { status: 401 }
+            );
+        }
+
+        // Use 'api' preset for status polling (100 req/min) — not 'bulk' (5 req/min)
+        const rateLimitId = getRequestIdentifier(req) + ':bulk-status:' + activeUserId;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
@@ -162,7 +227,7 @@ export async function GET(req: NextRequest) {
             }
 
             const { page, limit } = pagination.data;
-            const { jobs, total } = await batchService.listBatchJobs(user.id, page, limit);
+            const { jobs, total } = await batchService.listBatchJobs(activeUserId, page, limit);
             return NextResponse.json({
                 success: true,
                 jobs,
@@ -180,7 +245,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const status = await batchService.getBatchStatus(user.id, batchId);
+        const status = await batchService.getBatchStatus(activeUserId, batchId);
 
         if (!status) {
             return NextResponse.json(
@@ -194,7 +259,7 @@ export async function GET(req: NextRequest) {
         if ((status.status === 'completed' || status.status === 'partial_success') &&
             status.results.some(r => r.status === 'success')) {
             // Create signed download token (valid for 1 hour)
-            const token = createSignedDownloadToken(user.id, 'batch', batchId);
+            const token = createSignedDownloadToken(activeUserId, 'batch', batchId);
             downloadUrl = `/api/invoices/bulk-upload/download?batchId=${batchId}&token=${encodeURIComponent(token)}`;
         }
 
@@ -225,8 +290,18 @@ export async function DELETE(req: NextRequest) {
             );
         }
 
-        const rateLimitId = getRequestIdentifier(req) + ':bulk:' + user.id;
-        const rateLimit = await checkRateLimitAsync(rateLimitId, 'bulk');
+        const supabase = createServerClient();
+        const activeUserId = await resolveActiveUserId(supabase, user);
+        if (!activeUserId) {
+            return NextResponse.json(
+                { error: 'User account not found. Please login again.' },
+                { status: 401 }
+            );
+        }
+
+        // Use 'api' preset for cancel operations (100 req/min) — not 'bulk' (5 req/min)
+        const rateLimitId = getRequestIdentifier(req) + ':bulk-cancel:' + activeUserId;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
@@ -247,7 +322,7 @@ export async function DELETE(req: NextRequest) {
             );
         }
 
-        const cancelled = await batchService.cancelBatchJob(user.id, batchId);
+        const cancelled = await batchService.cancelBatchJob(activeUserId, batchId);
 
         if (!cancelled) {
             // FIX (BUG-040): Return proper status code

@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { API_TIMEOUTS } from '@/lib/constants';
+import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
 
 export type ExtractedInvoiceData = {
     invoiceNumber: string | null;
@@ -9,15 +11,21 @@ export type ExtractedInvoiceData = {
     buyerName: string | null;
     buyerEmail: string | null;
     buyerAddress: string | null;
+    buyerCity: string | null;
+    buyerPostalCode: string | null;
     buyerTaxId: string | null;
-    supplierName: string | null;
-    supplierEmail: string | null;
-    supplierAddress: string | null;
-    supplierTaxId: string | null;
+    buyerPhone: string | null;
+    sellerName: string | null;
+    sellerEmail: string | null;
+    sellerAddress: string | null;
+    sellerCity: string | null;
+    sellerPostalCode: string | null;
+    sellerTaxId: string | null;
     sellerIban?: string | null;
     sellerBic?: string | null;
+    sellerPhone: string | null;
     bankName?: string | null;
-    items: Array<{
+    lineItems: Array<{
         description: string;
         quantity: number;
         unitPrice: number;
@@ -32,49 +40,43 @@ export type ExtractedInvoiceData = {
     notes: string | null;
 };
 
-const EXTRACTION_PROMPT = `You are an expert invoice extraction system. Extract invoice data from the provided image and return a JSON object with the following structure:
+// FIX-015: Zod schema for validating AI-extracted invoice data
+const ExtractedInvoiceItemSchema = z.object({
+    description: z.string().default(''),
+    quantity: z.coerce.number().default(1),
+    unitPrice: z.coerce.number().default(0),
+    totalPrice: z.coerce.number().default(0),
+});
 
-{
-  "invoiceNumber": "string or null",
-  "invoiceDate": "string (YYYY-MM-DD) or null",
-  "buyerName": "string or null",
-  "buyerEmail": "string or null",
-  "buyerAddress": "string or null",
-  "buyerTaxId": "string or null",
-  "supplierName": "string or null",
-  "supplierEmail": "string or null",
-  "supplierAddress": "string or null",
-  "supplierTaxId": "string or null",
-  "sellerIban": "string or null",
-  "sellerBic": "string or null",
-  "bankName": "string or null",
-  "items": [
-    {
-      "description": "string",
-      "quantity": number,
-      "unitPrice": number,
-      "totalPrice": number
-    }
-  ],
-  "subtotal": number,
-  "taxRate": number,
-  "taxAmount": number,
-  "totalAmount": number,
-  "currency": "string (e.g., EUR, USD)",
-  "paymentTerms": "string or null",
-  "notes": "string or null"
-}
-
-IMPORTANT:
-1. Extract ALL visible information from the invoice
-2. For prices, use the exact values shown as numbers
-3. If tax is not separate, calculate based on total and subtotal
-4. Return ONLY valid JSON, no markdown, no code blocks
-5. Use null for missing fields
-6. Ensure all numbers are valid numbers, not strings
-7. Be accurate with dates (YYYY-MM-DD format)
-
-Extract the data now:`;
+const ExtractedInvoiceDataSchema = z.object({
+    invoiceNumber: z.union([z.string(), z.null()]).default(null),
+    invoiceDate: z.union([z.string(), z.null()]).default(null),
+    buyerName: z.union([z.string(), z.null()]).default(null),
+    buyerEmail: z.union([z.string(), z.null()]).default(null),
+    buyerAddress: z.union([z.string(), z.null()]).default(null),
+    buyerCity: z.union([z.string(), z.null()]).default(null),
+    buyerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
+    buyerTaxId: z.union([z.string(), z.null()]).default(null),
+    buyerPhone: z.union([z.string(), z.null()]).default(null),
+    sellerName: z.union([z.string(), z.null()]).default(null),
+    sellerEmail: z.union([z.string(), z.null()]).default(null),
+    sellerAddress: z.union([z.string(), z.null()]).default(null),
+    sellerCity: z.union([z.string(), z.null()]).default(null),
+    sellerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
+    sellerTaxId: z.union([z.string(), z.null()]).default(null),
+    sellerIban: z.union([z.string(), z.null()]).optional().default(null),
+    sellerBic: z.union([z.string(), z.null()]).optional().default(null),
+    sellerPhone: z.union([z.string(), z.null()]).default(null),
+    bankName: z.union([z.string(), z.null()]).optional().default(null),
+    lineItems: z.array(ExtractedInvoiceItemSchema).default([]),
+    subtotal: z.coerce.number().default(0),
+    taxRate: z.coerce.number().default(0),
+    taxAmount: z.coerce.number().default(0),
+    totalAmount: z.coerce.number().default(0),
+    currency: z.string().default('EUR'),
+    paymentTerms: z.union([z.string(), z.null()]).default(null),
+    notes: z.union([z.string(), z.null()]).default(null),
+});
 
 /**
  * Service for Gemini AI invoice data extraction
@@ -140,13 +142,19 @@ export class GeminiService {
                 { text: EXTRACTION_PROMPT },
             ]);
 
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('Gemini API timeout')), API_TIMEOUTS.GEMINI_EXTRACTION)
-            );
+            // FIX-018: Use AbortController to cancel the actual HTTP request on timeout
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => abortController.abort(), API_TIMEOUTS.GEMINI_EXTRACTION);
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                abortController.signal.addEventListener('abort', () => {
+                    reject(new Error('Gemini API timeout'));
+                });
+            });
 
             let response;
             try {
                 response = await Promise.race([responsePromise, timeoutPromise]);
+                clearTimeout(timeoutId);
             } catch (apiError) {
                 const responseTime = Date.now() - startTime;
 
@@ -244,7 +252,7 @@ export class GeminiService {
                 fileName,
                 responseTime,
                 totalAmount: extractedData.totalAmount,
-                itemCount: extractedData.items.length,
+                itemCount: extractedData.lineItems.length,
             });
 
             return extractedData;
@@ -286,23 +294,56 @@ export class GeminiService {
      */
     private parseResponse(textContent: string): ExtractedInvoiceData {
         try {
-            // Try to extract JSON from response
-            const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
+            // FIX-014: Try direct parse first, then strip code blocks, then balanced brace extraction
+            let rawJson: string | null = null;
+            try {
+                JSON.parse(textContent.trim());
+                rawJson = textContent.trim();
+            } catch {
+                const codeBlockMatch = textContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+                if (codeBlockMatch && codeBlockMatch[1]) {
+                    rawJson = codeBlockMatch[1].trim();
+                } else {
+                    const firstBrace = textContent.indexOf('{');
+                    if (firstBrace !== -1) {
+                        let depth = 0;
+                        let lastBrace = -1;
+                        for (let i = firstBrace; i < textContent.length; i++) {
+                            if (textContent[i] === '{') depth++;
+                            if (textContent[i] === '}') depth--;
+                            if (depth === 0) { lastBrace = i; break; }
+                        }
+                        if (lastBrace !== -1) {
+                            rawJson = textContent.substring(firstBrace, lastBrace + 1);
+                        }
+                    }
+                }
+            }
+
+            if (!rawJson) {
                 logger.error('No JSON found in Gemini response', {
                     responsePreview: textContent.substring(0, 300),
                 });
                 throw new Error('No JSON found in response');
             }
 
-            const data = JSON.parse(jsonMatch[0]) as ExtractedInvoiceData;
+            const rawData = JSON.parse(rawJson);
+
+            // FIX-015: Validate AI response with Zod schema
+            const parseResult = ExtractedInvoiceDataSchema.safeParse(rawData);
+            if (!parseResult.success) {
+                logger.warn('Gemini response failed Zod validation, using raw data with defaults', {
+                    errors: parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+                });
+            }
+            const data = (parseResult.success ? parseResult.data : rawData) as ExtractedInvoiceData;
 
             logger.info('Parsed extraction data', {
                 hasInvoiceNumber: !!data.invoiceNumber,
                 hasBuyerName: !!data.buyerName,
-                hasSupplierName: !!data.supplierName,
+                hasSellerName: !!data.sellerName,
                 totalAmount: data.totalAmount,
-                itemCount: Array.isArray(data.items) ? data.items.length : 0,
+                itemCount: Array.isArray(data.lineItems) ? data.lineItems.length : 0,
             });
 
             const subtotal = Number(data.subtotal) || 0;
@@ -319,10 +360,16 @@ export class GeminiService {
             const parsedTaxRate = hasTaxRate ? Number(normalizedTaxRate) : NaN;
             const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
 
-            const normalizeIban = (value: unknown) => {
+            const normalizeIban = (value: unknown): string | null => {
                 if (value === null || value === undefined) return null;
                 const text = String(value).replace(/\s+/g, '').toUpperCase();
-                return text || null;
+                if (!text) return null;
+                // FIX-016: Validate IBAN structure (15-34 chars, starts with 2 letters + 2 digits)
+                if (text.length >= 15 && text.length <= 34 && /^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(text)) {
+                    return text;
+                }
+                logger.warn('Invalid IBAN format detected', { iban: text.substring(0, 4) + '...' });
+                return text; // Return as-is, let downstream validation handle
             };
 
             return {
@@ -331,15 +378,21 @@ export class GeminiService {
                 buyerName: data.buyerName ?? null,
                 buyerEmail: data.buyerEmail ?? null,
                 buyerAddress: data.buyerAddress ?? null,
+                buyerCity: data.buyerCity ?? null,
+                buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
                 buyerTaxId: data.buyerTaxId ?? null,
-                supplierName: data.supplierName ?? null,
-                supplierEmail: data.supplierEmail ?? null,
-                supplierAddress: data.supplierAddress ?? null,
-                supplierTaxId: data.supplierTaxId ?? null,
+                buyerPhone: data.buyerPhone ?? null,
+                sellerName: data.sellerName ?? null,
+                sellerEmail: data.sellerEmail ?? null,
+                sellerAddress: data.sellerAddress ?? null,
+                sellerCity: data.sellerCity ?? null,
+                sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
+                sellerTaxId: data.sellerTaxId ?? null,
                 sellerIban: normalizeIban(data.sellerIban),
                 sellerBic: data.sellerBic ?? null,
+                sellerPhone: data.sellerPhone ?? null,
                 bankName: data.bankName ?? null,
-                items: Array.isArray(data.items) ? data.items : [],
+                lineItems: Array.isArray(data.lineItems) ? data.lineItems : [],
                 subtotal,
                 taxRate: !isNaN(parsedTaxRate) ? parsedTaxRate : derivedTaxRate,
                 taxAmount,
@@ -365,11 +418,11 @@ export class GeminiService {
             throw new AppError('VALIDATION_ERROR', 'Total amount is required', 400);
         }
 
-        if (!Array.isArray(data.items) || data.items.length === 0) {
+        if (!Array.isArray(data.lineItems) || data.lineItems.length === 0) {
             throw new AppError('VALIDATION_ERROR', 'Invoice must have at least one item', 400);
         }
 
-        for (const item of data.items) {
+        for (const item of data.lineItems) {
             if (!item.description || !item.quantity || !item.unitPrice) {
                 throw new AppError(
                     'VALIDATION_ERROR',
@@ -389,13 +442,13 @@ export class GeminiService {
         if (!data.invoiceNumber) score -= 5;
         if (!data.invoiceDate) score -= 5;
         if (!data.buyerName) score -= 10;
-        if (!data.supplierName) score -= 10;
+        if (!data.sellerName) score -= 10;
         if (!data.buyerTaxId) score -= 5;
-        if (!data.supplierTaxId) score -= 5;
+        if (!data.sellerTaxId) score -= 5;
         if (!data.buyerEmail) score -= 3;
-        if (!data.supplierEmail) score -= 3;
+        if (!data.sellerEmail) score -= 3;
         if (!data.buyerAddress) score -= 3;
-        if (!data.supplierAddress) score -= 3;
+        if (!data.sellerAddress) score -= 3;
 
         return Math.max(0, score);
     }

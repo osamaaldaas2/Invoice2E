@@ -99,7 +99,11 @@ export class AuthService {
             .single();
 
         if (error) {
-            logger.error('Signup database error', { error: error.message });
+            // FIX-008: Catch unique constraint violation from concurrent signups
+            if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+                throw new ValidationError('Email already registered');
+            }
+            logger.error('Signup database error', { error: error.message, code: error.code });
             throw new AppError('DB_ERROR', 'Failed to create user', 500);
         }
 
@@ -205,8 +209,7 @@ export class AuthService {
             });
 
             if (rpcError) {
-                // Fallback to direct update if RPC not available
-                // First get current login_count to increment it
+                // FIX-007: Use optimistic lock to prevent lost updates on concurrent logins
                 const { data: currentUser } = await supabase
                     .from('users')
                     .select('login_count')
@@ -215,13 +218,22 @@ export class AuthService {
 
                 const currentCount = currentUser?.login_count ?? 0;
 
-                await supabase
+                const { error: updateError } = await supabase
                     .from('users')
                     .update({
                         last_login_at: new Date().toISOString(),
                         login_count: currentCount + 1,
                     })
-                    .eq('id', userId);
+                    .eq('id', userId)
+                    .eq('login_count', currentCount);
+
+                if (updateError) {
+                    // Concurrent login detected, just update timestamp
+                    await supabase
+                        .from('users')
+                        .update({ last_login_at: new Date().toISOString() })
+                        .eq('id', userId);
+                }
             }
         } catch (error) {
             // Don't fail login if stats update fails

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { logger } from '@/lib/logger';
 
 interface ChartData {
     date: string;
@@ -17,6 +18,7 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
     const [chartData, setChartData] = useState<ChartData[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedPeriod, setSelectedPeriod] = useState(period);
+    const [error, setError] = useState<string | null>(null);
 
     const fetchChartData = useCallback(async () => {
         try {
@@ -25,8 +27,11 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
             if (!response.ok) throw new Error('Failed to fetch analytics');
             const data = await response.json();
             setChartData(data.chartData || []);
+            setError(null);
         } catch (err) {
-            console.error('Failed to fetch chart data:', err);
+            const message = err instanceof Error ? err.message : 'Failed to fetch chart data';
+            setError(message);
+            logger.error('Failed to fetch chart data', err);
         } finally {
             setLoading(false);
         }
@@ -51,6 +56,11 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
 
     return (
         <div className="glass-card overflow-hidden">
+            {error ? (
+                <div className="mx-4 mt-4 glass-panel text-rose-200 p-3 rounded-lg border border-rose-400/30" role="alert">
+                    {error}
+                </div>
+            ) : null}
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-white font-display">
                     {t('conversionTrend')}

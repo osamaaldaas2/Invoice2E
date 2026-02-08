@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { logger } from '@/lib/logger';
 
 interface Conversion {
     id: string;
@@ -68,7 +69,11 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
             const response = await fetch(`/api/invoices/history?page=${page}&limit=${limit}${statusParam}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error('History API Error:', response.status, response.statusText, errorData);
+                logger.warn('History API error', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorData,
+                });
                 throw new Error(errorData.error || `Failed to fetch history (${response.status})`);
             }
             const data = await response.json();
@@ -80,9 +85,9 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                     : items;
             setConversions(filtered);
             setTotal(statusFilter === 'all' ? (data.total || 0) : filtered.length);
-        } catch (err: any) {
-            console.error('Fetch history exception:', err);
-            setError(err.message || 'Failed to load history');
+        } catch (err: unknown) {
+            logger.error('Fetch history exception', err);
+            setError(err instanceof Error ? err.message : 'Failed to load history');
         } finally {
             setLoading(false);
         }

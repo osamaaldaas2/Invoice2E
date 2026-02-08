@@ -158,9 +158,9 @@ describe('ReviewService', () => {
                 invoiceNumber: validData.invoiceNumber,
                 invoiceDate: validData.invoiceDate,
                 buyerName: validData.buyerName,
-                supplierName: validData.sellerName,
+                sellerName: validData.sellerName,
                 totalAmount: validData.totalAmount,
-                items: validData.lineItems,
+                lineItems: validData.lineItems,
                 buyerReference: validData.buyerReference,
                 paymentInstructions: validData.paymentInstructions,
             };
@@ -175,9 +175,9 @@ describe('ReviewService', () => {
                 invoiceNumber: validData.invoiceNumber,
                 invoiceDate: validData.invoiceDate,
                 buyerName: validData.buyerName,
-                supplierName: validData.sellerName,
+                sellerName: validData.sellerName,
                 totalAmount: validData.totalAmount,
-                items: validData.lineItems,
+                lineItems: validData.lineItems,
                 buyerReference: validData.buyerReference,
                 paymentInstructions: validData.paymentInstructions,
             };
@@ -197,9 +197,9 @@ describe('ReviewService', () => {
                 invoiceNumber: 'X',
                 invoiceDate: 'Y',
                 buyerName: 'Z',
-                supplierName: 'W',
+                sellerName: 'W',
                 totalAmount: 999999,
-                items: [],
+                lineItems: [],
             };
             const accuracy = service.calculateAccuracy(original, validData);
             expect(accuracy).toBeGreaterThanOrEqual(0);

@@ -6,6 +6,7 @@ export interface IGeminiAdapter {
         mimeType: string
     ): Promise<GeminiExtractionResult>;
 
+    sendPrompt(fileBuffer: Buffer, mimeType: string, prompt: string): Promise<string>;
     getProviderName(): string;
     validateConfiguration(): boolean;
 }

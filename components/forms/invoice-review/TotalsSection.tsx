@@ -10,18 +10,20 @@ interface TotalsSectionProps {
 export const TotalsSection: React.FC<TotalsSectionProps> = ({ register, watch, setValue }) => {
     const items = watch('items') || [];
 
-    // Calculate totals automatically based on items
+    // FIX-028: Use integer cents to avoid floating point errors
     useEffect(() => {
-        const calculatedSubtotal = items.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0);
-        const calculatedTax = items.reduce((sum: number, item: any) => {
-            const amount = Number(item.totalPrice) || 0;
+        const calculatedSubtotalCents = items.reduce((sum: number, item: { totalPrice?: number }) => {
+            return sum + Math.round((Number(item.totalPrice) || 0) * 100);
+        }, 0);
+        const calculatedTaxCents = items.reduce((sum: number, item: { totalPrice?: number; taxRate?: number }) => {
+            const amountCents = Math.round((Number(item.totalPrice) || 0) * 100);
             const rate = Number(item.taxRate) || 0;
-            return sum + (amount * (rate / 100));
+            return sum + Math.round(amountCents * (rate / 100));
         }, 0);
 
-        setValue('subtotal', parseFloat(calculatedSubtotal.toFixed(2)));
-        setValue('taxAmount', parseFloat(calculatedTax.toFixed(2)));
-        setValue('totalAmount', parseFloat((calculatedSubtotal + calculatedTax).toFixed(2)));
+        setValue('subtotal', calculatedSubtotalCents / 100);
+        setValue('taxAmount', calculatedTaxCents / 100);
+        setValue('totalAmount', (calculatedSubtotalCents + calculatedTaxCents) / 100);
     }, [items, setValue]);
 
     return (

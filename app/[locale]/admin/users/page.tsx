@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminUserWithCredits } from '@/types/admin';
+import { logger } from '@/lib/logger';
 
 export default function AdminUsersPage() {
     const router = useRouter();
@@ -40,7 +41,7 @@ export default function AdminUsersPage() {
             setUsers(data.data.users);
             setTotalPages(data.data.pagination.pages);
         } catch (err) {
-            console.error('Failed to fetch users:', err);
+            logger.error('Failed to fetch users', err);
             setError('Failed to load users');
         } finally {
             setLoading(false);
@@ -80,7 +81,7 @@ export default function AdminUsersPage() {
             // Refresh list
             fetchUsers();
         } catch (err) {
-            console.error('Ban/unban error:', err);
+            logger.error('Ban/unban error', err);
             alert('Failed to update user');
         }
     };

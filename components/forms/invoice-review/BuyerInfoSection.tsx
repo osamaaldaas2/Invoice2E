@@ -28,32 +28,20 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
 
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Buyer Email <span className="text-red-500">*</span>
-                        <span className="text-xs text-faded ml-1">(PEPPOL-EN16931-R010)</span>
+                        Buyer Email
                     </label>
                     <input
                         type="email"
-                        {...register('buyerEmail', { required: 'Buyer email is required for XRechnung (PEPPOL-EN16931-R010)' })}
+                        {...register('buyerEmail')}
                         className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors.buyerEmail ? 'border-rose-400/60' : 'border-white/10'} text-white`}
                         placeholder="buyer@example.de"
                     />
+                    <p className="mt-1 text-xs text-slate-500">Optional, but recommended for XRechnung processing.</p>
                     {errors.buyerEmail && (
                         <p className="mt-1 text-sm text-red-500">{errors.buyerEmail.message as string}</p>
                     )}
                 </div>
 
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Address
-                    </label>
-                    <input
-                        type="text"
-                        {...register('buyerAddress')}
-                        className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white mb-2"
-                        placeholder="Full Address String"
-                    />
-                </div>
-                {/*  Add structured address fields if logic separated, simplified for now based on typical form usage in parent */}
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
                         Street

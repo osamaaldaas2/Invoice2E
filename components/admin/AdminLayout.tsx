@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { logger } from '@/lib/logger';
 
 // Admin navigation items
 const adminNavItems = [
@@ -29,6 +30,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const router = useRouter();
     const [user, setUser] = useState<AdminUser | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [loggingOut, setLoggingOut] = useState(false);
+    const [logoutError, setLogoutError] = useState<string | null>(null);
 
     const locale = useMemo(() => {
         const parts = pathname?.split('/') || [];
@@ -60,12 +63,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            setLoggingOut(true);
+            setLogoutError(null);
+            const response = await fetch('/api/auth/logout', { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`Logout failed (${response.status})`);
+            }
+            emitAuthChanged();
+            router.push(`/${locale}/login`);
         } catch (error) {
-            console.error('Logout error:', error);
+            setLogoutError('Failed to sign out. Please try again.');
+            logger.error('Admin logout failed', error);
+        } finally {
+            setLoggingOut(false);
         }
-        emitAuthChanged();
-        router.push(`/${locale}/login`);
     };
 
     const visibleNavItems = useMemo(() => {
@@ -140,10 +151,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                     <button
                         onClick={handleLogout}
+                        disabled={loggingOut}
                         className="mt-3 w-full px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors border border-white/10"
                     >
-                        Sign out
+                        {loggingOut ? 'Signing out...' : 'Sign out'}
                     </button>
+                    {logoutError ? (
+                        <p className="mt-2 text-xs text-rose-300" role="alert">{logoutError}</p>
+                    ) : null}
                 </div>
             </aside>
 

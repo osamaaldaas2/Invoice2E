@@ -89,47 +89,8 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
         };
     }, [locale]);
 
-    // helper to parse address
-    const parseAddress = (address?: string) => {
-        if (!address || address.trim() === '') {
-            return { street: '', postalCode: '', city: '', country: 'DE' };
-        }
-
-        const lines = address.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length === 0) {
-            return { street: '', postalCode: '', city: '', country: 'DE' };
-        }
-
-        const lastLine = lines[lines.length - 1];
-        if (!lastLine || lastLine.trim() === '') {
-            return {
-                street: lines.slice(0, -1).join(', '),
-                postalCode: '',
-                city: '',
-                country: 'DE',
-            };
-        }
-
-        const postalCodeMatch = lastLine.match(/^(\d{4,6})\s+(.+)$/);
-        if (postalCodeMatch) {
-            return {
-                street: lines.slice(0, -1).join(', '),
-                postalCode: postalCodeMatch[1] || '',
-                city: postalCodeMatch[2] || '',
-                country: 'DE', // Defaulting, logic could be smarter
-            };
-        }
-
-        return {
-            street: lines.slice(0, -1).join(', '),
-            postalCode: '',
-            city: lastLine,
-            country: 'DE',
-        };
-    };
-
-    const sellerDerived = parseAddress(initialData?.sellerAddress);
-    const buyerDerived = parseAddress(initialData?.buyerAddress);
+    // AI now returns separate fields (sellerAddress=street, sellerCity, sellerPostalCode)
+    // so we use them directly instead of parsing a combined address string.
 
     const rawSubtotal = Number(initialData?.subtotal) || 0;
     const rawTotalAmount = Number(initialData?.totalAmount) || 0;
@@ -178,9 +139,9 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             sellerEmail: initialData?.sellerEmail || '',
             sellerAddress: initialData?.sellerAddress || '',
             sellerParsedAddress: {
-                street: sellerDerived.street || '',
-                postalCode: sellerDerived.postalCode || initialData?.sellerPostalCode || '',
-                city: sellerDerived.city || initialData?.sellerCity || '',
+                street: initialData?.sellerAddress || '',
+                postalCode: initialData?.sellerPostalCode || '',
+                city: initialData?.sellerCity || '',
                 country: initialData?.sellerCountryCode || 'DE'
             },
             // Keep flat fields synced via watch/effects or just use nested -> relying on parsed for now but mapping back for submission
@@ -193,9 +154,9 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             buyerEmail: initialData?.buyerEmail || '',
             buyerAddress: initialData?.buyerAddress || '',
             buyerParsedAddress: {
-                street: buyerDerived.street || '',
-                postalCode: buyerDerived.postalCode || initialData?.buyerPostalCode || '',
-                city: buyerDerived.city || initialData?.buyerCity || '',
+                street: initialData?.buyerAddress || '',
+                postalCode: initialData?.buyerPostalCode || '',
+                city: initialData?.buyerCity || '',
                 country: initialData?.buyerCountryCode || 'DE'
             },
             buyerTaxId: initialData?.buyerTaxId || '',
@@ -224,9 +185,11 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             // For safety, we map parsed address fields back to flat fields if the API relies on them.
             const payload = {
                 ...data,
+                sellerAddress: data.sellerParsedAddress.street,
                 sellerCity: data.sellerParsedAddress.city,
                 sellerPostalCode: data.sellerParsedAddress.postalCode,
                 sellerCountryCode: data.sellerParsedAddress.country,
+                buyerAddress: data.buyerParsedAddress.street,
                 buyerCity: data.buyerParsedAddress.city,
                 buyerPostalCode: data.buyerParsedAddress.postalCode,
                 buyerCountryCode: data.buyerParsedAddress.country,

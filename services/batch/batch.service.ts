@@ -5,6 +5,7 @@ import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
 import { batchGenerator } from './batch.generator';
 import { AppError, ValidationError } from '@/lib/errors';
+import { MAX_CONCURRENT_BATCH_JOBS } from '@/lib/constants';
 
 type BatchJobRow = {
     id: string;
@@ -14,148 +15,220 @@ type BatchJobRow = {
     completed_files: number;
     failed_files: number;
     results: BatchResult[] | null;
+    input_file_path?: string | null;
     created_at: string;
     completed_at?: string | null;
 };
 
+type ParsedZip = {
+    files: { name: string; content: Buffer }[];
+    totalExtractedSize: number;
+};
+
 export class BatchService {
-    // FIX (BUG-012/013): Size limits to prevent memory exhaustion and DoS
     private readonly MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB per file
     private readonly MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB total batch
     private readonly MAX_FILES = 100;
+    private readonly INPUT_BUCKET = 'batch-inputs';
+    private bucketEnsured = false;
 
-    /**
-     * Estimate number of PDF files in ZIP without creating a job
-     * Used for credit checking BEFORE job creation to avoid orphan jobs
-     */
-    async estimateFileCount(zipBuffer: Buffer): Promise<number> {
-        // Check ZIP size before processing
-        if (zipBuffer.length > this.MAX_TOTAL_SIZE) {
-            throw new ValidationError(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
+    private getSupabase() {
+        return createServerClient();
+    }
+
+    private async ensureInputBucket(): Promise<void> {
+        if (this.bucketEnsured) return;
+        const supabase = this.getSupabase();
+
+        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+        if (listError) {
+            throw new AppError('STORAGE_ERROR', `Failed to list storage buckets: ${listError.message}`, 500);
         }
 
-        const zip = await JSZip.loadAsync(zipBuffer);
-        let pdfCount = 0;
+        const exists = (buckets || []).some((bucket: { name: string }) => bucket.name === this.INPUT_BUCKET);
+        if (!exists) {
+            const { error: createError } = await supabase.storage.createBucket(this.INPUT_BUCKET, {
+                public: false,
+                fileSizeLimit: `${this.MAX_TOTAL_SIZE}`,
+            });
 
-        for (const [filename, file] of Object.entries(zip.files)) {
-            if (!file.dir && filename.toLowerCase().endsWith('.pdf')) {
-                pdfCount++;
-                if (pdfCount > this.MAX_FILES) {
-                    throw new ValidationError(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
-                }
+            if (createError && !String(createError.message || '').toLowerCase().includes('already exists')) {
+                throw new AppError('STORAGE_ERROR', `Failed to create storage bucket: ${createError.message}`, 500);
             }
         }
 
-        if (pdfCount === 0) {
-            throw new ValidationError('No PDF files found in ZIP archive');
-        }
-
-        return pdfCount;
+        this.bucketEnsured = true;
     }
 
-    /**
-     * Parse ZIP file and create batch job
-     * FIX (BUG-012/013): Added file size validation to prevent memory exhaustion
-     */
-    async createBatchJob(userId: string, zipBuffer: Buffer): Promise<BatchJob> {
-        logger.info('Creating batch job', { userId, zipSize: zipBuffer.length });
-
-        // FIX: Check ZIP size before processing
+    private async parseZip(zipBuffer: Buffer): Promise<ParsedZip> {
         if (zipBuffer.length > this.MAX_TOTAL_SIZE) {
             throw new ValidationError(`ZIP file too large. Maximum size is ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB`);
         }
 
-        // Parse ZIP
         const zip = await JSZip.loadAsync(zipBuffer);
-        const pdfFiles: { name: string; content: Buffer }[] = [];
+        const files: { name: string; content: Buffer }[] = [];
         let totalExtractedSize = 0;
 
-        // Extract PDF files with size validation
         for (const [filename, file] of Object.entries(zip.files)) {
             if (!file.dir && filename.toLowerCase().endsWith('.pdf')) {
-                // FIX (BUG-013): Check file count BEFORE extracting more
-                if (pdfFiles.length >= this.MAX_FILES) {
+                // FIX-029: Sanitize ZIP filenames to prevent path traversal
+                const safeName = filename.split('/').pop() || filename;
+                if (safeName.includes('..') || safeName.startsWith('/') || safeName.startsWith('\\')) {
+                    logger.warn('Skipping suspicious ZIP entry', { filename });
+                    continue;
+                }
+
+                if (files.length >= this.MAX_FILES) {
                     throw new ValidationError(`Maximum ${this.MAX_FILES} PDF files allowed per batch`);
                 }
 
                 const content = await file.async('nodebuffer');
-
-                // FIX (BUG-013): Validate individual file size
                 if (content.length > this.MAX_FILE_SIZE) {
                     throw new ValidationError(
                         `File "${filename}" (${Math.round(content.length / 1024 / 1024)}MB) exceeds maximum of ${this.MAX_FILE_SIZE / 1024 / 1024}MB`
                     );
                 }
 
-                // FIX (BUG-012): Track total size to prevent memory exhaustion
                 totalExtractedSize += content.length;
                 if (totalExtractedSize > this.MAX_TOTAL_SIZE) {
-                    throw new ValidationError(
-                        `Total batch size exceeds ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB limit`
-                    );
+                    throw new ValidationError(`Total batch size exceeds ${this.MAX_TOTAL_SIZE / 1024 / 1024}MB limit`);
                 }
 
-                pdfFiles.push({ name: filename, content });
+                files.push({ name: safeName, content });
             }
         }
 
-        if (pdfFiles.length === 0) {
+        if (files.length === 0) {
             throw new ValidationError('No PDF files found in ZIP archive');
         }
 
+        return { files, totalExtractedSize };
+    }
+
+    private async uploadInputZip(path: string, zipBuffer: Buffer): Promise<void> {
+        await this.ensureInputBucket();
+        const supabase = this.getSupabase();
+
+        const { error } = await supabase.storage
+            .from(this.INPUT_BUCKET)
+            .upload(path, zipBuffer, {
+                contentType: 'application/zip',
+                upsert: true,
+            });
+
+        if (error) {
+            throw new AppError('STORAGE_ERROR', `Failed to upload input ZIP: ${error.message}`, 500);
+        }
+    }
+
+    private async downloadInputZip(path: string): Promise<Buffer> {
+        await this.ensureInputBucket();
+        const supabase = this.getSupabase();
+
+        const { data, error } = await supabase.storage
+            .from(this.INPUT_BUCKET)
+            .download(path);
+
+        if (error || !data) {
+            throw new AppError('STORAGE_ERROR', `Failed to download input ZIP: ${error?.message || 'Missing file'}`, 500);
+        }
+
+        const arrayBuffer = await data.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+    }
+
+    /**
+     * Estimate number of PDF files in ZIP without creating a job.
+     */
+    async estimateFileCount(zipBuffer: Buffer): Promise<number> {
+        const { files } = await this.parseZip(zipBuffer);
+        return files.length;
+    }
+
+    /**
+     * Parse ZIP file, store payload, and create queue job.
+     */
+    async createBatchJob(userId: string, zipBuffer: Buffer): Promise<BatchJob> {
+        logger.info('Creating batch job', { userId, zipSize: zipBuffer.length });
+
+        // FIX-030: Check concurrent batch job limit
+        const supabaseCheck = this.getSupabase();
+        const { count: activeJobCount, error: countError } = await supabaseCheck
+            .from('batch_jobs')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['pending', 'processing']);
+
+        if (countError) {
+            logger.error('Failed to check active batch jobs', { userId, error: countError.message });
+        }
+
+        if ((activeJobCount || 0) >= MAX_CONCURRENT_BATCH_JOBS) {
+            throw new ValidationError(
+                `Maximum ${MAX_CONCURRENT_BATCH_JOBS} concurrent batch jobs allowed. Please wait for existing jobs to complete.`
+            );
+        }
+
+        const { files, totalExtractedSize } = await this.parseZip(zipBuffer);
         logger.info('PDF files validated', {
-            fileCount: pdfFiles.length,
-            totalSizeMB: Math.round(totalExtractedSize / 1024 / 1024)
+            fileCount: files.length,
+            totalSizeMB: Math.round(totalExtractedSize / 1024 / 1024),
         });
 
-        // Create batch job in database
-        const supabase = createServerClient();
+        const supabase = this.getSupabase();
+        const initialResults: BatchResult[] = files.map((file) => ({
+            filename: file.name,
+            status: 'pending',
+            reviewStatus: 'not_available',
+        }));
+
         const { data: job, error } = await supabase
             .from('batch_jobs')
             .insert({
                 user_id: userId,
                 status: 'pending',
-                total_files: pdfFiles.length,
+                total_files: files.length,
                 completed_files: 0,
                 failed_files: 0,
-                results: pdfFiles.map(f => ({
-                    filename: f.name,
-                    status: 'pending',
-                })),
+                results: initialResults,
             })
             .select()
             .single();
 
-        if (error) {
+        if (error || !job) {
             logger.error('Failed to create batch job', { error });
-            throw new AppError(
-                'DATABASE_ERROR',
-                `Failed to create batch job: ${error.message}`,
-                500
-            );
+            throw new AppError('DATABASE_ERROR', `Failed to create batch job: ${error?.message || 'unknown error'}`, 500);
         }
 
-        // Store files temporarily for processing
-        // In production, store in cloud storage (S3, GCS)
-        await this.storeFilesForProcessing(job.id, pdfFiles);
+        const inputPath = `${userId}/${job.id}/input.zip`;
+        await this.uploadInputZip(inputPath, zipBuffer);
 
-        logger.info('Batch job created', { jobId: job.id, totalFiles: pdfFiles.length });
+        const { error: pathError } = await supabase
+            .from('batch_jobs')
+            .update({ input_file_path: inputPath })
+            .eq('id', job.id);
+
+        if (pathError) {
+            logger.error('Failed to update batch input file path', { jobId: job.id, error: pathError.message });
+            throw new AppError('DATABASE_ERROR', `Failed to update batch input path: ${pathError.message}`, 500);
+        }
+
+        logger.info('Batch job created', { jobId: job.id, totalFiles: files.length, inputPath });
 
         return {
             id: job.id,
             userId: job.user_id,
-            status: job.status,
+            status: job.status as BatchJob['status'],
             totalFiles: job.total_files,
             completedFiles: job.completed_files,
             failedFiles: job.failed_files,
-            results: job.results || [],
+            results: (job.results as BatchResult[] | null) || initialResults,
             createdAt: job.created_at,
         };
     }
 
     /**
-     * Process batch job
-     * Delegates to BatchProcessor
+     * Delegates to BatchProcessor.
      */
     async processBatch(
         jobId: string,
@@ -166,10 +239,84 @@ export class BatchService {
     }
 
     /**
-     * Get batch job status
+     * Pick and process one pending job from the queue.
+     */
+    async runWorkerOnce(): Promise<boolean> {
+        const supabase = this.getSupabase();
+        const { data: pending, error: pendingError } = await supabase
+            .from('batch_jobs')
+            .select('id')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (pendingError) {
+            logger.error('Failed to query pending batch jobs', { error: pendingError.message });
+            throw new AppError('DATABASE_ERROR', `Failed to query pending jobs: ${pendingError.message}`, 500);
+        }
+
+        if (!pending?.id) {
+            return false;
+        }
+
+        const { data: claimed, error: claimError } = await supabase
+            .from('batch_jobs')
+            .update({
+                status: 'processing',
+                processing_started_at: new Date().toISOString(),
+            })
+            .eq('id', pending.id)
+            .eq('status', 'pending')
+            .select('id, user_id, input_file_path')
+            .maybeSingle();
+
+        if (claimError) {
+            logger.warn('Failed to claim pending batch job', { jobId: pending.id, error: claimError.message });
+            return false;
+        }
+        if (!claimed?.id) {
+            return false;
+        }
+
+        const jobId = claimed.id as string;
+        try {
+            const inputPath = claimed.input_file_path as string | null;
+            if (!inputPath) {
+                throw new ValidationError('Missing input ZIP path for batch job');
+            }
+
+            const zipBuffer = await this.downloadInputZip(inputPath);
+            const parsed = await this.parseZip(zipBuffer);
+            await this.processBatch(jobId, parsed.files, 'CII');
+
+            logger.info('Worker processed batch job', {
+                jobId,
+                userId: claimed.user_id,
+                fileCount: parsed.files.length,
+            });
+            return true;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.error('Worker failed to process batch job', { jobId, error: message });
+
+            await supabase
+                .from('batch_jobs')
+                .update({
+                    status: 'failed',
+                    error_message: message,
+                    completed_at: new Date().toISOString(),
+                })
+                .eq('id', jobId);
+            return true;
+        }
+    }
+
+    /**
+     * Get batch job status for current user.
      */
     async getBatchStatus(userId: string, jobId: string): Promise<BatchProgress | null> {
-        const supabase = createServerClient();
+        const supabase = this.getSupabase();
 
         const { data: job, error } = await supabase
             .from('batch_jobs')
@@ -193,23 +340,22 @@ export class BatchService {
             completedFiles: job.completed_files,
             failedFiles: job.failed_files,
             progress,
-            results: job.results || [],
+            results: (job.results as BatchResult[] | null) || [],
         };
     }
 
     /**
-     * Generate output ZIP with all converted XMLs
-     * Delegates to BatchGenerator
+     * Generate output ZIP with all converted XMLs.
      */
     async generateOutputZip(results: BatchResult[]): Promise<Buffer> {
         return batchGenerator.generateOutputZip(results);
     }
 
     /**
-     * Cancel batch job
+     * Cancel batch job.
      */
     async cancelBatchJob(userId: string, jobId: string): Promise<boolean> {
-        const supabase = createServerClient();
+        const supabase = this.getSupabase();
 
         const { error } = await supabase
             .from('batch_jobs')
@@ -222,14 +368,14 @@ export class BatchService {
     }
 
     /**
-     * List user's batch jobs
+     * List user jobs.
      */
     async listBatchJobs(
         userId: string,
         page: number = 1,
         limit: number = 10
     ): Promise<{ jobs: BatchJob[]; total: number }> {
-        const supabase = createServerClient();
+        const supabase = this.getSupabase();
         const offset = (page - 1) * limit;
 
         const { data, count, error } = await supabase
@@ -241,11 +387,7 @@ export class BatchService {
 
         if (error) {
             logger.error('Failed to list batch jobs', { error, userId, page, limit });
-            throw new AppError(
-                'DATABASE_ERROR',
-                `Failed to list batch jobs: ${error.message}`,
-                500
-            );
+            throw new AppError('DATABASE_ERROR', `Failed to list batch jobs: ${error.message}`, 500);
         }
 
         const jobs: BatchJob[] = (data || []).map((row: BatchJobRow) => ({
@@ -261,18 +403,6 @@ export class BatchService {
         }));
 
         return { jobs, total: count || 0 };
-    }
-
-    /**
-     * Store files for processing (temporary storage)
-     */
-    private async storeFilesForProcessing(
-        jobId: string,
-        files: { name: string; content: Buffer }[]
-    ): Promise<void> {
-        // In production, upload to cloud storage (S3, GCS, etc.)
-        // For now, we'll process immediately in-memory
-        logger.info('Files staged for processing', { jobId, fileCount: files.length });
     }
 }
 

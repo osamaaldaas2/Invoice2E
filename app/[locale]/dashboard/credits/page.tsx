@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CreditPurchaseForm from '@/components/forms/CreditPurchaseForm';
 import VoucherRedeemForm from '@/components/forms/VoucherRedeemForm';
+import { logger } from '@/lib/logger';
 
 export default function CreditsPage() {
     const t = useTranslations('credits');
@@ -20,7 +21,7 @@ export default function CreditsPage() {
                     setCredits(data.statistics?.availableCredits ?? 0);
                 }
             } catch (error) {
-                console.error('Failed to fetch credits:', error);
+                logger.error('Failed to fetch credits', error);
             } finally {
                 setLoading(false);
             }

@@ -13,6 +13,11 @@ type ExtractedData = {
     responseTime: number;
 };
 
+type MultiInvoiceResult = {
+    totalInvoices: number;
+    extractions: { extractionId: string; label: string; confidence: number }[];
+};
+
 
 type FileUploadFormProps = {
     userId?: string;
@@ -26,8 +31,10 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     const [state, setState] = useState<UploadState>('idle');
     const [error, setError] = useState('');
     const [result, setResult] = useState<ExtractedData | null>(null);
+    const [multiResult, setMultiResult] = useState<MultiInvoiceResult | null>(null);
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const locale = useMemo(() => {
@@ -79,24 +86,28 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         setState('uploading');
         setError('');
         setResult(null);
-        setProgress(20);
+        setMultiResult(null);
+        setProgress(5);
+
+        // FIX-027: Gradual progress simulation, cap at 90% until response
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 90) return 90;
+                return prev + Math.random() * 5 + 2;
+            });
+        }, 500);
 
         try {
+            // FIX-026: Don't send userId in request body, server gets it from session
             const formData = new FormData();
             formData.append('file', file);
-            if (userId) {
-                formData.append('userId', userId);
-            }
 
-            setProgress(40);
             setState('extracting');
 
             const response = await fetch('/api/invoices/extract', {
                 method: 'POST',
                 body: formData,
             });
-
-            setProgress(80);
 
             const data = await response.json();
 
@@ -108,22 +119,34 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 throw new Error(data.error || 'Extraction failed');
             }
 
+            clearInterval(progressInterval);
             setProgress(100);
             setState('success');
-            setResult({
-                extractionId: data.data.extractionId,
-                confidenceScore: data.data.confidenceScore,
-                responseTime: data.data.responseTime,
-            });
 
-            if (onExtractionComplete) {
-                onExtractionComplete(data.data.extractionId, data.data);
+            if (data.data.multiInvoice) {
+                // Multi-invoice PDF result
+                setMultiResult({
+                    totalInvoices: data.data.totalInvoices,
+                    extractions: data.data.extractions,
+                });
+            } else {
+                // Single invoice result
+                setResult({
+                    extractionId: data.data.extractionId,
+                    confidenceScore: data.data.confidenceScore,
+                    responseTime: data.data.responseTime,
+                });
+
+                if (onExtractionComplete) {
+                    onExtractionComplete(data.data.extractionId, data.data);
+                }
             }
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
         } catch (err) {
+            clearInterval(progressInterval);
             setState('error');
             setError(err instanceof Error ? err.message : 'Extraction failed');
         }
@@ -167,11 +190,50 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         setState('idle');
         setError('');
         setResult(null);
+        setMultiResult(null);
         setProgress(0);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
+
+    const handleDownloadZip = useCallback(async () => {
+        if (!multiResult) return;
+
+        const extractionIds = multiResult.extractions
+            .filter(e => e.extractionId)
+            .map(e => e.extractionId);
+
+        if (extractionIds.length === 0) return;
+
+        setIsDownloading(true);
+        try {
+            const response = await fetch('/api/invoices/batch-download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ extractionIds }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Download failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'invoices_xrechnung.zip';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Download failed');
+        } finally {
+            setIsDownloading(false);
+        }
+    }, [multiResult]);
 
     const getStatusIcon = () => {
         if (!hasCredits) return '🔒';
@@ -280,7 +342,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 </div>
             )}
 
-            {state === 'success' && result && (
+            {state === 'success' && result && !multiResult && (
                 <div className="mt-4 p-4 glass-panel border border-emerald-400/30 rounded-xl">
                     <p className="text-emerald-200 font-medium mb-3">✅ Invoice extracted successfully!</p>
                     <div className="grid grid-cols-2 gap-3 text-sm">
@@ -299,6 +361,58 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                             className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 text-white font-semibold hover:brightness-110 transition-colors"
                         >
                             Review & Edit Data
+                        </button>
+                        <button
+                            onClick={resetForm}
+                            className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                            New Upload
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {state === 'success' && multiResult && (
+                <div className="mt-4 p-4 glass-panel border border-emerald-400/30 rounded-xl">
+                    <p className="text-emerald-200 font-medium mb-3">
+                        ✅ {multiResult.totalInvoices} invoices detected and extracted
+                    </p>
+                    <div className="space-y-2">
+                        {multiResult.extractions.map((ext, idx) => (
+                            <div
+                                key={ext.extractionId || idx}
+                                className="flex items-center justify-between glass-panel p-3 rounded-lg"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-medium text-white">
+                                        {ext.label || `Invoice ${idx + 1}`}
+                                    </span>
+                                    {ext.confidence > 0 && (
+                                        <span className="text-xs text-faded">
+                                            {Math.round(ext.confidence * 100)}% confidence
+                                        </span>
+                                    )}
+                                </div>
+                                {ext.extractionId ? (
+                                    <button
+                                        onClick={() => router.push(withLocale(`/review/${ext.extractionId}`))}
+                                        className="px-3 py-1 text-sm rounded-full bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition-colors"
+                                    >
+                                        Review
+                                    </button>
+                                ) : (
+                                    <span className="text-xs text-rose-300">Failed</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            onClick={handleDownloadZip}
+                            disabled={isDownloading}
+                            className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors disabled:opacity-50"
+                        >
+                            {isDownloading ? 'Generating ZIP...' : 'Download All as ZIP'}
                         </button>
                         <button
                             onClick={resetForm}

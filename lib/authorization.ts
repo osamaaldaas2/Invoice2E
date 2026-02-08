@@ -9,6 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { getSessionFromCookie, UserRole } from '@/lib/session';
+import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
 
@@ -35,6 +36,33 @@ export interface AuthorizationResult {
     error?: string;
 }
 
+type LiveAdminState = {
+    role: UserRole;
+    isBanned: boolean;
+} | null;
+
+async function getLiveAdminState(userId: string): Promise<LiveAdminState> {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+        .from('users')
+        .select('role, is_banned')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (error || !data) {
+        logger.warn('Failed to load live authorization state', {
+            userId,
+            error: error?.message,
+        });
+        return null;
+    }
+
+    return {
+        role: (data.role || 'user') as UserRole,
+        isBanned: Boolean(data.is_banned),
+    };
+}
+
 /**
  * Get authenticated and authorized admin user
  * Throws UnauthorizedError if not authenticated
@@ -51,10 +79,23 @@ export async function requireAdmin(request: NextRequest): Promise<AuthorizedUser
         throw new UnauthorizedError('Authentication required');
     }
 
-    if (!['admin', 'super_admin'].includes(session.role)) {
+    const liveState = await getLiveAdminState(session.userId);
+    if (!liveState) {
+        throw new UnauthorizedError('Authentication required');
+    }
+
+    if (liveState.isBanned) {
+        logger.warn('Banned user attempted admin access', {
+            userId: session.userId,
+            path: request.nextUrl.pathname,
+        });
+        throw new ForbiddenError('Account is banned');
+    }
+
+    if (!['admin', 'super_admin'].includes(liveState.role)) {
         logger.warn('Non-admin attempted admin access', {
             userId: session.userId,
-            role: session.role,
+            role: liveState.role,
             path: request.nextUrl.pathname,
         });
         throw new ForbiddenError('Admin access required');
@@ -71,7 +112,7 @@ export async function requireAdmin(request: NextRequest): Promise<AuthorizedUser
         email: session.email,
         firstName: session.firstName,
         lastName: session.lastName,
-        role: session.role,
+        role: liveState.role,
     };
 }
 
@@ -114,7 +155,14 @@ async function checkAdminAuthInternal(): Promise<AuthorizationResult> {
         return { authorized: false, user: null, error: 'Not authenticated' };
     }
 
-    if (!['admin', 'super_admin'].includes(session.role)) {
+    const liveState = await getLiveAdminState(session.userId);
+    if (!liveState) {
+        return { authorized: false, user: null, error: 'Authentication required' };
+    }
+    if (liveState.isBanned) {
+        return { authorized: false, user: null, error: 'Account is banned' };
+    }
+    if (!['admin', 'super_admin'].includes(liveState.role)) {
         return { authorized: false, user: null, error: 'Not an admin' };
     }
 
@@ -125,7 +173,7 @@ async function checkAdminAuthInternal(): Promise<AuthorizationResult> {
             email: session.email,
             firstName: session.firstName,
             lastName: session.lastName,
-            role: session.role,
+            role: liveState.role,
         },
     };
 }
@@ -136,7 +184,9 @@ async function checkAdminAuthInternal(): Promise<AuthorizationResult> {
 export async function hasRole(roles: UserRole[]): Promise<boolean> {
     const session = await getSessionFromCookie();
     if (!session) return false;
-    return roles.includes(session.role);
+    const liveState = await getLiveAdminState(session.userId);
+    if (!liveState || liveState.isBanned) return false;
+    return roles.includes(liveState.role);
 }
 
 /**

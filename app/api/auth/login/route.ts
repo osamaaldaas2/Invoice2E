@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
-import { checkRateLimit, getRequestIdentifier, resetRateLimit } from '@/lib/rate-limiter';
+import { checkRateLimitAsync, getRequestIdentifier, resetRateLimit } from '@/lib/rate-limiter';
 import { setSessionCookie } from '@/lib/session';
 import { LoginSchema } from '@/lib/validators';
 import { authService } from '@/services/auth.service';
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Check rate limit before processing
         rateLimitId = getRequestIdentifier(request, email);
-        const rateLimit = checkRateLimit(rateLimitId);
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'login');
 
         if (!rateLimit.allowed) {
             logger.warn('Login rate limited', { email, blockedForSeconds: rateLimit.blockedForSeconds });
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         logger.info('Login successful', { userId: user.id });
 
         // Reset rate limit on successful login
-        resetRateLimit(rateLimitId);
+        await resetRateLimit(rateLimitId);
 
         // SECURITY FIX: Use signed session token instead of plain user ID
         await setSessionCookie(user);

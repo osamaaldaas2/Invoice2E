@@ -26,6 +26,14 @@ export interface AdminUser {
 export interface AdminUserWithCredits extends AdminUser {
     availableCredits: number;
     usedCredits: number;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+    phone?: string;
+    taxId?: string;
+    language?: string;
 }
 
 // ============================================
@@ -192,6 +200,42 @@ export interface AdminTransaction {
     paymentMethod: string;
     paymentStatus: string;
     createdAt: Date;
+}
+
+export interface AdminCreditTransaction {
+    id: string;
+    userId: string;
+    amount: number;
+    transactionType: string;
+    source: string;
+    referenceId?: string;
+    balanceAfter?: number;
+    createdAt: Date;
+}
+
+export interface AdminConversion {
+    id: string;
+    userId: string;
+    extractionId: string;
+    invoiceNumber?: string;
+    buyerName?: string;
+    conversionFormat?: string;
+    conversionStatus?: string;
+    validationStatus?: string;
+    creditsUsed: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface AdminBatchJobSummary {
+    id: string;
+    userId: string;
+    status: string;
+    totalFiles: number;
+    completedFiles: number;
+    failedFiles: number;
+    createdAt: Date;
+    completedAt?: Date;
 }
 
 // ============================================

@@ -25,9 +25,9 @@ function getSessionSecret(): string {
                 'CRITICAL: SESSION_SECRET environment variable must be set in production. Generate one with: openssl rand -hex 32'
             );
         }
+        // FIX-004: Use stable dev-only secret, never SUPABASE_SERVICE_ROLE_KEY
         logger.warn('SESSION_SECRET not set - using fallback (DEVELOPMENT ONLY)');
-        const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || 'DEV_FALLBACK_KEY';
-        return crypto.createHash('sha256').update(fallback).digest('hex');
+        return crypto.createHash('sha256').update('INVOICE2E_DEV_SESSION_SECRET').digest('hex');
     }
     return secret;
 }

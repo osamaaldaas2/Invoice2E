@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger';
-import { XRechnungGenerationResult } from './types';
+import { XRechnungGenerationResult, XRechnungInvoiceData } from './types';
 import { xrechnungValidator } from './validator';
 import { xrechnungBuilder } from './builder';
 
@@ -9,7 +9,7 @@ export class XRechnungService {
         private builder = xrechnungBuilder
     ) { }
 
-    generateXRechnung(invoiceData: any): XRechnungGenerationResult {
+    generateXRechnung(invoiceData: XRechnungInvoiceData): XRechnungGenerationResult {
         try {
             logger.info('Starting XRechnung 3.0.2 generation (FULL BR-DE COMPLIANT)', {
                 invoiceNumber: invoiceData.invoiceNumber,

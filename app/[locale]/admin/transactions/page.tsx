@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { logger } from '@/lib/logger';
 
 interface Transaction {
     id: string;
@@ -54,7 +55,7 @@ export default function AdminTransactionsPage() {
             setTransactions(data.data.transactions);
             setTotalPages(data.data.pagination.pages);
         } catch (err) {
-            console.error('Failed to fetch transactions:', err);
+            logger.error('Failed to fetch transactions', err);
             setError('Failed to load transactions');
         } finally {
             setLoading(false);
@@ -88,7 +89,7 @@ export default function AdminTransactionsPage() {
             setSelectedTransaction(null);
             fetchTransactions();
         } catch (err) {
-            console.error('Refund failed:', err);
+            logger.error('Refund failed', err);
             setError(err instanceof Error ? err.message : 'Failed to process refund');
         } finally {
             setRefundingId(null);

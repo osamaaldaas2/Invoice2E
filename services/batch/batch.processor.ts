@@ -2,32 +2,244 @@ import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { creditsDbService } from '@/services/credits.db.service';
-import { xrechnungService } from '@/services/xrechnung.service';
-import { ublService } from '@/services/ubl.service';
+import { invoiceDbService } from '@/services/invoice.db.service';
+import { boundaryDetectionService } from '@/services/boundary-detection.service';
+import { pdfSplitterService } from '@/services/pdf-splitter.service';
+import { BATCH_EXTRACTION } from '@/lib/constants';
 import { BatchResult } from './types';
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export class BatchProcessor {
-    constructor(
-        private xService = xrechnungService,
-        private uService = ublService
-    ) { }
 
     /**
-     * Process batch job
-     * FIX (BUG-020/021/022): Improved status management and progress tracking
+     * Retry extraction with exponential backoff on 429/transient errors.
+     */
+    private async extractWithRetry(
+        extractor: ReturnType<typeof ExtractorFactory.create>,
+        fileContent: Buffer,
+        fileName: string,
+        jobId: string,
+    ) {
+        let lastError: Error | null = null;
+
+        for (let attempt = 0; attempt <= BATCH_EXTRACTION.MAX_RETRIES; attempt++) {
+            try {
+                return await extractor.extractFromFile(fileContent, fileName, 'application/pdf');
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                const errorMessage = lastError.message;
+
+                const isRetryable = errorMessage.includes('429')
+                    || errorMessage.includes('rate limit')
+                    || errorMessage.includes('quota')
+                    || errorMessage.includes('RATE_LIMIT')
+                    || errorMessage.includes('Too Many Requests')
+                    || errorMessage.includes('503')
+                    || errorMessage.includes('overloaded');
+
+                if (!isRetryable || attempt === BATCH_EXTRACTION.MAX_RETRIES) {
+                    throw lastError;
+                }
+
+                const backoffMs = Math.min(
+                    BATCH_EXTRACTION.INITIAL_BACKOFF_MS * Math.pow(BATCH_EXTRACTION.BACKOFF_MULTIPLIER, attempt),
+                    BATCH_EXTRACTION.MAX_BACKOFF_MS,
+                );
+
+                logger.warn('AI API rate limited, retrying with backoff', {
+                    jobId,
+                    fileName,
+                    attempt: attempt + 1,
+                    maxRetries: BATCH_EXTRACTION.MAX_RETRIES,
+                    backoffMs,
+                    error: errorMessage,
+                });
+
+                await delay(backoffMs);
+            }
+        }
+
+        throw lastError || new Error('Extraction failed after retries');
+    }
+
+    /**
+     * Process a single file: extract data via AI and save as draft.
+     * XML generation is deferred to user review (avoids validation failures
+     * when AI-extracted data is missing required fields like country code).
+     */
+    private async processFile(
+        file: { name: string; content: Buffer },
+        index: number,
+        extractor: ReturnType<typeof ExtractorFactory.create>,
+        userId: string,
+        jobId: string,
+        results: BatchResult[],
+        supabase: ReturnType<typeof createServerClient>,
+    ): Promise<void> {
+        const startedAt = new Date().toISOString();
+        results[index] = {
+            filename: file.name,
+            status: 'pending',
+            reviewStatus: 'not_available',
+            startedAt,
+        };
+
+        logger.info('Processing file', { jobId, filename: file.name, index: index + 1 });
+
+        try {
+            // Detect invoice boundaries
+            const boundaryResult = await boundaryDetectionService.detect(file.content, 'application/pdf');
+
+            if (boundaryResult.totalInvoices > 1) {
+                // Multi-invoice PDF: split and process each segment
+                const pageGroups = boundaryResult.invoices.map(inv => inv.pages);
+                const splitBuffers = await pdfSplitterService.splitByPageGroups(file.content, pageGroups);
+
+                logger.info('Multi-invoice PDF detected in batch', {
+                    jobId,
+                    filename: file.name,
+                    invoiceCount: boundaryResult.totalInvoices,
+                });
+
+                // Process first segment into the current index, rest as appended results
+                for (let s = 0; s < splitBuffers.length; s++) {
+                    const invoice = boundaryResult.invoices[s]!;
+                    const segmentBuffer = splitBuffers[s]!;
+                    const segmentName = `${file.name} [${invoice.label}]`;
+
+
+                    try {
+                        const extractedData = await this.extractWithRetry(extractor, segmentBuffer, segmentName, jobId);
+                        const extraction = await invoiceDbService.createExtraction({
+                            userId,
+                            extractionData: extractedData as unknown as Record<string, unknown>,
+                            confidenceScore: extractedData.confidence,
+                            status: 'draft',
+                        });
+                        await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
+
+                        const segmentResult: BatchResult = {
+                            filename: segmentName,
+                            status: 'success' as const,
+                            invoiceNumber: extractedData.invoiceNumber || undefined,
+                            extractionId: extraction.id,
+                            confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
+                            reviewStatus: 'pending_review',
+                            startedAt,
+                            completedAt: new Date().toISOString(),
+                        };
+
+                        if (s === 0) {
+                            results[index] = segmentResult;
+                        } else {
+                            results.push(segmentResult);
+                        }
+                    } catch (segError) {
+                        const errMsg = segError instanceof Error ? segError.message : 'Unknown error';
+                        const segmentResult: BatchResult = {
+                            filename: segmentName,
+                            status: 'failed' as const,
+                            error: errMsg,
+                            reviewStatus: 'not_available',
+                            startedAt,
+                            completedAt: new Date().toISOString(),
+                        };
+                        if (s === 0) {
+                            results[index] = segmentResult;
+                        } else {
+                            results.push(segmentResult);
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Single invoice (existing flow)
+            const extractedData = await this.extractWithRetry(extractor, file.content, file.name, jobId);
+
+            const extraction = await invoiceDbService.createExtraction({
+                userId,
+                extractionData: extractedData as unknown as Record<string, unknown>,
+                confidenceScore: extractedData.confidence,
+                status: 'draft',
+            });
+
+            const deducted = await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
+            if (!deducted) {
+                logger.warn('Insufficient credits during batch, keeping extraction for review', {
+                    extractionId: extraction.id,
+                    userId,
+                });
+                results[index] = {
+                    filename: file.name,
+                    status: 'failed' as const,
+                    error: 'Insufficient credits during batch processing',
+                    extractionId: extraction.id,
+                    reviewStatus: 'pending_review',
+                    startedAt,
+                    completedAt: new Date().toISOString(),
+                };
+                return;
+            }
+
+            results[index] = {
+                filename: file.name,
+                status: 'success' as const,
+                invoiceNumber: extractedData.invoiceNumber || undefined,
+                extractionId: extraction.id,
+                confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
+                reviewStatus: 'pending_review',
+                startedAt,
+                completedAt: new Date().toISOString(),
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            logger.error('Failed to process file', {
+                jobId,
+                filename: file.name,
+                error: errorMessage,
+            });
+
+            results[index] = {
+                filename: file.name,
+                status: 'failed' as const,
+                error: errorMessage,
+                reviewStatus: 'not_available',
+                startedAt,
+                completedAt: new Date().toISOString(),
+            };
+        }
+
+        // Update progress after each file completes
+        const successCount = results.filter(r => r.status === 'success').length;
+        const failCount = results.filter(r => r.status === 'failed').length;
+
+        await supabase
+            .from('batch_jobs')
+            .update({
+                completed_files: successCount,
+                failed_files: failCount,
+                results: results,
+            })
+            .eq('id', jobId);
+    }
+
+    /**
+     * Process batch job with concurrent file extraction.
      */
     async processBatch(
         jobId: string,
         files: { name: string; content: Buffer }[],
         format: 'CII' | 'UBL' = 'CII'
     ): Promise<BatchResult[]> {
-        logger.info('Processing batch', { jobId, fileCount: files.length, format });
+        const concurrency = BATCH_EXTRACTION.CONCURRENCY;
+        logger.info('Processing batch', { jobId, fileCount: files.length, format, concurrency });
 
         const supabase = createServerClient();
-        const results: BatchResult[] = [];
+        const results: BatchResult[] = new Array(files.length);
         const extractor = ExtractorFactory.create();
 
-        // FIX (BUG-020): Wrap entire processing in try/catch to handle unexpected failures
         try {
             // Fetch batch job owner for credit deduction
             const { data: job, error: jobError } = await supabase
@@ -53,144 +265,68 @@ export class BatchProcessor {
                 logger.warn('Failed to update batch status to processing', { jobId, error: updateError.message });
             }
 
-            // FIX (BUG-022): Process files sequentially with progress updates
-            for (let index = 0; index < files.length; index++) {
-                const file = files[index];
+            // Initialize all results as pending
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 if (!file) {
-                    logger.warn('Skipping missing file entry', { jobId, index });
-
-                    // Record as failed so progress counts align
-                    const result: BatchResult = {
-                        filename: `file_${index}`,
+                    results[i] = {
+                        filename: `file_${i}`,
                         status: 'failed' as const,
                         error: 'Missing file entry',
+                        reviewStatus: 'not_available',
+                        startedAt: new Date().toISOString(),
+                        completedAt: new Date().toISOString(),
                     };
-                    results.push(result);
-
-                    // Update progress
-                    const failCount = results.filter(r => r.status === 'failed').length;
-                    await supabase
-                        .from('batch_jobs')
-                        .update({
-                            failed_files: failCount,
-                            results: results,
-                        })
-                        .eq('id', jobId);
-
-                    continue;
-                }
-                logger.info('Processing file', { jobId, filename: file.name, index: index + 1, total: files.length });
-
-                let result: BatchResult;
-
-                try {
-                    // Extract invoice data using AI
-                    const extractedData = await extractor.extractFromFile(file.content, file.name, 'application/pdf');
-
-                    // Deduct credits AFTER successful extraction
-                    const deducted = await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
-                    if (!deducted) {
-                        result = {
-                            filename: file.name,
-                            status: 'failed' as const,
-                            error: 'Insufficient credits during batch processing',
-                        };
-                        results.push(result);
-
-                        // Update progress after failure
-                        const successCount = results.filter(r => r.status === 'success').length;
-                        const failCount = results.filter(r => r.status === 'failed').length;
-
-                        await supabase
-                            .from('batch_jobs')
-                            .update({
-                                completed_files: successCount,
-                                failed_files: failCount,
-                                results: results,
-                            })
-                            .eq('id', jobId);
-
-                        continue;
-                    }
-
-                    // Generate XML based on format
-                    let xml: string;
-                    if (format === 'UBL') {
-                        xml = await this.uService.generate({
-                            invoiceNumber: extractedData.invoiceNumber || `INV-${Date.now()}`,
-                            invoiceDate: extractedData.invoiceDate || (new Date().toISOString().split('T')[0] || new Date().toISOString()),
-                            currency: extractedData.currency || 'EUR',
-                            sellerName: extractedData.sellerName || '',
-                            sellerEmail: extractedData.sellerEmail || '',
-                            sellerTaxId: extractedData.sellerTaxId || '',
-                            sellerAddress: extractedData.sellerAddress || undefined,
-                            sellerCountryCode: 'DE',
-                            buyerName: extractedData.buyerName || '',
-                            buyerEmail: extractedData.buyerEmail || undefined,
-                            buyerAddress: extractedData.buyerAddress || undefined,
-                            buyerCountryCode: 'DE',
-                            lineItems: (extractedData.lineItems || []).map(item => ({
-                                description: item.description || '',
-                                quantity: item.quantity || 1,
-                                unitPrice: item.unitPrice || 0,
-                                totalPrice: item.totalPrice || 0,
-                            })),
-                            subtotal: extractedData.subtotal || 0,
-                            taxAmount: extractedData.taxAmount || 0,
-                            totalAmount: extractedData.totalAmount || 0,
-                        });
-                    } else {
-                        const xResult = this.xService.generateXRechnung(extractedData);
-                        xml = xResult.xmlContent;
-                    }
-
-                    result = {
+                } else {
+                    results[i] = {
                         filename: file.name,
-                        status: 'success' as const,
-                        invoiceNumber: extractedData.invoiceNumber || undefined,
-                        xmlContent: xml,
-                    };
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    logger.error('Failed to process file', { jobId, filename: file.name, error: errorMessage });
-
-                    result = {
-                        filename: file.name,
-                        status: 'failed' as const,
-                        error: errorMessage,
+                        status: 'pending',
+                        reviewStatus: 'not_available',
                     };
                 }
-
-                results.push(result);
-
-                // FIX (BUG-022): Update progress after each file
-                const successCount = results.filter(r => r.status === 'success').length;
-                const failCount = results.filter(r => r.status === 'failed').length;
-
-                await supabase
-                    .from('batch_jobs')
-                    .update({
-                        completed_files: successCount,
-                        failed_files: failCount,
-                        results: results,
-                    })
-                    .eq('id', jobId);
             }
 
-            // FIX (BUG-021): Use proper status based on results
+            await supabase
+                .from('batch_jobs')
+                .update({ results })
+                .eq('id', jobId);
+
+            // Process files concurrently with a pool of `concurrency` workers
+            const validFiles = files
+                .map((file, index) => ({ file, index }))
+                .filter(({ file }) => !!file) as { file: { name: string; content: Buffer }; index: number }[];
+
+            // Chunk into groups of `concurrency` and process each group in parallel
+            for (let i = 0; i < validFiles.length; i += concurrency) {
+                const chunk = validFiles.slice(i, i + concurrency);
+
+                logger.info('Processing file chunk', {
+                    jobId,
+                    chunkStart: i,
+                    chunkSize: chunk.length,
+                    totalFiles: validFiles.length,
+                });
+
+                await Promise.all(
+                    chunk.map(({ file, index }) =>
+                        this.processFile(file, index, extractor, userId, jobId, results, supabase)
+                    )
+                );
+            }
+
+            // Compute final status
             const successCount = results.filter(r => r.status === 'success').length;
             const failCount = results.filter(r => r.status === 'failed').length;
 
             let finalStatus: string;
             if (failCount === 0) {
-                finalStatus = 'completed'; // All succeeded
+                finalStatus = 'completed';
             } else if (successCount === 0) {
-                finalStatus = 'failed'; // All failed
+                finalStatus = 'failed';
             } else {
-                finalStatus = 'partial_success'; // Some succeeded, some failed
+                finalStatus = 'partial_success';
             }
 
-            // Mark job as completed with final status
             await supabase
                 .from('batch_jobs')
                 .update({
@@ -212,7 +348,6 @@ export class BatchProcessor {
             return results;
 
         } catch (processingError) {
-            // FIX (BUG-020): Mark job as failed if unexpected error occurs
             const errorMessage = processingError instanceof Error
                 ? processingError.message
                 : 'Unknown processing error';
@@ -220,7 +355,6 @@ export class BatchProcessor {
             logger.error('Batch processing failed unexpectedly', {
                 jobId,
                 error: errorMessage,
-                processedSoFar: results.length
             });
 
             await supabase

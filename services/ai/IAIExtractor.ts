@@ -4,13 +4,19 @@ export interface ExtractedInvoiceData {
     buyerName: string | null;
     buyerEmail: string | null;
     buyerAddress: string | null;
+    buyerCity?: string | null;
+    buyerPostalCode?: string | null;
     buyerTaxId: string | null;
+    buyerPhone?: string | null;
     sellerName: string | null;
     sellerEmail: string | null;
     sellerAddress: string | null;
+    sellerCity?: string | null;
+    sellerPostalCode?: string | null;
     sellerTaxId: string | null;
     sellerIban?: string | null;
     sellerBic?: string | null;
+    sellerPhone?: string | null;
     bankName?: string | null;
     lineItems: Array<{
         description: string;

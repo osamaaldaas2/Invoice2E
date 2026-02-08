@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import AdminStatsCard from '@/components/admin/AdminStatsCard';
 import { AdminDashboardStats } from '@/types/admin';
+import { logger } from '@/lib/logger';
 
 export default function AdminDashboardPage() {
     const params = useParams();
@@ -27,7 +28,7 @@ export default function AdminDashboardPage() {
                 const data = await response.json();
                 setStats(data.data);
             } catch (err) {
-                console.error('Failed to fetch stats:', err);
+                logger.error('Failed to fetch stats', err);
                 setError('Failed to load dashboard stats');
             } finally {
                 setLoading(false);

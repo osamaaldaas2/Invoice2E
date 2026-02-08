@@ -6,6 +6,7 @@ export interface IDeepSeekAdapter {
         mimeType: string
     ): Promise<DeepSeekExtractionResult>;
 
+    sendPrompt(fileBuffer: Buffer, mimeType: string, prompt: string): Promise<string>;
     getProviderName(): string;
     validateConfiguration(): boolean;
 }

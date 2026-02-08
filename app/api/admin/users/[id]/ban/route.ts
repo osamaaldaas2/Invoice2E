@@ -49,6 +49,20 @@ export async function POST(
             );
         }
 
+        const targetUser = await adminUserService.getUserById(userId);
+        if (targetUser.role === 'super_admin') {
+            return NextResponse.json(
+                { success: false, error: 'Cannot ban super admin accounts' },
+                { status: 403 }
+            );
+        }
+        if (targetUser.role === 'admin' && admin.role !== 'super_admin') {
+            return NextResponse.json(
+                { success: false, error: 'Only super admin can ban admin accounts' },
+                { status: 403 }
+            );
+        }
+
         // Get request context
         const ipAddress = getClientIp(request);
         const userAgent = getUserAgent(request);

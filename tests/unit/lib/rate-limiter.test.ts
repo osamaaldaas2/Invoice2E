@@ -84,10 +84,11 @@ describe('Rate Limiter', () => {
 
     describe('getRequestIdentifier', () => {
         it('should generate identifier from IP', () => {
+            // FIX-002: Use cf-connecting-ip (trusted header) instead of x-forwarded-for
             const request = {
                 headers: {
                     get: (name: string) => {
-                        if (name === 'x-forwarded-for') return '192.168.1.1';
+                        if (name === 'cf-connecting-ip') return '192.168.1.1';
                         return null;
                     },
                 },

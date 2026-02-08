@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { creditsDbService } from '@/services/credits.db.service';
+import { boundaryDetectionService } from '@/services/boundary-detection.service';
+import { pdfSplitterService } from '@/services/pdf-splitter.service';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { FILE_LIMITS } from '@/lib/constants';
@@ -109,7 +111,92 @@ export async function POST(request: NextRequest) {
             fileName: file.name,
         });
 
-        // Extract data
+        // Detect invoice boundaries in PDF files
+        const boundaryResult = await boundaryDetectionService.detect(buffer, file.type);
+
+        if (boundaryResult.totalInvoices > 1) {
+            // Multi-invoice PDF: check credits, split, extract each
+            const requiredCredits = boundaryResult.totalInvoices;
+            try {
+                const credits = await creditsDbService.getUserCredits(userId);
+                if (credits.availableCredits < requiredCredits) {
+                    return NextResponse.json(
+                        { success: false, error: `This PDF contains ${requiredCredits} invoices but you only have ${credits.availableCredits} credits.` },
+                        { status: 402 }
+                    );
+                }
+            } catch (e) {
+                logger.error('Failed to re-check credits for multi-invoice', { userId, error: e });
+                return NextResponse.json(
+                    { success: false, error: 'Failed to verify credits' },
+                    { status: 500 }
+                );
+            }
+
+            const pageGroups = boundaryResult.invoices.map(inv => inv.pages);
+            const splitBuffers = await pdfSplitterService.splitByPageGroups(buffer, pageGroups);
+
+            const extractions: { extractionId: string; label: string; confidence: number }[] = [];
+
+            for (let i = 0; i < splitBuffers.length; i++) {
+                const invoice = boundaryResult.invoices[i]!;
+                const segmentBuffer = splitBuffers[i]!;
+                const label = invoice.label;
+                const segmentName = `${file.name} [${label}]`;
+
+                try {
+                    const extractedData = await extractor.extractFromFile(segmentBuffer, segmentName, file.type);
+
+                    const extraction = await invoiceDbService.createExtraction({
+                        userId,
+                        extractionData: extractedData as unknown as Record<string, unknown>,
+                        confidenceScore: extractedData.confidence,
+                        geminiResponseTimeMs: extractedData.processingTimeMs,
+                        status: 'draft',
+                    });
+
+                    await creditsDbService.deductCredits(userId, 1, 'extraction');
+
+                    extractions.push({
+                        extractionId: extraction.id,
+                        label,
+                        confidence: extractedData.confidence,
+                    });
+                } catch (segmentError) {
+                    logger.error('Failed to extract invoice segment', {
+                        index: i,
+                        label,
+                        error: segmentError instanceof Error ? segmentError.message : String(segmentError),
+                    });
+                    extractions.push({
+                        extractionId: '',
+                        label,
+                        confidence: 0,
+                    });
+                }
+            }
+
+            logger.info('Multi-invoice extraction completed', {
+                totalInvoices: boundaryResult.totalInvoices,
+                successful: extractions.filter(e => e.extractionId).length,
+                userId,
+            });
+
+            return NextResponse.json(
+                {
+                    success: true,
+                    data: {
+                        multiInvoice: true,
+                        totalInvoices: boundaryResult.totalInvoices,
+                        extractions,
+                        provider: extractor.getProviderName(),
+                    },
+                },
+                { status: 200 }
+            );
+        }
+
+        // Single invoice flow (existing behavior)
         const startTime = Date.now();
         let extractedData;
         try {
@@ -120,8 +207,6 @@ export async function POST(request: NextRequest) {
                 errorName: extractionError instanceof Error ? extractionError.constructor.name : 'Unknown',
                 errorMessage: extractionError instanceof Error ? extractionError.message : String(extractionError),
                 errorStack: extractionError instanceof Error ? extractionError.stack : undefined,
-
-                // If it's an AppError, log the details
                 ...(extractionError instanceof AppError && {
                     appErrorCode: extractionError.name,
                     appErrorStatus: extractionError.statusCode,
@@ -145,7 +230,7 @@ export async function POST(request: NextRequest) {
             userId,
             extractionData: extractedData as unknown as Record<string, unknown>,
             confidenceScore: extractedData.confidence,
-            geminiResponseTimeMs: responseTime, // Schema expected this name, keep it for now
+            geminiResponseTimeMs: responseTime,
             status: 'draft',
         });
 
@@ -153,7 +238,6 @@ export async function POST(request: NextRequest) {
         try {
             const deducted = await creditsDbService.deductCredits(userId, 1, 'extraction');
             if (!deducted) {
-                // Best-effort cleanup to avoid unpaid drafts
                 try {
                     await invoiceDbService.deleteExtraction(extraction.id);
                 } catch (cleanupError) {

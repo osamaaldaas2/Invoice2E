@@ -31,7 +31,7 @@ export const LineItemsSection: React.FC<LineItemsSectionProps> = ({ register, co
             <div className="space-y-4">
                 {fields.map((item, index) => (
                     <div key={item.id} className="grid grid-cols-12 gap-4 items-start p-4 bg-white/5 border border-white/10 rounded-2xl relative group">
-                        <div className="col-span-12 md:col-span-5">
+                        <div className="col-span-12 md:col-span-4">
                             <label className="block text-xs font-medium text-slate-300 mb-1">Description</label>
                             <input
                                 {...register(`items.${index}.description` as const, { required: 'Required' })}
@@ -73,8 +73,7 @@ export const LineItemsSection: React.FC<LineItemsSectionProps> = ({ register, co
                             />
                         </div>
 
-                        <div className="col-span-11 md:col-span-1">
-                            {/* Total Price usually calculated, avoiding input might be better but for flexibility keeping it */}
+                        <div className="col-span-11 md:col-span-2">
                             <label className="block text-xs font-medium text-slate-300 mb-1">Total</label>
                             <input
                                 type="number"
