@@ -36,7 +36,7 @@ export const getPaymentEmailHtml = (data: PaymentEmailData): string => {
       </div>
       
       <p style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/upload" class="button">Start Converting Invoices</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/dashboard" class="button">Start Converting Invoices</a>
       </p>
     </div>
     <div class="footer">

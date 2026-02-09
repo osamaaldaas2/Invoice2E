@@ -182,6 +182,6 @@ export interface ExtractedInvoiceData {
     currency: string;
     paymentTerms: string | null;
     notes: string | null;
-    confidence: number;
-    processingTimeMs: number;
+    confidence?: number;
+    processingTimeMs?: number;
 }

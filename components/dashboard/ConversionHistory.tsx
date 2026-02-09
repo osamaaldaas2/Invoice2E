@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logger } from '@/lib/logger';
 
@@ -43,6 +43,7 @@ function BatchRow({
     downloadingId,
     formatDate,
     getStatusBadge,
+    getStatusLabel,
     t,
 }: {
     conversion: Conversion;
@@ -53,6 +54,7 @@ function BatchRow({
     downloadingId: string | null;
     formatDate: (d: string) => string;
     getStatusBadge: (s: string) => string;
+    getStatusLabel: (s: string) => string;
     t: (key: string) => string;
 }) {
     const results = conversion.batch_results || [];
@@ -75,8 +77,8 @@ function BatchRow({
                     XRechnung
                 </td>
                 <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}>
-                        {conversion.status === 'partial_success' ? 'partial' : conversion.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`} aria-label={`Status: ${conversion.status}`}>
+                        {getStatusLabel(conversion.status)}
                     </span>
                     {conversion.failed_files && conversion.failed_files > 0 ? (
                         <span className="ml-1 text-xs text-rose-400">
@@ -125,8 +127,8 @@ function BatchRow({
                         XRechnung
                     </td>
                     <td className="px-4 py-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(result.status === 'success' ? 'completed' : result.status)}`}>
-                            {result.status === 'success' ? 'completed' : result.status}
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(result.status === 'success' ? 'completed' : result.status)}`} aria-label={`Status: ${result.status}`}>
+                            {getStatusLabel(result.status === 'success' ? 'completed' : result.status)}
                         </span>
                     </td>
                     <td className="px-4 py-2 text-sm text-slate-400">
@@ -153,7 +155,7 @@ function BatchRow({
 
 export default function ConversionHistory({ limit = 10, showPagination = true }: Props) {
     const t = useTranslations('history');
-    const pathname = usePathname();
+    const locale = useLocale();
     const searchParams = useSearchParams();
     const initialStatus = useMemo<'all' | 'draft' | 'completed'>(() => {
         const statusParam = searchParams.get('status');
@@ -170,11 +172,6 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
     const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'completed'>(initialStatus);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const withLocale = useMemo(() => {
         return (path: string) => {
@@ -248,6 +245,19 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
             pending: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
         };
         return styles[status as keyof typeof styles] || styles.pending;
+    };
+
+    // UX-12: Accessible status labels with text prefix for color-blind users
+    const getStatusLabel = (status: string) => {
+        const labels: Record<string, string> = {
+            completed: '\u2713 completed',  // checkmark
+            draft: '\u270E draft',          // pencil
+            failed: '\u2717 failed',        // X mark
+            processing: '\u21BB processing', // clockwise arrow
+            pending: '\u25CB pending',       // circle
+            partial_success: '\u25D1 partial', // half circle
+        };
+        return labels[status] || status;
     };
 
     const formatDate = (dateString: string) => {
@@ -453,6 +463,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                                         downloadingId={downloadingId}
                                         formatDate={formatDate}
                                         getStatusBadge={getStatusBadge}
+                                        getStatusLabel={getStatusLabel}
                                         t={t}
                                     />
                                 ) : (
@@ -467,8 +478,8 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                                             {conversion.record_type === 'draft' ? '-' : (conversion.output_format || 'XRechnung')}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}>
-                                                {conversion.status}
+                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`} aria-label={`Status: ${conversion.status}`}>
+                                                {getStatusLabel(conversion.status)}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-slate-300">

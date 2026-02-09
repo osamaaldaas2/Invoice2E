@@ -99,13 +99,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // Need to map ReviewedInvoiceData (from review form) to ExtractedInvoiceData (for service)
         const serviceData = {
             ...invoiceData,
-            supplierName: invoiceData.sellerName,
-            supplierEmail: invoiceData.sellerEmail,
-            supplierAddress: invoiceData.sellerAddress,
-            supplierTaxId: invoiceData.sellerTaxId,
             sellerCountryCode: invoiceData.sellerCountryCode || 'DE',
             buyerCountryCode: invoiceData.buyerCountryCode || 'DE',
-            items: invoiceData.lineItems, // Service uses 'items', form uses 'lineItems'
         };
 
         let result: {
@@ -128,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     invoiceDate: serviceData.invoiceDate || new Date().toISOString().split('T')[0],
                     dueDate: serviceData.dueDate,
                     currency: serviceData.currency || 'EUR',
-                    sellerName: serviceData.sellerName || serviceData.supplierName || '',
+                    sellerName: serviceData.sellerName || '',
                     sellerEmail: serviceData.sellerEmail || '',
                     sellerPhone: serviceData.sellerPhone,
                     sellerTaxId: serviceData.sellerTaxId || '',
@@ -240,13 +235,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 userId
             });
 
-            // Update validation status and mark conversion as completed
+            // Update validation status, cache XML, and mark conversion as completed (PERF-2)
             await invoiceDbService.updateConversion(actualConversionId, {
                 validationStatus: result.validationStatus,
                 validationErrors: result.validationErrors.length > 0
                     ? { errors: result.validationErrors } as Record<string, unknown>
                     : undefined,
                 conversionStatus: 'completed',
+                xmlContent: result.xmlContent,
+                xmlFileName: result.fileName,
             });
 
             // Mark extraction as completed

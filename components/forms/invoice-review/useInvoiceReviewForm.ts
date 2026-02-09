@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { logger } from '@/lib/logger';
 
 export interface InvoiceReviewFormValues {
@@ -65,14 +66,9 @@ interface UseInvoiceReviewFormProps {
 
 export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseInvoiceReviewFormProps) => {
     const router = useRouter();
-    const pathname = usePathname();
+    const locale = useLocale();
     const [submitError, setSubmitError] = useState('');
     const [submitSuccess, setSubmitSuccess] = useState('');
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const withLocale = useMemo(() => {
         return (path: string) => {
@@ -175,6 +171,43 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
         }
     });
 
+    // Auto-save to sessionStorage every 30s
+    const autoSaveKey = `autosave_review_${extractionId}`;
+    const submitted = useRef(false);
+
+    useEffect(() => {
+        // Restore auto-saved draft if available
+        try {
+            const saved = sessionStorage.getItem(autoSaveKey);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                form.reset(parsed, { keepDefaultValues: true });
+            }
+        } catch {
+            // ignore parse errors
+        }
+    }, [autoSaveKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (form.formState.isDirty && !submitted.current) {
+                sessionStorage.setItem(autoSaveKey, JSON.stringify(form.getValues()));
+            }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [autoSaveKey, form]);
+
+    // Warn before navigating away with unsaved changes
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (form.formState.isDirty && !submitted.current) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [form.formState.isDirty]);
+
     const onSubmit: SubmitHandler<InvoiceReviewFormValues> = async (data) => {
         setSubmitError('');
         setSubmitSuccess('');
@@ -219,6 +252,8 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
                 throw new Error(responseData.error || 'Review failed');
             }
 
+            submitted.current = true;
+            sessionStorage.removeItem(autoSaveKey);
             setSubmitSuccess(`Invoice reviewed successfully! Accuracy: ${responseData.data.accuracy.toFixed(1)}%`);
             logger.info('Invoice review submitted', { extractionId, accuracy: responseData.data.accuracy });
 

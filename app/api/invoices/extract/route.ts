@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
                         extractions[i] = {
                             extractionId: extraction.id,
                             label,
-                            confidence: extractedData.confidence,
+                            confidence: extractedData.confidence ?? 0,
                         };
                     } catch (segmentError) {
                         logger.error('Failed to extract invoice segment', {

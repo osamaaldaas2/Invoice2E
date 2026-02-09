@@ -1,22 +1,19 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { emitAuthChanged } from '@/lib/client-auth';
+import Link from 'next/link';
 
 export default function LoginForm() {
     const router = useRouter();
-    const pathname = usePathname();
     const searchParams = useSearchParams();
+    const locale = useLocale();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const redirectTarget = useMemo(() => {
         const fallback = `/${locale}/dashboard`;
@@ -107,6 +104,14 @@ export default function LoginForm() {
                     disabled={loading}
                     autoComplete="current-password"
                 />
+                <div className="mt-1 text-right">
+                    <Link
+                        href={`/${locale}/forgot-password`}
+                        className="text-xs text-sky-300 hover:text-sky-200 transition-colors"
+                    >
+                        Forgot password?
+                    </Link>
+                </div>
             </div>
 
             {error && (

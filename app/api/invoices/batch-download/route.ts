@@ -60,11 +60,6 @@ export async function POST(request: NextRequest) {
                 // Map extracted data to XRechnung service format
                 const serviceData = {
                     ...data,
-                    supplierName: data.sellerName,
-                    supplierEmail: data.sellerEmail,
-                    supplierAddress: data.sellerAddress,
-                    supplierTaxId: data.sellerTaxId,
-                    items: data.lineItems,
                     invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
                     invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
                     sellerName: data.sellerName || 'Unknown Seller',

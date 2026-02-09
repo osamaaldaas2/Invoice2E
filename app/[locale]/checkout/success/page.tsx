@@ -97,7 +97,7 @@ export default function CheckoutSuccessPage() {
                 <Button
                     className="w-full"
                     variant="outline"
-                    onClick={() => router.push(`/${locale}/upload`)}
+                    onClick={() => router.push(`/${locale}/dashboard`)}
                 >
                     {isGerman ? 'Rechnung konvertieren' : 'Convert Invoice'}
                 </Button>

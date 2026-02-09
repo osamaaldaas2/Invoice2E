@@ -5,6 +5,7 @@ import { SignupSchema, LoginSchema } from '@/lib/validators';
 import { UserRole } from '@/types/index';
 import { DEFAULT_CREDITS_ON_SIGNUP } from '@/lib/constants';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 type SignupData = {
     email: string;
@@ -285,6 +286,175 @@ export class AuthService {
 
     async hashPassword(password: string): Promise<string> {
         return bcrypt.hash(password, this.SALT_ROUNDS);
+    }
+
+    /**
+     * Request a password reset. Always returns success to prevent email enumeration.
+     */
+    async requestPasswordReset(email: string): Promise<void> {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await this.getUserByEmail(normalizedEmail);
+
+        if (!user) {
+            // Don't reveal whether email exists — silently succeed
+            logger.info('Password reset requested for unknown email', { email: normalizedEmail });
+            return;
+        }
+
+        // Generate a secure random token
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        const supabase = this.getSupabase();
+
+        // Invalidate any existing tokens for this user
+        await supabase
+            .from('password_reset_tokens')
+            .delete()
+            .eq('user_id', user.id);
+
+        // Store the hashed token
+        const { error } = await supabase.from('password_reset_tokens').insert({
+            user_id: user.id,
+            token_hash: tokenHash,
+            expires_at: expiresAt.toISOString(),
+        });
+
+        if (error) {
+            logger.error('Failed to store password reset token', { userId: user.id, error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to process password reset request', 500);
+        }
+
+        logger.info('Password reset token created', { userId: user.id });
+
+        // Return the plain token so the caller can send it via email
+        // The emailService call is handled by the API route, not here
+        return;
+    }
+
+    /**
+     * Generate a password reset token and return it (for the API route to email).
+     */
+    async createPasswordResetToken(email: string): Promise<{ token: string; userName: string } | null> {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await this.getUserByEmail(normalizedEmail);
+
+        if (!user) {
+            return null;
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        const supabase = this.getSupabase();
+
+        // Invalidate existing tokens
+        await supabase
+            .from('password_reset_tokens')
+            .delete()
+            .eq('user_id', user.id);
+
+        const { error } = await supabase.from('password_reset_tokens').insert({
+            user_id: user.id,
+            token_hash: tokenHash,
+            expires_at: expiresAt.toISOString(),
+        });
+
+        if (error) {
+            logger.error('Failed to store password reset token', { userId: user.id, error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to process password reset request', 500);
+        }
+
+        logger.info('Password reset token created', { userId: user.id });
+        return { token, userName: user.first_name };
+    }
+
+    /**
+     * Validate a reset token. Returns userId if valid.
+     */
+    async validateResetToken(token: string): Promise<{ userId: string } | null> {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const supabase = this.getSupabase();
+
+        const { data, error } = await supabase
+            .from('password_reset_tokens')
+            .select('id, user_id, expires_at, used_at')
+            .eq('token_hash', tokenHash)
+            .single();
+
+        if (error || !data) {
+            return null;
+        }
+
+        // Check if already used
+        if (data.used_at) {
+            return null;
+        }
+
+        // Check if expired
+        if (new Date(data.expires_at) < new Date()) {
+            return null;
+        }
+
+        return { userId: data.user_id };
+    }
+
+    /**
+     * Reset password using a valid token.
+     */
+    async resetPassword(token: string, newPassword: string): Promise<void> {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const supabase = this.getSupabase();
+
+        // Validate token
+        const { data: tokenData, error: tokenError } = await supabase
+            .from('password_reset_tokens')
+            .select('id, user_id, expires_at, used_at')
+            .eq('token_hash', tokenHash)
+            .single();
+
+        if (tokenError || !tokenData) {
+            throw new ValidationError('Invalid or expired reset link');
+        }
+
+        if (tokenData.used_at) {
+            throw new ValidationError('This reset link has already been used');
+        }
+
+        if (new Date(tokenData.expires_at) < new Date()) {
+            throw new ValidationError('This reset link has expired');
+        }
+
+        // Hash new password
+        const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
+
+        // Update user password
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
+            .eq('id', tokenData.user_id);
+
+        if (updateError) {
+            logger.error('Failed to update password', { userId: tokenData.user_id, error: updateError.message });
+            throw new AppError('DB_ERROR', 'Failed to reset password', 500);
+        }
+
+        // Mark token as used
+        await supabase
+            .from('password_reset_tokens')
+            .update({ used_at: new Date().toISOString() })
+            .eq('id', tokenData.id);
+
+        // Invalidate all other tokens for this user
+        await supabase
+            .from('password_reset_tokens')
+            .delete()
+            .eq('user_id', tokenData.user_id)
+            .neq('id', tokenData.id);
+
+        logger.info('Password reset successful', { userId: tokenData.user_id });
     }
 }
 

@@ -111,24 +111,46 @@ export async function GET(req: NextRequest) {
                     continue;
                 }
 
-                const data = extraction.extractionData as Record<string, unknown>;
-                const serviceData = {
-                    ...data,
-                    supplierName: data.sellerName,
-                    supplierEmail: data.sellerEmail,
-                    supplierAddress: data.sellerAddress,
-                    supplierTaxId: data.sellerTaxId,
-                    items: data.lineItems,
-                    invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
-                    invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
-                    sellerName: data.sellerName || 'Unknown Seller',
-                    sellerCountryCode: data.sellerCountryCode || 'DE',
-                    buyerCountryCode: data.buyerCountryCode || 'DE',
-                    totalAmount: Number(data.totalAmount) || 0,
-                } as Record<string, unknown>;
+                // PERF-2: Check for cached XML first
+                const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+                const cachedXml = (existingConversion as Record<string, unknown> | null)?.xml_content as string | undefined;
+                const cachedFileName = (existingConversion as Record<string, unknown> | null)?.xml_file_name as string | undefined;
 
-                const xmlResult = xrechnungService.generateXRechnung(serviceData as any);
-                let fileName = xmlResult.fileName.replace(/[<>:"/\\|?*]/g, '_');
+                let xmlContent: string;
+                let xmlFileName: string;
+                let validationStatus: string | undefined;
+
+                if (cachedXml && cachedFileName) {
+                    xmlContent = cachedXml;
+                    xmlFileName = cachedFileName;
+                    logger.info('Using cached XML for batch download', { extractionId });
+                } else {
+                    const data = extraction.extractionData as Record<string, unknown>;
+                    const serviceData = {
+                        ...data,
+                        invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
+                        invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
+                        sellerName: data.sellerName || 'Unknown Seller',
+                        sellerCountryCode: data.sellerCountryCode || 'DE',
+                        buyerCountryCode: data.buyerCountryCode || 'DE',
+                        totalAmount: Number(data.totalAmount) || 0,
+                    } as Record<string, unknown>;
+
+                    const xmlResult = xrechnungService.generateXRechnung(serviceData as any);
+                    xmlContent = xmlResult.xmlContent;
+                    xmlFileName = xmlResult.fileName;
+                    validationStatus = xmlResult.validationStatus;
+
+                    // Cache the generated XML
+                    if (existingConversion) {
+                        await invoiceDbService.updateConversion(existingConversion.id, {
+                            xmlContent,
+                            xmlFileName,
+                        });
+                    }
+                }
+
+                let fileName = xmlFileName.replace(/[<>:"/\\|?*]/g, '_');
                 // Deduplicate filenames to prevent ZIP overwrite
                 if (usedFileNames.has(fileName)) {
                     const base = fileName.replace(/\.xml$/i, '');
@@ -137,15 +159,14 @@ export async function GET(req: NextRequest) {
                     fileName = `${base}_${counter}.xml`;
                 }
                 usedFileNames.add(fileName);
-                zip.file(fileName, xmlResult.xmlContent);
+                zip.file(fileName, xmlContent);
                 successCount++;
 
                 // Update extraction + conversion status to completed
-                const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
                 if (existingConversion) {
                     await invoiceDbService.updateConversion(existingConversion.id, {
                         conversionStatus: 'completed',
-                        validationStatus: xmlResult.validationStatus,
+                        ...(validationStatus ? { validationStatus } : {}),
                     });
                 }
                 await invoiceDbService.updateExtraction(extractionId, { status: 'completed' });

@@ -28,7 +28,7 @@ export const getWelcomeEmailHtml = (userName: string): string => {
       <div class="feature">✅ Download XRechnung XML</div>
       
       <p style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/upload" class="button">Convert Your First Invoice</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/dashboard" class="button">Convert Your First Invoice</a>
       </p>
       
       <p>Need help? Check our <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/help">documentation</a> or contact us at support@invoice2e.de</p>

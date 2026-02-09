@@ -332,8 +332,6 @@ export class BatchService {
                         status: 'draft',
                     });
 
-                    await creditsDbService.deductCredits(userId, 1, 'extraction');
-
                     results.push({
                         filename: segmentName,
                         status: 'success',
@@ -372,6 +370,11 @@ export class BatchService {
                     jobId, completedFiles, failedFiles, error: progressError.message,
                 });
             }
+        }
+
+        // Deduct credits once for all successful extractions
+        if (completedFiles > 0) {
+            await creditsDbService.deductCredits(userId, completedFiles, `batch:${jobId}`);
         }
 
         // Final status
@@ -438,6 +441,62 @@ export class BatchService {
         format: 'CII' | 'UBL' = 'CII'
     ): Promise<BatchResult[]> {
         return batchProcessor.processBatch(jobId, files, format);
+    }
+
+    /**
+     * Recover batch jobs stuck in 'processing' state (EXP-1 fix).
+     * If processing_started_at is older than threshold, reset to pending.
+     * If total job age exceeds 3x threshold, mark as failed instead.
+     */
+    async recoverStuckJobs(thresholdMs: number = 300000): Promise<number> {
+        const supabase = this.getSupabase();
+        const cutoff = new Date(Date.now() - thresholdMs).toISOString();
+
+        const { data: stuckJobs, error } = await supabase
+            .from('batch_jobs')
+            .select('id, created_at, processing_started_at')
+            .eq('status', 'processing')
+            .lt('processing_started_at', cutoff);
+
+        if (error) {
+            logger.error('Failed to query stuck batch jobs', { error: error.message });
+            return 0;
+        }
+
+        if (!stuckJobs?.length) return 0;
+
+        let recovered = 0;
+        for (const job of stuckJobs) {
+            const ageMs = Date.now() - new Date(job.created_at).getTime();
+
+            if (ageMs > thresholdMs * 3) {
+                // Job has been around too long — give up
+                await supabase
+                    .from('batch_jobs')
+                    .update({
+                        status: 'failed',
+                        error_message: 'Job stuck in processing — exceeded maximum recovery attempts',
+                        completed_at: new Date().toISOString(),
+                    })
+                    .eq('id', job.id)
+                    .eq('status', 'processing');
+                logger.warn('Stuck batch job marked as failed', { jobId: job.id, ageMs });
+            } else {
+                // Reset for another attempt
+                await supabase
+                    .from('batch_jobs')
+                    .update({ status: 'pending', processing_started_at: null })
+                    .eq('id', job.id)
+                    .eq('status', 'processing');
+                logger.info('Stuck batch job reset to pending', { jobId: job.id, ageMs });
+            }
+            recovered++;
+        }
+
+        if (recovered > 0) {
+            logger.info('Recovered stuck batch jobs', { recovered });
+        }
+        return recovered;
     }
 
     /**

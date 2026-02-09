@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { FILE_LIMITS } from '@/lib/constants';
 import { logger } from '@/lib/logger';
+import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
 
 type ReviewStatus = 'pending_review' | 'reviewed' | 'not_available';
 
@@ -104,7 +105,7 @@ function toReviewPayload(raw: Record<string, unknown>): Record<string, unknown> 
 export default function BulkUploadForm() {
     const t = useTranslations('bulkUpload');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -123,7 +124,7 @@ export default function BulkUploadForm() {
 
     const stopPolling = () => {
         if (pollRef.current) {
-            clearInterval(pollRef.current);
+            clearTimeout(pollRef.current);
             pollRef.current = null;
         }
         setPolling(false);
@@ -151,7 +152,9 @@ export default function BulkUploadForm() {
     const startPolling = (batchId: string) => {
         stopPolling();
         setPolling(true);
-        pollRef.current = setInterval(async () => {
+        let delay = 2000;
+
+        const poll = async () => {
             try {
                 const response = await fetch(`/api/invoices/bulk-upload?batchId=${batchId}`);
                 const payload = await response.json() as {
@@ -177,6 +180,7 @@ export default function BulkUploadForm() {
                     }));
                     if (payload.status && completedStatuses.has(payload.status)) {
                         stopPolling();
+                        return;
                     }
                 }
             } catch (pollError) {
@@ -184,7 +188,11 @@ export default function BulkUploadForm() {
                     error: pollError instanceof Error ? pollError.message : String(pollError),
                 });
             }
-        }, 2000);
+            delay = Math.min(delay * 1.5, 20000);
+            pollRef.current = setTimeout(poll, delay);
+        };
+
+        pollRef.current = setTimeout(poll, delay);
     };
 
     const handleUpload = async () => {
@@ -601,23 +609,35 @@ export default function BulkUploadForm() {
                             </div>
                         )}
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleUpload}
-                        disabled={!file || uploading}
-                        className="mt-4 w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {uploading ? t('uploading') : t('startProcessing')}
-                    </button>
+                    {uploading ? (
+                        <div className="mt-4">
+                            <AILoadingSpinner message={t('uploading')} />
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleUpload}
+                            disabled={!file}
+                            className="mt-4 w-full py-3 px-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 hover:brightness-110 text-white font-semibold rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {t('startProcessing')}
+                        </button>
+                    )}
                 </>
             ) : (
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-300">{t('processing')}</span>
-                        <span className="px-2 py-1 text-xs rounded-full border border-white/10 text-white">{job.status}</span>
-                    </div>
+                    {polling ? (
+                        <AILoadingSpinner
+                            message={`${t('processing')} — ${job.completedFiles + job.failedFiles}/${job.totalFiles} (${job.progress}%)`}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-slate-300">{t('processing')}</span>
+                            <span className="px-2 py-1 text-xs rounded-full border border-white/10 text-white">{job.status}</span>
+                        </div>
+                    )}
                     <div className="w-full bg-white/10 rounded-full h-3">
-                        <div className="bg-gradient-to-r from-sky-400 to-blue-500 h-3 rounded-full" style={{ width: `${job.progress}%` }} />
+                        <div className="bg-gradient-to-r from-emerald-400 to-green-500 h-3 rounded-full transition-all duration-500" style={{ width: `${job.progress}%` }} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-center">
                         <div><div className="text-2xl text-white">{job.totalFiles}</div><div className="text-xs text-faded">{t('total')}</div></div>
@@ -638,8 +658,8 @@ export default function BulkUploadForm() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                            <div className="overflow-x-auto -mx-4 px-4">
+                                <table className="w-full text-sm min-w-[600px]">
                                     <thead>
                                         <tr className="border-b border-white/10 text-faded">
                                             <th className="text-left py-2">File</th>

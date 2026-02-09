@@ -6,6 +6,7 @@ import { getConversionEmailHtml, getConversionEmailText } from './templates/conv
 import { getPaymentEmailHtml, getPaymentEmailText } from './templates/payment.template';
 import { getWelcomeEmailHtml, getWelcomeEmailText } from './templates/welcome.template';
 import { getErrorEmailHtml } from './templates/error.template';
+import { getPasswordResetEmailHtml, getPasswordResetEmailText, PasswordResetEmailData } from './templates/password-reset.template';
 
 export class EmailService {
     constructor(private adapter: ISendGridAdapter = sendgridAdapter) { }
@@ -71,6 +72,18 @@ export class EmailService {
             subject: `❌ Error processing${invoiceNumber ? ` invoice ${invoiceNumber}` : ' your request'}`,
             html: getErrorEmailHtml(errorMessage, invoiceNumber),
             text: `Error processing${invoiceNumber ? ` invoice ${invoiceNumber}` : ''}: ${errorMessage}`,
+        });
+    }
+
+    async sendPasswordResetEmail(
+        recipientEmail: string,
+        data: PasswordResetEmailData
+    ): Promise<boolean> {
+        return this.sendEmail({
+            to: recipientEmail,
+            subject: 'Reset your Invoice2E password',
+            html: getPasswordResetEmailHtml(data),
+            text: getPasswordResetEmailText(data),
         });
     }
 

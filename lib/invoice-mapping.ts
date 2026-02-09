@@ -45,19 +45,8 @@ export interface ReviewFormData {
     [key: string]: unknown;
 }
 
-export function mapReviewDataToServiceData(reviewData: ReviewFormData): ReviewFormData & {
-    supplierName?: string;
-    supplierEmail?: string;
-    supplierAddress?: string;
-    supplierTaxId?: string;
-    items?: ReviewFormData['lineItems'];
-} {
+export function mapReviewDataToServiceData(reviewData: ReviewFormData): ReviewFormData {
     return {
         ...reviewData,
-        supplierName: reviewData.sellerName,
-        supplierEmail: reviewData.sellerEmail,
-        supplierAddress: reviewData.sellerAddress,
-        supplierTaxId: reviewData.sellerTaxId,
-        items: reviewData.lineItems,
     };
 }

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     try {
         const user = await getAuthenticatedUser(request);
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
         const profile = await userService.getProfile(user.id);
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
     try {
         const user = await getAuthenticatedUser(request);
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
         const body = await request.json();
@@ -49,13 +49,13 @@ export async function PUT(request: NextRequest) {
     } catch (error) {
         if (error instanceof ZodError) {
             return NextResponse.json(
-                { error: error.errors[0]?.message || 'Validation failed' },
+                { success: false, error: error.errors[0]?.message || 'Validation failed' },
                 { status: 400 }
             );
         }
 
         if (error instanceof ValidationError || error instanceof AppError) {
-            return NextResponse.json({ error: error.message }, { status: error.statusCode });
+            return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
         }
 
         return handleApiError(error, 'Failed to update profile', {

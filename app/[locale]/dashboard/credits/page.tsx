@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import CreditPurchaseForm from '@/components/forms/CreditPurchaseForm';
 import VoucherRedeemForm from '@/components/forms/VoucherRedeemForm';
+import CreditHistory from '@/components/dashboard/CreditHistory';
 import { logger } from '@/lib/logger';
 
 export default function CreditsPage() {
     const t = useTranslations('credits');
+    const router = useRouter();
+    const locale = useLocale();
     const [credits, setCredits] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -44,14 +47,8 @@ export default function CreditsPage() {
                 </p>
             </div>
 
-            <CreditPurchaseForm />
-
-            <div className="mt-6">
-                <VoucherRedeemForm />
-            </div>
-
             {/* Current Balance Card */}
-            <div className="mt-6 glass-card p-6">
+            <div className="glass-card p-6">
                 <h3 className="text-lg font-semibold text-white font-display mb-4">
                     {t('yourBalance')}
                 </h3>
@@ -66,6 +63,21 @@ export default function CreditsPage() {
                     </div>
                     <div className="text-6xl">💳</div>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => router.push(`/${locale}/pricing`)}
+                    className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 transition-colors"
+                >
+                    {t('purchaseCredits')}
+                </button>
+            </div>
+
+            <div className="mt-6">
+                <VoucherRedeemForm />
+            </div>
+
+            <div className="mt-6">
+                <CreditHistory locale={locale} />
             </div>
         </DashboardLayout>
     );

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         const user = await getAuthenticatedUser(req);
 
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
         const rateLimitId = `${getRequestIdentifier(req)}:payments-checkout:${user.id}`;
@@ -50,27 +50,28 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { packageId, method, paymentMethod } = body;
+        const { packageId, packageSlug, method, paymentMethod } = body;
         const selectedMethod: PaymentMethod = method || paymentMethod || 'stripe';
 
-        // Resolve package from database
+        // Resolve package from database (accept packageId, packageSlug, or slug)
+        const identifier = packageId || packageSlug;
         let pkg: CreditPackage | null = null;
 
-        if (packageId) {
-            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(packageId);
+        if (identifier) {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
             if (isUUID) {
-                pkg = await packageService.getPackageById(packageId);
+                pkg = await packageService.getPackageById(identifier);
             } else {
-                pkg = await packageService.getPackageBySlug(packageId);
+                pkg = await packageService.getPackageBySlug(identifier);
             }
         }
 
         if (!pkg || !pkg.is_active) {
-            return NextResponse.json({ error: 'Invalid or inactive package' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'Invalid or inactive package' }, { status: 400 });
         }
 
         if (!['stripe', 'paypal'].includes(selectedMethod)) {
-            return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'Invalid payment method' }, { status: 400 });
         }
 
         // Get user email

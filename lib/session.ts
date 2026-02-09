@@ -199,7 +199,34 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
             return null;
         }
 
-        return verifySessionToken(token);
+        const session = verifySessionToken(token);
+        if (!session) return null;
+
+        // EXP-6: Sliding window — renew session if older than half the TTL (3.5 days)
+        const now = Math.floor(Date.now() / 1000);
+        const halfTtl = SESSION_MAX_AGE / 2;
+        if (now - session.issuedAt > halfTtl) {
+            try {
+                const freshToken = createSessionToken({
+                    id: session.userId,
+                    email: session.email,
+                    firstName: session.firstName,
+                    lastName: session.lastName,
+                    role: session.role,
+                });
+                cookieStore.set(SESSION_COOKIE_NAME, freshToken, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    maxAge: SESSION_MAX_AGE,
+                    path: '/',
+                });
+            } catch {
+                // Non-critical: if cookie renewal fails, session still valid
+            }
+        }
+
+        return session;
     } catch (error) {
         logger.error('Error getting session from cookie', { error });
         return null;

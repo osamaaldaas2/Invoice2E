@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import FileUploadForm from '@/components/forms/FileUploadForm';
 import { fetchSessionUser } from '@/lib/client-auth';
@@ -55,6 +56,7 @@ const navItems = [
 export default function DashboardPage() {
     const router = useRouter();
     const pathname = usePathname();
+    const locale = useLocale();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -63,11 +65,6 @@ export default function DashboardPage() {
     const [conversions, setConversions] = useState<ConversionItem[]>([]);
     const [conversionsLoading, setConversionsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const withLocale = useMemo(() => {
         return (path: string) => {
@@ -365,7 +362,7 @@ export default function DashboardPage() {
                                     {stats?.totalConversions || 0}
                                 </p>
                             </div>
-                            <Link href={withLocale('/dashboard/credits')} className="glass-card p-6 hover:border-emerald-400/40 transition-colors">
+                            <Link href={withLocale('/pricing')} className="glass-card p-6 hover:border-emerald-400/40 transition-colors">
                                 <h3 className="text-faded font-medium">Credits Remaining</h3>
                                 <p className="text-3xl font-bold text-emerald-200 mt-2">
                                     {stats?.availableCredits ?? '--'}

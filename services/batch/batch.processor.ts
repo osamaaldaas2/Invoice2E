@@ -119,8 +119,6 @@ export class BatchProcessor {
                                 confidenceScore: extractedData.confidence,
                                 status: 'draft',
                             });
-                            await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
-
                             const segmentResult: BatchResult = {
                                 filename: segmentName,
                                 status: 'success' as const,
@@ -167,24 +165,6 @@ export class BatchProcessor {
                 confidenceScore: extractedData.confidence,
                 status: 'draft',
             });
-
-            const deducted = await creditsDbService.deductCredits(userId, 1, 'batch_extraction');
-            if (!deducted) {
-                logger.warn('Insufficient credits during batch, keeping extraction for review', {
-                    extractionId: extraction.id,
-                    userId,
-                });
-                results[index] = {
-                    filename: file.name,
-                    status: 'failed' as const,
-                    error: 'Insufficient credits during batch processing',
-                    extractionId: extraction.id,
-                    reviewStatus: 'pending_review',
-                    startedAt,
-                    completedAt: new Date().toISOString(),
-                };
-                return;
-            }
 
             results[index] = {
                 filename: file.name,
@@ -317,9 +297,18 @@ export class BatchProcessor {
                 );
             }
 
-            // Compute final status
+            // Deduct credits once for all successful extractions in this batch
             const successCount = results.filter(r => r.status === 'success').length;
             const failCount = results.filter(r => r.status === 'failed').length;
+
+            if (successCount > 0) {
+                const deducted = await creditsDbService.deductCredits(userId, successCount, `batch:${jobId}`);
+                if (!deducted) {
+                    logger.warn('Insufficient credits for batch deduction', { jobId, userId, successCount });
+                }
+            }
+
+            // Compute final status
 
             let finalStatus: string;
             if (failCount === 0) {

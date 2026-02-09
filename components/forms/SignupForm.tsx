@@ -1,15 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import { emitAuthChanged } from '@/lib/client-auth';
 
 export default function SignupForm() {
     const router = useRouter();
-    const pathname = usePathname();
     const searchParams = useSearchParams();
     const t = useTranslations('auth');
+    const locale = useLocale();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
@@ -25,11 +25,6 @@ export default function SignupForm() {
         country: 'DE',
         phone: '',
     });
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const redirectTarget = useMemo(() => {
         const fallback = `/${locale}/dashboard`;

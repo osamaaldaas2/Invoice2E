@@ -43,14 +43,7 @@ export interface XRechnungInvoiceData {
     sellerContact?: string | null;
     sellerPhoneNumber?: string | null;
     sellerPhone?: string | null;
-    supplierName?: string | null;
-    supplierEmail?: string | null;
-    supplierAddress?: string | null;
-    supplierTaxId?: string | null;
-    iban?: string | null;
-    bic?: string | null;
     lineItems?: XRechnungLineItem[];
-    items?: XRechnungLineItem[];
     subtotal?: number | null;
     taxRate?: number | null;
     vatRate?: number | null;
@@ -61,5 +54,4 @@ export interface XRechnungInvoiceData {
     paymentDueDate?: string | null;
     notes?: string | null;
     dueDate?: string | null;
-    [key: string]: unknown;
 }

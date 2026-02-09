@@ -29,11 +29,7 @@ export class XRechnungValidator {
 
         // Line items
         if (!Array.isArray(data.lineItems) || data.lineItems.length === 0) {
-            if (Array.isArray(data.items) && data.items.length > 0) {
-                // Legacy 'items' alias accepted
-            } else {
-                errors.push('At least one line item is required');
-            }
+            errors.push('At least one line item is required');
         }
 
         if (errors.length > 0) {

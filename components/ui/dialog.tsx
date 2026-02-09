@@ -131,16 +131,40 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
             };
         }, [open]);
 
+        // Focus trap + Escape handler (UX-2 fix)
         useEffect(() => {
             if (!open) return;
-            const handleEscape = (event: KeyboardEvent) => {
+            const handleKeyDown = (event: KeyboardEvent) => {
                 if (event.key === 'Escape') {
                     event.preventDefault();
                     setOpen(false);
+                    return;
+                }
+
+                if (event.key === 'Tab') {
+                    const node = contentRef.current;
+                    if (!node) return;
+                    const focusable = node.querySelectorAll<HTMLElement>(
+                        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    );
+                    if (focusable.length === 0) return;
+                    const first = focusable[0]!;
+                    const last = focusable[focusable.length - 1]!;
+                    if (event.shiftKey) {
+                        if (document.activeElement === first) {
+                            event.preventDefault();
+                            last.focus();
+                        }
+                    } else {
+                        if (document.activeElement === last) {
+                            event.preventDefault();
+                            first.focus();
+                        }
+                    }
                 }
             };
-            window.addEventListener('keydown', handleEscape);
-            return () => window.removeEventListener('keydown', handleEscape);
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
         }, [open, setOpen]);
 
         if (!mounted || !open) return null;

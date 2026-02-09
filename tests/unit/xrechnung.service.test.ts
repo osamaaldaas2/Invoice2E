@@ -30,7 +30,6 @@ describe('XRechnungService', () => {
             buyerReference: 'REF-123',
 
             sellerName: 'Seller Company',
-            supplierName: 'Seller Company', // Legacy Alias
             sellerEmail: 'seller@test.de',
             sellerAddress: '456 Test Ave, Munich',
             sellerTaxId: 'DE987654321',
@@ -39,7 +38,6 @@ describe('XRechnungService', () => {
             sellerPostalCode: '80331',
             sellerContact: 'Contact Person',
 
-            items: items,
             lineItems: items,
 
             subtotal: 100,
@@ -97,7 +95,7 @@ describe('XRechnungService', () => {
         it('should escape XML special characters correctly', () => {
             const data = createValidData();
             data.buyerName = 'Test & Co. <Ltd>';
-            data.items[0].description = 'Item with "quotes"';
+            data.lineItems[0].description = 'Item with "quotes"';
 
             const result = service.generateXRechnung(data);
 

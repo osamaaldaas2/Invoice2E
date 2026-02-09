@@ -105,11 +105,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Validate file size (500MB max)
-        const maxSize = 500 * 1024 * 1024; // 500MB
+        // Validate file size (EXP-9: reduced from 500MB to 200MB)
+        const maxSize = 200 * 1024 * 1024; // 200MB
         if (file.size > maxSize) {
             return NextResponse.json(
-                { error: 'File size exceeds 500MB limit' },
+                { error: 'File size exceeds 200MB limit' },
                 { status: 400 }
             );
         }
@@ -119,6 +119,14 @@ export async function POST(req: NextRequest) {
 
         // CREDIT CHECK FIX: Estimate file count BEFORE creating job to avoid orphan jobs
         const estimatedFileCount = await batchService.estimateFileCount(buffer);
+
+        // EXP-9: Reject excessively large batches early
+        if (estimatedFileCount > 50) {
+            return NextResponse.json(
+                { error: `This ZIP contains ${estimatedFileCount} files. Maximum is 50 files per batch. Please split into smaller batches.` },
+                { status: 400 }
+            );
+        }
 
         // Check user credits BEFORE creating job
         const supabase = createServerClient();
@@ -252,6 +260,15 @@ export async function GET(req: NextRequest) {
                 { error: 'Batch job not found' },
                 { status: 404 }
             );
+        }
+
+        // Self-healing: if job is stuck as 'pending' for >10s, re-trigger the worker (EXP-1)
+        if (status.status === 'pending' && status.createdAt) {
+            const ageMs = Date.now() - new Date(status.createdAt).getTime();
+            if (ageMs > 10_000) {
+                logger.warn('Batch job stuck in pending, re-triggering worker', { batchId, ageMs });
+                triggerBatchWorkerAsync(req);
+            }
         }
 
         // FIX (BUG-031): If completed, include SIGNED download URL

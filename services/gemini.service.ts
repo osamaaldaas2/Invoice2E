@@ -5,43 +5,8 @@ import { AppError } from '@/lib/errors';
 import { API_TIMEOUTS } from '@/lib/constants';
 import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
 
-export type ExtractedInvoiceData = {
-    invoiceNumber: string | null;
-    invoiceDate: string | null;
-    buyerName: string | null;
-    buyerEmail: string | null;
-    buyerAddress: string | null;
-    buyerCity: string | null;
-    buyerPostalCode: string | null;
-    buyerCountryCode?: string | null;
-    buyerTaxId: string | null;
-    buyerPhone: string | null;
-    sellerName: string | null;
-    sellerEmail: string | null;
-    sellerAddress: string | null;
-    sellerCity: string | null;
-    sellerPostalCode: string | null;
-    sellerCountryCode?: string | null;
-    sellerTaxId: string | null;
-    sellerIban?: string | null;
-    sellerBic?: string | null;
-    sellerPhone: string | null;
-    bankName?: string | null;
-    lineItems: Array<{
-        description: string;
-        quantity: number;
-        unitPrice: number;
-        totalPrice: number;
-        taxRate?: number;
-    }>;
-    subtotal: number;
-    taxRate: number;
-    taxAmount: number;
-    totalAmount: number;
-    currency: string;
-    paymentTerms: string | null;
-    notes: string | null;
-};
+import type { ExtractedInvoiceData } from '@/types';
+export type { ExtractedInvoiceData } from '@/types';
 
 // FIX-015: Zod schema for validating AI-extracted invoice data
 const ExtractedInvoiceItemSchema = z.object({

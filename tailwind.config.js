@@ -38,6 +38,21 @@ module.exports = {
                 md: 'calc(var(--radius) - 2px)',
                 sm: 'calc(var(--radius) - 4px)',
             },
+            animation: {
+                'spin-slow': 'spin 2.5s linear infinite',
+                'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
+                'fade-in': 'fade-in 0.5s ease-out',
+            },
+            keyframes: {
+                'pulse-subtle': {
+                    '0%, 100%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.06)' },
+                },
+                'fade-in': {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                },
+            },
         },
     },
     plugins: [],

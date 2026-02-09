@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { APP_NAME } from '@/lib/constants';
 import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
 import { logger } from '@/lib/logger';
@@ -17,17 +17,13 @@ type User = {
 
 export default function Header(): React.ReactElement {
     const t = useTranslations('common');
+    const locale = useLocale();
     const router = useRouter();
     const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [mounted, setMounted] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState<string | null>(null);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const withLocale = useMemo(() => {
         return (path: string) => {

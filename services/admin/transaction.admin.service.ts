@@ -10,6 +10,7 @@ import { AdminTransaction, AdminTransactionsFilter, RefundTransactionInput } fro
 import { adminAuditService } from './audit.admin.service';
 import { stripeService } from '../stripe.service';
 import { paypalService } from '../paypal.service';
+import { creditsDbService } from '../credits.db.service';
 
 type TransactionRow = {
     id: string;
@@ -297,19 +298,28 @@ class AdminTransactionService {
             });
         }
 
-        // Deduct credits from user
-        const { data: credits, error: creditsError } = await supabase
-            .from('user_credits')
-            .select('available_credits')
-            .eq('user_id', transaction.userId)
-            .single();
-
-        if (!creditsError && credits) {
-            const newCredits = Math.max(0, credits.available_credits - transaction.creditsPurchased);
-            await supabase
-                .from('user_credits')
-                .update({ available_credits: newCredits })
-                .eq('user_id', transaction.userId);
+        // Deduct credits from user atomically (EXP-4 fix: was non-atomic read-modify-write)
+        try {
+            const deducted = await creditsDbService.deductCredits(
+                transaction.userId,
+                transaction.creditsPurchased,
+                `refund:${input.transactionId}`
+            );
+            if (!deducted) {
+                logger.warn('Credits deduction returned false during refund (insufficient balance)', {
+                    transactionId: input.transactionId,
+                    userId: transaction.userId,
+                    creditsToDeduct: transaction.creditsPurchased,
+                });
+            }
+        } catch (creditError) {
+            // Log but don't throw — the provider refund already succeeded
+            logger.error('Failed to deduct credits during refund', {
+                transactionId: input.transactionId,
+                userId: transaction.userId,
+                creditsToDeduct: transaction.creditsPurchased,
+                error: creditError instanceof Error ? creditError.message : String(creditError),
+            });
         }
 
         // Audit log

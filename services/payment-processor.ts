@@ -142,11 +142,54 @@ export class PaymentProcessor {
         const eventId = event.id;
         logger.info('Handling Stripe webhook', { type: event.type, eventId });
 
+        const supabase = createServerClient();
+
+        // Handle failed/expired checkout sessions (API-6 fix)
+        if (event.type === 'checkout.session.expired') {
+            const session = event.data.object;
+            const sessionId = session.id as string;
+            if (sessionId) {
+                await supabase
+                    .from('payment_transactions')
+                    .update({ payment_status: 'failed', updated_at: new Date().toISOString() })
+                    .eq('stripe_session_id', sessionId)
+                    .eq('payment_status', 'pending');
+                logger.info('Stripe checkout session expired, transaction marked failed', { sessionId });
+            }
+            return { success: true, message: 'Session expired - transaction marked failed' };
+        }
+
+        if (event.type === 'payment_intent.payment_failed') {
+            const paymentIntent = event.data.object;
+            const paymentIntentId = paymentIntent.id as string;
+            if (paymentIntentId) {
+                await supabase
+                    .from('payment_transactions')
+                    .update({ payment_status: 'failed', updated_at: new Date().toISOString() })
+                    .eq('stripe_payment_id', paymentIntentId)
+                    .in('payment_status', ['pending', 'processing']);
+                logger.info('Stripe payment failed, transaction updated', { paymentIntentId });
+            }
+            return { success: true, message: 'Payment failed - transaction updated' };
+        }
+
+        if (event.type === 'charge.refunded') {
+            const charge = event.data.object;
+            const paymentIntentId = charge.payment_intent as string;
+            if (paymentIntentId) {
+                await supabase
+                    .from('payment_transactions')
+                    .update({ payment_status: 'refunded', updated_at: new Date().toISOString() })
+                    .eq('stripe_payment_id', paymentIntentId)
+                    .eq('payment_status', 'completed');
+                logger.info('Stripe charge refunded via webhook', { paymentIntentId });
+            }
+            return { success: true, message: 'Charge refunded - processed' };
+        }
+
         if (event.type !== 'checkout.session.completed') {
             return { success: true, message: 'Event type ignored' };
         }
-
-        const supabase = createServerClient();
 
         // SECURITY FIX (BUG-004): Check if this webhook has already been processed
         const { data: existingEvent } = await supabase
@@ -272,11 +315,25 @@ export class PaymentProcessor {
         const eventId = event.id || (event.resource.id as string);
         logger.info('Handling PayPal webhook', { type: event.event_type, eventId });
 
+        const supabase = createServerClient();
+
+        // Handle denied/failed captures (API-6 fix)
+        if (event.event_type === 'PAYMENT.CAPTURE.DENIED') {
+            const orderId = event.resource.id as string;
+            if (orderId) {
+                await supabase
+                    .from('payment_transactions')
+                    .update({ payment_status: 'failed', updated_at: new Date().toISOString() })
+                    .eq('paypal_order_id', orderId)
+                    .in('payment_status', ['pending', 'processing']);
+                logger.info('PayPal capture denied, transaction marked failed', { orderId });
+            }
+            return { success: true, message: 'Capture denied - transaction marked failed' };
+        }
+
         if (event.event_type !== 'CHECKOUT.ORDER.APPROVED') {
             return { success: true, message: 'Event type ignored' };
         }
-
-        const supabase = createServerClient();
 
         // SECURITY FIX (BUG-004): Check if this webhook has already been processed
         const { data: existingEvent } = await supabase

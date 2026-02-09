@@ -17,6 +17,13 @@ const buildErrorPayload = (message: string, includeSuccess: boolean, extra?: Rec
     return { error: message, ...(extra || {}) };
 };
 
+/**
+ * Standard success response helper (API-2: consistent envelope)
+ */
+export function apiSuccess<T>(data: T, status: number = 200): NextResponse {
+    return NextResponse.json({ success: true, data }, { status });
+}
+
 export function apiError(
     message: string,
     status: number = 500,
@@ -33,7 +40,7 @@ export function handleApiError(
 ): NextResponse {
     logger.error(context, error instanceof Error ? error : undefined);
 
-    const includeSuccess = options?.includeSuccess ?? false;
+    const includeSuccess = options?.includeSuccess ?? true;
     const extra = options?.extra;
 
     if (error instanceof ZodError) {

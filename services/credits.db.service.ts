@@ -40,7 +40,16 @@ export class CreditsDatabaseService {
             throw new NotFoundError('Credits not found');
         }
 
-        return snakeToCamelKeys(data) as UserCredits;
+        const credits = snakeToCamelKeys(data) as UserCredits;
+
+        // GAP-1: Check credit expiry
+        const expiryDate = (data as Record<string, unknown>).credits_expiry_date as string | null;
+        if (expiryDate && new Date(expiryDate) < new Date()) {
+            logger.info('User credits expired', { userId, expiryDate });
+            return { ...credits, availableCredits: 0 };
+        }
+
+        return credits;
     }
 
     /**

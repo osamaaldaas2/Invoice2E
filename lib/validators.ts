@@ -57,6 +57,17 @@ export const UpdateProfileSchema = z.object({
     language: z.enum(['en', 'de']).optional(),
 });
 
+// Forgot password schema
+export const ForgotPasswordSchema = z.object({
+    email: EmailSchema,
+});
+
+// Reset password schema
+export const ResetPasswordSchema = z.object({
+    token: z.string().min(1, 'Reset token is required'),
+    password: PasswordSchema,
+});
+
 // Pagination query params schema
 export const PaginationSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),

@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 
 import { FILE_LIMITS } from '@/lib/constants';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
 
 type UploadState = 'idle' | 'uploading' | 'extracting' | 'success' | 'error';
 
@@ -27,7 +30,7 @@ type FileUploadFormProps = {
 
 export default function FileUploadForm({ userId, onExtractionComplete, availableCredits = 0 }: FileUploadFormProps) {
     const router = useRouter();
-    const pathname = usePathname();
+    const locale = useLocale();
     const [state, setState] = useState<UploadState>('idle');
     const [error, setError] = useState('');
     const [result, setResult] = useState<ExtractedData | null>(null);
@@ -35,16 +38,14 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
     const [backgroundProgress, setBackgroundProgress] = useState(0);
     const [backgroundTotal, setBackgroundTotal] = useState(0);
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
+    const lastFileRef = useRef<File | null>(null);
 
     const withLocale = useMemo(() => {
         return (path: string) => {
@@ -67,14 +68,16 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
     const stopPolling = useCallback(() => {
         if (pollRef.current) {
-            clearInterval(pollRef.current);
+            clearTimeout(pollRef.current);
             pollRef.current = null;
         }
     }, []);
 
     const startPolling = useCallback((jobId: string) => {
         stopPolling();
-        pollRef.current = setInterval(async () => {
+        let delay = 2000;
+
+        const poll = async () => {
             try {
                 const response = await fetch(`/api/invoices/extract?jobId=${jobId}`);
                 const payload = await response.json();
@@ -91,7 +94,6 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                         setState('success');
                         setProgress(100);
 
-                        // Convert results to multiResult format
                         const results = payload.results || [];
                         const extractions = results
                             .filter((r: { status: string }) => r.status === 'success' || r.status === 'failed')
@@ -105,12 +107,17 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                             totalInvoices: total,
                             extractions,
                         });
+                        return;
                     }
                 }
             } catch {
-                // Silently ignore poll errors, will retry on next interval
+                // Silently ignore poll errors, will retry
             }
-        }, 2000);
+            delay = Math.min(delay * 1.5, 20000);
+            pollRef.current = setTimeout(poll, delay);
+        };
+
+        pollRef.current = setTimeout(poll, delay);
     }, [stopPolling, completedStatuses]);
 
     // Cleanup polling on unmount
@@ -129,6 +136,8 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     }, []);
 
     const handleFileUpload = useCallback(async (file: File) => {
+        lastFileRef.current = file;
+
         if (!hasCredits) {
             setError('Insufficient credits. Please purchase more credits.');
             setState('error');
@@ -223,10 +232,19 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         }
     }, [validateClientSide, userId, onExtractionComplete, hasCredits]);
 
+    const confirmAndUpload = useCallback(() => {
+        if (pendingFile) {
+            setShowConfirm(false);
+            handleFileUpload(pendingFile);
+            setPendingFile(null);
+        }
+    }, [pendingFile, handleFileUpload]);
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            handleFileUpload(file);
+            setPendingFile(file);
+            setShowConfirm(true);
         }
     };
 
@@ -253,7 +271,8 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
         const file = e.dataTransfer.files?.[0];
         if (file) {
-            handleFileUpload(file);
+            setPendingFile(file);
+            setShowConfirm(true);
         }
     };
 
@@ -337,6 +356,22 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
     return (
         <div className="w-full max-w-lg mx-auto">
+            {!hasCredits && state === 'idle' && (
+                <div className="mb-4 p-4 rounded-xl border border-amber-400/30 bg-amber-500/10 flex items-center gap-3">
+                    <span className="text-2xl">⚠️</span>
+                    <div className="flex-1">
+                        <p className="text-amber-200 font-medium text-sm">No credits remaining</p>
+                        <p className="text-amber-200/70 text-xs">Purchase credits to start converting invoices.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => router.push(withLocale('/pricing'))}
+                        className="px-3 py-1.5 bg-amber-500 text-white rounded-full text-xs font-semibold hover:bg-amber-400 transition-colors whitespace-nowrap"
+                    >
+                        Get Credits
+                    </button>
+                </div>
+            )}
             <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -362,12 +397,26 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 />
 
                 <div className="pointer-events-none">
-                    <div className="text-5xl mb-4">{getStatusIcon()}</div>
-                    <p className={`text-lg font-semibold ${!hasCredits ? 'text-rose-300' : 'text-white'}`}>
-                        {getStatusMessage()}
-                    </p>
+                    {isProcessing ? (
+                        <AILoadingSpinner
+                            message={
+                                backgroundJobId
+                                    ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
+                                    : state === 'uploading'
+                                        ? 'Uploading...'
+                                        : 'AI extracting invoice data...'
+                            }
+                        />
+                    ) : (
+                        <>
+                            <div className="text-5xl mb-4">{getStatusIcon()}</div>
+                            <p className={`text-lg font-semibold ${!hasCredits ? 'text-rose-300' : 'text-white'}`}>
+                                {getStatusMessage()}
+                            </p>
+                        </>
+                    )}
 
-                    {!hasCredits ? (
+                    {!isProcessing && !hasCredits && (
                         <div className="mt-4 pointer-events-auto">
                             <p className="text-sm text-faded mb-3">
                                 You need at least 1 credit to upload.
@@ -376,14 +425,15 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(withLocale('/dashboard/credits'));
+                                    router.push(withLocale('/pricing'));
                                 }}
                                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition-colors shadow-sm"
                             >
                                 Buy Credits
                             </button>
                         </div>
-                    ) : (
+                    )}
+                    {!isProcessing && hasCredits && (
                         <p className="text-sm text-faded mt-2">
                             AI extracts data automatically (PDF, JPG, PNG - Max {FILE_LIMITS.MAX_FILE_SIZE_MB}MB)
                         </p>
@@ -391,35 +441,38 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 </div>
             </div>
 
-
             {isProcessing && (
                 <div className="mt-4">
                     <div className="w-full bg-white/10 rounded-full h-2.5">
                         <div
-                            className="bg-gradient-to-r from-sky-400 to-blue-500 h-2.5 rounded-full transition-all duration-300"
+                            className="bg-gradient-to-r from-emerald-400 to-green-500 h-2.5 rounded-full transition-all duration-300"
                             style={{ width: `${backgroundJobId ? backgroundProgress : progress}%` }}
                         />
                     </div>
-                    <p className="text-sm text-faded mt-2 text-center">
-                        {backgroundJobId
-                            ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
-                            : state === 'uploading'
-                                ? 'Uploading...'
-                                : 'AI extracting invoice data...'}
-                    </p>
                 </div>
             )}
 
             {state === 'error' && (
                 <div className="mt-4 p-4 glass-panel border border-rose-400/30 rounded-xl">
                     <p className="text-rose-200 font-medium">❌ {error}</p>
-                    <button
-                        type="button"
-                        onClick={resetForm}
-                        className="mt-2 text-sm text-rose-200/80 hover:text-rose-100 underline"
-                    >
-                        Try again
-                    </button>
+                    <div className="flex gap-3 mt-3">
+                        {lastFileRef.current && hasCredits && (
+                            <button
+                                type="button"
+                                onClick={() => lastFileRef.current && handleFileUpload(lastFileRef.current)}
+                                className="px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white text-sm font-semibold hover:brightness-110 transition-colors"
+                            >
+                                Retry
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            className="px-4 py-2 rounded-full border border-white/15 text-slate-200 text-sm bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                            Upload Different File
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -509,6 +562,41 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     </div>
                 </div>
             )}
+
+            {/* UX-6: Credit confirmation dialog */}
+            <Dialog open={showConfirm} onOpenChange={(open) => {
+                setShowConfirm(open);
+                if (!open) setPendingFile(null);
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Upload</DialogTitle>
+                        <DialogDescription>
+                            This will use at least 1 credit (1 per invoice detected in the file).
+                            You currently have {availableCredits} credit{availableCredits !== 1 ? 's' : ''}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {pendingFile && (
+                        <p className="text-sm text-faded mt-2">
+                            File: {pendingFile.name} ({(pendingFile.size / 1024 / 1024).toFixed(1)}MB)
+                        </p>
+                    )}
+                    <div className="flex gap-3 mt-6">
+                        <button
+                            type="button"
+                            onClick={confirmAndUpload}
+                            className="flex-1 px-4 py-2 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 transition-colors"
+                        >
+                            Continue
+                        </button>
+                        <DialogClose
+                            className="flex-1 px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                            Cancel
+                        </DialogClose>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -193,20 +193,29 @@ export default function ConvertPage() {
                                 )}
 
                                 {!xmlContent ? (
-                                    <button
-                                        onClick={handleConvert}
-                                        disabled={converting}
-                                        className="w-full px-6 py-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-bold text-lg hover:brightness-110 disabled:opacity-50 transition-colors shadow-lg shadow-sky-500/30"
-                                    >
-                                        {converting ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                                                Generating XML...
-                                            </span>
-                                        ) : (
-                                            '⚡ Convert to XRechnung'
-                                        )}
-                                    </button>
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={handleConvert}
+                                            disabled={converting}
+                                            className="w-full px-6 py-4 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-bold text-lg hover:brightness-110 disabled:opacity-50 transition-colors shadow-lg shadow-sky-500/30"
+                                        >
+                                            {converting ? (
+                                                <span className="flex items-center justify-center gap-2">
+                                                    <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                                                    Generating XML...
+                                                </span>
+                                            ) : (
+                                                '⚡ Convert to XRechnung'
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => router.push(withLocale(`/review/${extractionId}`))}
+                                            disabled={converting}
+                                            className="w-full px-6 py-3 bg-white/5 text-slate-100 border border-white/10 rounded-full font-semibold hover:bg-white/10 disabled:opacity-50 transition-colors"
+                                        >
+                                            Back to Review
+                                        </button>
+                                    </div>
                                 ) : (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         <div className="p-4 glass-panel border border-white/10 rounded-lg">

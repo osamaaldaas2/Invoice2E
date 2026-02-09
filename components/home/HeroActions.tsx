@@ -56,12 +56,6 @@ export default function HeroActions({ locale }: HeroActionsProps) {
                 >
                     Go to Dashboard
                 </Link>
-                <Link
-                    href={withLocale('/upload')}
-                    className="px-8 py-4 rounded-full font-semibold text-base md:text-lg border border-white/20 text-white bg-white/5 hover:bg-white/10 transition"
-                >
-                    Upload Invoice
-                </Link>
             </div>
         );
     }

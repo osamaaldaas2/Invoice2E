@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -28,15 +29,11 @@ type AdminUser = {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
+    const locale = useLocale();
     const [user, setUser] = useState<AdminUser | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [loggingOut, setLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState<string | null>(null);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     useEffect(() => {
         const loadUser = async () => {

@@ -48,7 +48,7 @@ export class XRechnungBuilder {
     }
 
     private buildSupplyChainTradeTransaction(data: XRechnungInvoiceData): string {
-        const items = data.lineItems || data.items || [];
+        const items = data.lineItems || [];
 
         return `
     <rsm:SupplyChainTradeTransaction>
@@ -262,8 +262,8 @@ export class XRechnungBuilder {
      * IBAN is now required - if missing, payment means section is omitted with warning
      */
     private buildPaymentMeans(data: XRechnungInvoiceData): string {
-        const iban = data.sellerIban || data.iban;
-        const bic = data.sellerBic || data.bic || '';
+        const iban = data.sellerIban;
+        const bic = data.sellerBic || '';
 
         if (!iban) {
             logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)', { seller: data.sellerName });
@@ -302,7 +302,7 @@ export class XRechnungBuilder {
     private buildTradeSettlement(data: XRechnungInvoiceData): string {
         const total = this.safeNumber(data.totalAmount);
         const currency = this.normalizeCurrency(data.currency);
-        const items = data.lineItems || data.items || [];
+        const items = data.lineItems || [];
 
         // Group line items by tax rate to build per-rate tax breakdowns
         const taxGroups = this.buildTaxGroups(items);

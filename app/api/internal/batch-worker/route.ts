@@ -32,6 +32,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
+        // EXP-1 fix: Recover jobs stuck in 'processing' before picking new ones
+        await batchService.recoverStuckJobs();
+
         const { searchParams } = new URL(request.url);
         const maxJobsParam = Number(searchParams.get('maxJobs') || '3');
         const maxJobs = Number.isFinite(maxJobsParam) && maxJobsParam > 0

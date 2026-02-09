@@ -100,7 +100,7 @@ export class DeepSeekAdapter implements IDeepSeekAdapter {
 
             return {
                 data: finalResult,
-                confidence: finalResult.confidence,
+                confidence: finalResult.confidence ?? 0.7,
                 processingTimeMs,
                 rawResponse: response.data,
             };

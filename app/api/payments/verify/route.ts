@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
         if (!session) {
             logger.warn('Payment verification attempted without valid session');
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
         // Create user object from session
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
         if (!sessionId && !orderId) {
             return NextResponse.json(
-                { error: 'Session ID or Order ID is required' },
+                { success: false, error: 'Session ID or Order ID is required' },
                 { status: 400 }
             );
         }
@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
                 // In strict mode we fail, but we could create it here if we trusted the provider enough.
                 // For now, fail to alert admin/user.
                 return NextResponse.json({
+                    success: false,
                     error: 'Transaction record not found',
                     code: 'TRANSACTION_NOT_FOUND'
                 }, { status: 404 });

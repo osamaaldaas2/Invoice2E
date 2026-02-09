@@ -34,6 +34,8 @@ export type UpdateConversionData = {
     emailRecipient?: string;
     fileDownloadTriggered?: boolean;
     downloadTriggeredAt?: Date;
+    xmlContent?: string;
+    xmlFileName?: string;
 };
 
 export class InvoiceDatabaseService {

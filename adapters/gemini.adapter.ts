@@ -100,7 +100,7 @@ export class GeminiAdapter implements IGeminiAdapter {
 
             return {
                 data: finalResult,
-                confidence: finalResult.confidence,
+                confidence: finalResult.confidence ?? 0.8,
                 processingTimeMs: responseTime,
                 // @ts-ignore
                 rawResponse: result.response,

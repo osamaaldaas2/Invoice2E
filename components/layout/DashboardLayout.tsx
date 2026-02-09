@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { fetchSessionUser } from '@/lib/client-auth';
 
@@ -28,13 +29,9 @@ interface Props {
 export default function DashboardLayout({ children }: Props) {
     const router = useRouter();
     const pathname = usePathname();
+    const locale = useLocale();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const withLocale = useMemo(() => {
         return (path: string) => {

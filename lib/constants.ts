@@ -26,8 +26,9 @@ export const FILE_LIMITS = {
         'image/png',
     ] as const,
     MAX_BULK_FILES: 100,
-    MAX_ZIP_SIZE_BYTES: 500 * 1024 * 1024, // 500MB
-    MAX_ZIP_SIZE_MB: 500,
+    MAX_ZIP_SIZE_BYTES: 200 * 1024 * 1024, // 200MB (EXP-9: reduced from 500MB)
+    MAX_ZIP_SIZE_MB: 200,
+    MAX_ZIP_FILES: 50, // EXP-9: max files per batch to limit memory
 } as const;
 
 // Credit system

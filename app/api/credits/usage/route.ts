@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const user = await getAuthenticatedUser(request);
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
         const supabase = createServerClient();
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         if (creditError) {
             logger.error('Failed to fetch user credits', { userId: user.id, error: creditError.message });
-            return NextResponse.json({ error: 'Failed to fetch credits' }, { status: 500 });
+            return NextResponse.json({ success: false, error: 'Failed to fetch credits' }, { status: 500 });
         }
 
         let usedCreditsThisMonth = 0;

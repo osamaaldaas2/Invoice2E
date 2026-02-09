@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { fetchSessionUser } from '@/lib/client-auth';
 
 type ProtectedRouteProps = {
@@ -21,13 +22,9 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
     const router = useRouter();
     const pathname = usePathname();
+    const locale = useLocale();
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
-
-    const locale = useMemo(() => {
-        const parts = pathname?.split('/') || [];
-        return parts.length > 1 ? parts[1] : 'en';
-    }, [pathname]);
 
     const localizedFallback = useMemo(() => {
         if (!fallbackUrl.startsWith('/')) {
