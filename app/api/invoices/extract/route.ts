@@ -14,20 +14,31 @@ import { handleApiError } from '@/lib/api-helpers';
 
 const BACKGROUND_THRESHOLD = 3;
 
-const triggerBatchWorkerAsync = (req: NextRequest): void => {
+/**
+ * Trigger the batch worker reliably.
+ * Uses AbortController to ensure the request is sent without waiting for the
+ * worker to finish processing (it runs as a separate serverless invocation).
+ */
+const triggerBatchWorker = async (req: NextRequest): Promise<void> => {
     const secret = process.env.BATCH_WORKER_SECRET;
     const headers: Record<string, string> = {};
     if (secret) {
         headers['x-internal-worker-key'] = secret;
     }
-    void fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=1`, {
-        method: 'POST',
-        headers,
-    }).catch((error) => {
-        logger.warn('Failed to trigger batch worker for multi-invoice job', {
-            error: error instanceof Error ? error.message : String(error),
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    try {
+        await fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=1`, {
+            method: 'POST',
+            headers,
+            signal: controller.signal,
         });
-    });
+    } catch {
+        // Expected: abort timeout fires because worker takes longer than 3s.
+        // The worker function was already triggered and runs independently.
+    } finally {
+        clearTimeout(timeoutId);
+    }
 };
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
@@ -167,7 +178,7 @@ export async function POST(request: NextRequest) {
                     boundaryResult.totalInvoices,
                 );
 
-                triggerBatchWorkerAsync(request);
+                await triggerBatchWorker(request);
 
                 return NextResponse.json(
                     {
@@ -375,6 +386,15 @@ export async function GET(request: NextRequest) {
                 { success: false, error: 'Job not found' },
                 { status: 404 }
             );
+        }
+
+        // Self-healing: if job is stuck as 'pending' for >10s, re-trigger the worker
+        if (status.status === 'pending' && status.createdAt) {
+            const ageMs = Date.now() - new Date(status.createdAt).getTime();
+            if (ageMs > 10_000) {
+                logger.warn('Job stuck in pending, re-triggering worker', { jobId, ageMs });
+                await triggerBatchWorker(request);
+            }
         }
 
         return NextResponse.json({ success: true, ...status });

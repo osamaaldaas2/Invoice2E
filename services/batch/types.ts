@@ -34,4 +34,5 @@ export interface BatchProgress {
     progress: number; // 0-100
     results: BatchResult[];
     estimatedTimeRemaining?: number; // seconds
+    createdAt?: string;
 }

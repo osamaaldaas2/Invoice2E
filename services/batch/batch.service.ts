@@ -358,7 +358,7 @@ export class BatchService {
             }));
 
             // Update progress after each chunk
-            await supabase
+            const { error: progressError } = await supabase
                 .from('batch_jobs')
                 .update({
                     completed_files: completedFiles,
@@ -366,6 +366,12 @@ export class BatchService {
                     results,
                 })
                 .eq('id', jobId);
+
+            if (progressError) {
+                logger.error('Failed to update batch job progress', {
+                    jobId, completedFiles, failedFiles, error: progressError.message,
+                });
+            }
         }
 
         // Final status
@@ -544,6 +550,7 @@ export class BatchService {
             failedFiles: job.failed_files,
             progress,
             results: (job.results as BatchResult[] | null) || [],
+            createdAt: job.created_at,
         };
     }
 

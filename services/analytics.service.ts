@@ -181,8 +181,7 @@ export class AnalyticsService {
                 let conversionQuery = supabase
                     .from('invoice_conversions')
                     .select('*', { count: 'exact' })
-                    .eq('user_id', userId)
-                    .or('conversion_status.eq.completed,validation_status.not.is.null');
+                    .eq('user_id', userId);
 
                 if (filters?.format) {
                     conversionQuery = conversionQuery.eq('conversion_format', filters.format);
@@ -321,6 +320,17 @@ export class AnalyticsService {
                 conversionItems = conversionItems.filter(c => !c.extraction_id || !batchExtractionIds.has(c.extraction_id));
                 draftCount -= (beforeDrafts - draftItems.length);
                 conversionCount -= (beforeConversions - conversionItems.length);
+            }
+
+            // Dedup: remove draft items that already have a conversion record
+            // (same extraction can exist in both invoice_extractions and invoice_conversions)
+            if (conversionItems.length > 0 && draftItems.length > 0) {
+                const conversionExtractionIds = new Set(
+                    conversionItems.map(c => c.extraction_id).filter(Boolean)
+                );
+                const beforeDrafts = draftItems.length;
+                draftItems = draftItems.filter(d => !d.extraction_id || !conversionExtractionIds.has(d.extraction_id));
+                draftCount -= (beforeDrafts - draftItems.length);
             }
 
             let items: ConversionHistoryItem[] = [];
