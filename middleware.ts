@@ -23,7 +23,12 @@ export default function middleware(request: NextRequest) {
         }
 
         // Check origin for non-preflight requests
-        if (origin && !isOriginAllowed(origin)) {
+        // Allow same-origin: if Origin host matches the request host, it's same-origin
+        const requestHost = request.headers.get('host');
+        const originHost = origin ? new URL(origin).host : null;
+        const isSameOrigin = !!originHost && originHost === requestHost;
+
+        if (origin && !isSameOrigin && !isOriginAllowed(origin)) {
             return new NextResponse(
                 JSON.stringify({ error: 'CORS origin not allowed' }),
                 { status: 403, headers: { 'Content-Type': 'application/json' } }

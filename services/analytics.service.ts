@@ -389,7 +389,6 @@ export class AnalyticsService {
         let conversions: Array<{
             validation_status: string | null;
             credits_used: number | null;
-            processing_time_ms: number | null;
             conversion_format: string | null;
         }> = [];
 
@@ -397,7 +396,7 @@ export class AnalyticsService {
             const conversionsResponse: any = await this.queryWithTimeout(
                 supabase
                     .from('invoice_conversions')
-                    .select('validation_status, credits_used, processing_time_ms, conversion_format')
+                    .select('validation_status, credits_used, conversion_format')
                     .eq('user_id', userId),
                 API_TIMEOUTS.DATABASE_QUERY
             );
@@ -417,10 +416,7 @@ export class AnalyticsService {
         const successful = conversions.filter((c) => c.validation_status === 'valid').length;
         const failed = total - successful;
         const totalCredits = usedCredits || conversions.reduce((sum, c) => sum + (c.credits_used || 1), 0);
-        const processingTimes = conversions.filter((c) => c.processing_time_ms).map((c) => c.processing_time_ms as number);
-        const avgTime = processingTimes.length > 0
-            ? processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length
-            : 0;
+        const avgTime = 0;
 
         // Calculate format distribution
         const formatCounts: Record<string, number> = {};
