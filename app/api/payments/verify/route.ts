@@ -294,16 +294,20 @@ export async function POST(req: NextRequest) {
             // IDEMPOTENCY FIX: Record in webhook_events to prevent webhook from adding credits again
             // Use a unique event_id based on session/order ID with 'verify_' prefix
             const verifyEventId = `verify_${paymentId}`;
-            await supabase.from('webhook_events').insert({
-                event_id: verifyEventId,
-                provider: sessionId ? 'stripe' : 'paypal',
-                event_type: 'payment.verified',
-                user_id: user.id,
-                credits_added: credits,
-            }).catch((err: unknown) => {
-                // Don't fail if insert fails (might be duplicate), just log
+            try {
+                const { error: eventErr } = await supabase.from('webhook_events').insert({
+                    event_id: verifyEventId,
+                    provider: sessionId ? 'stripe' : 'paypal',
+                    event_type: 'payment.verified',
+                    user_id: user.id,
+                    credits_added: credits,
+                });
+                if (eventErr) {
+                    logger.warn('Failed to insert verify event (may be duplicate)', { error: eventErr.message });
+                }
+            } catch (err) {
                 logger.warn('Failed to insert verify event (may be duplicate)', { error: err });
-            });
+            }
 
             return NextResponse.json({
                 success: true,
