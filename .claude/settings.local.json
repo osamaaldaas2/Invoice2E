@@ -9,7 +9,14 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(powershell -Command \"if \\(Test-Path ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''\\) { Remove-Item -Force ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''; Write-Host ''File deleted'' } else { Write-Host ''File not found'' }\")"
+      "Bash(powershell -Command \"if \\(Test-Path ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''\\) { Remove-Item -Force ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\nul''; Write-Host ''File deleted'' } else { Write-Host ''File not found'' }\")",
+      "Bash(curl:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: batch download XML generation, tax rate normalization, country code extraction, and batch history feature\n\n- Fix ZIP batch download returning only conversion_report \\(no XML files\\) by generating XML on-the-fly from extraction data\n- Fix History download failing on missing country codes \\(BR-09, BR-11\\) by adding sellerCountryCode/buyerCountryCode to extraction prompt, types, and fallback defaults\n- Fix AI extracting tax rate as 0.19 or 18.69 by clarifying prompt format, removing AI calculation instruction, and adding normalization in all adapters\n- Fix filename collision in ZIP downloads causing only 1 invoice to appear\n- Add batch uploads to History page with expandable rows, ZIP download, and individual invoice download\n- Deduplicate batch-owned extractions from individual history entries\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git push:*)"
     ]
   }
 }
