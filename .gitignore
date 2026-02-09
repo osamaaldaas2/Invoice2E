@@ -12,6 +12,7 @@ out/
 
 # Misc
 .DS_Store
+nul
 *.pem
 *.log
 npm-debug.log*

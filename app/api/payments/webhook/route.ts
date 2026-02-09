@@ -13,6 +13,8 @@ import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
+export const maxDuration = 60;
+
 /**
  * POST /api/payments/webhook
  * Handle payment provider webhooks

@@ -3,6 +3,8 @@ import { batchService } from '@/services/batch.service';
 import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
 
+export const maxDuration = 120;
+
 function isWorkerAuthorized(request: NextRequest): boolean {
     const configuredSecret = process.env.BATCH_WORKER_SECRET;
     const provided = request.headers.get('x-internal-worker-key');
@@ -11,8 +13,14 @@ function isWorkerAuthorized(request: NextRequest): boolean {
         return provided === configuredSecret;
     }
 
+    // In production, require the secret — never fall back to open access
+    if (process.env.NODE_ENV === 'production') {
+        logger.error('BATCH_WORKER_SECRET is not configured in production — rejecting all worker requests');
+        return false;
+    }
+
     // Development fallback
-    return process.env.NODE_ENV !== 'production';
+    return true;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

@@ -6,6 +6,8 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
     try {
         const user = await getAuthenticatedUser(request);
