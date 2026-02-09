@@ -154,6 +154,7 @@ export interface ExtractedInvoiceData {
     buyerAddress: string | null;
     buyerCity?: string | null;
     buyerPostalCode?: string | null;
+    buyerCountryCode?: string | null;
     buyerTaxId: string | null;
     buyerPhone?: string | null;
     sellerName: string | null;
@@ -161,6 +162,7 @@ export interface ExtractedInvoiceData {
     sellerAddress: string | null;
     sellerCity?: string | null;
     sellerPostalCode?: string | null;
+    sellerCountryCode?: string | null;
     sellerTaxId: string | null;
     sellerIban?: string | null;
     sellerBic?: string | null;

@@ -103,6 +103,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             supplierEmail: invoiceData.sellerEmail,
             supplierAddress: invoiceData.sellerAddress,
             supplierTaxId: invoiceData.sellerTaxId,
+            sellerCountryCode: invoiceData.sellerCountryCode || 'DE',
+            buyerCountryCode: invoiceData.buyerCountryCode || 'DE',
             items: invoiceData.lineItems, // Service uses 'items', form uses 'lineItems'
         };
 

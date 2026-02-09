@@ -13,6 +13,7 @@ export type ExtractedInvoiceData = {
     buyerAddress: string | null;
     buyerCity: string | null;
     buyerPostalCode: string | null;
+    buyerCountryCode?: string | null;
     buyerTaxId: string | null;
     buyerPhone: string | null;
     sellerName: string | null;
@@ -20,6 +21,7 @@ export type ExtractedInvoiceData = {
     sellerAddress: string | null;
     sellerCity: string | null;
     sellerPostalCode: string | null;
+    sellerCountryCode?: string | null;
     sellerTaxId: string | null;
     sellerIban?: string | null;
     sellerBic?: string | null;
@@ -30,6 +32,7 @@ export type ExtractedInvoiceData = {
         quantity: number;
         unitPrice: number;
         totalPrice: number;
+        taxRate?: number;
     }>;
     subtotal: number;
     taxRate: number;
@@ -46,6 +49,7 @@ const ExtractedInvoiceItemSchema = z.object({
     quantity: z.coerce.number().default(1),
     unitPrice: z.coerce.number().default(0),
     totalPrice: z.coerce.number().default(0),
+    taxRate: z.coerce.number().optional(),
 });
 
 const ExtractedInvoiceDataSchema = z.object({
@@ -56,6 +60,7 @@ const ExtractedInvoiceDataSchema = z.object({
     buyerAddress: z.union([z.string(), z.null()]).default(null),
     buyerCity: z.union([z.string(), z.null()]).default(null),
     buyerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
+    buyerCountryCode: z.union([z.string(), z.null()]).optional().default(null),
     buyerTaxId: z.union([z.string(), z.null()]).default(null),
     buyerPhone: z.union([z.string(), z.null()]).default(null),
     sellerName: z.union([z.string(), z.null()]).default(null),
@@ -63,6 +68,7 @@ const ExtractedInvoiceDataSchema = z.object({
     sellerAddress: z.union([z.string(), z.null()]).default(null),
     sellerCity: z.union([z.string(), z.null()]).default(null),
     sellerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
+    sellerCountryCode: z.union([z.string(), z.null()]).optional().default(null),
     sellerTaxId: z.union([z.string(), z.null()]).default(null),
     sellerIban: z.union([z.string(), z.null()]).optional().default(null),
     sellerBic: z.union([z.string(), z.null()]).optional().default(null),
@@ -357,7 +363,15 @@ export class GeminiService {
             // Normalize empty string to undefined for tax rate
             const normalizedTaxRate = (typeof data.taxRate === 'string' && data.taxRate === '') ? undefined : data.taxRate;
             const hasTaxRate = normalizedTaxRate !== null && normalizedTaxRate !== undefined;
-            const parsedTaxRate = hasTaxRate ? Number(normalizedTaxRate) : NaN;
+            let parsedTaxRate = hasTaxRate ? Number(normalizedTaxRate) : NaN;
+            // FIX: Normalize decimal tax rate (0.19) to percentage (19)
+            if (!isNaN(parsedTaxRate) && parsedTaxRate > 0 && parsedTaxRate < 1) {
+                parsedTaxRate = Math.round(parsedTaxRate * 10000) / 100;
+            }
+            // FIX: Reject unrealistic tax rates (> 30%) — fall back to derived rate
+            if (!isNaN(parsedTaxRate) && parsedTaxRate > 30) {
+                parsedTaxRate = NaN;
+            }
             const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
 
             const normalizeIban = (value: unknown): string | null => {
@@ -380,6 +394,7 @@ export class GeminiService {
                 buyerAddress: data.buyerAddress ?? null,
                 buyerCity: data.buyerCity ?? null,
                 buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
+                buyerCountryCode: data.buyerCountryCode ?? null,
                 buyerTaxId: data.buyerTaxId ?? null,
                 buyerPhone: data.buyerPhone ?? null,
                 sellerName: data.sellerName ?? null,
@@ -387,12 +402,26 @@ export class GeminiService {
                 sellerAddress: data.sellerAddress ?? null,
                 sellerCity: data.sellerCity ?? null,
                 sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
+                sellerCountryCode: data.sellerCountryCode ?? null,
                 sellerTaxId: data.sellerTaxId ?? null,
                 sellerIban: normalizeIban(data.sellerIban),
                 sellerBic: data.sellerBic ?? null,
                 sellerPhone: data.sellerPhone ?? null,
                 bankName: data.bankName ?? null,
-                lineItems: Array.isArray(data.lineItems) ? data.lineItems : [],
+                lineItems: (Array.isArray(data.lineItems) ? data.lineItems : []).map((item) => {
+                    let itemRate = item.taxRate;
+                    if (itemRate !== undefined && itemRate !== null) {
+                        if (itemRate > 0 && itemRate < 1) itemRate = Math.round(itemRate * 10000) / 100;
+                        if (itemRate > 30) itemRate = undefined;
+                    }
+                    return {
+                        description: item.description || '',
+                        quantity: item.quantity ?? 1,
+                        unitPrice: item.unitPrice ?? 0,
+                        totalPrice: item.totalPrice ?? 0,
+                        taxRate: itemRate,
+                    };
+                }),
                 subtotal,
                 taxRate: !isNaN(parsedTaxRate) ? parsedTaxRate : derivedTaxRate,
                 taxAmount,

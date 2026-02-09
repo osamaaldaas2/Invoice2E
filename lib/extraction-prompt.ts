@@ -12,6 +12,7 @@ export const EXTRACTION_PROMPT = `You are an expert invoice extraction system. E
   "buyerAddress": "string or null",
   "buyerCity": "string or null",
   "buyerPostalCode": "string or null",
+  "buyerCountryCode": "string (ISO 3166-1 alpha-2, e.g. DE, AT, CH) or null",
   "buyerTaxId": "string or null",
   "buyerPhone": "string or null",
   "sellerName": "string or null",
@@ -19,6 +20,7 @@ export const EXTRACTION_PROMPT = `You are an expert invoice extraction system. E
   "sellerAddress": "string or null",
   "sellerCity": "string or null",
   "sellerPostalCode": "string or null",
+  "sellerCountryCode": "string (ISO 3166-1 alpha-2, e.g. DE, AT, CH) or null",
   "sellerTaxId": "string or null",
   "sellerIban": "string or null",
   "sellerBic": "string or null",
@@ -30,11 +32,11 @@ export const EXTRACTION_PROMPT = `You are an expert invoice extraction system. E
       "quantity": number,
       "unitPrice": number,
       "totalPrice": number,
-      "taxRate": number or null
+      "taxRate": number as percentage (e.g. 19 for 19%, 7 for 7%, NOT 0.19) or null
     }
   ],
   "subtotal": number,
-  "taxRate": number or null,
+  "taxRate": number as percentage (e.g. 19 for 19%, NOT 0.19) or null,
   "taxAmount": number,
   "totalAmount": number,
   "currency": "string (e.g., EUR, USD)",
@@ -46,7 +48,7 @@ export const EXTRACTION_PROMPT = `You are an expert invoice extraction system. E
 IMPORTANT:
 1. Extract ALL visible information from the invoice
 2. For prices, use the exact values shown as numbers
-3. If tax is not separate, calculate based on total and subtotal
+3. If the tax rate is not explicitly shown on the invoice, return taxRate as null — do NOT calculate it yourself
 4. Return ONLY valid JSON, no markdown, no code blocks
 5. Use null for missing fields
 6. Ensure all numbers are valid numbers, not strings

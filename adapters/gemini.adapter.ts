@@ -182,7 +182,15 @@ export class GeminiAdapter implements IGeminiAdapter {
                 ? rawTaxAmount
                 : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) * 100) / 100 : 0);
             const hasTaxRate = data.taxRate !== null && data.taxRate !== undefined && data.taxRate !== '';
-            const parsedTaxRate = hasTaxRate ? Number(data.taxRate) : NaN;
+            let parsedTaxRate = hasTaxRate ? Number(data.taxRate) : NaN;
+            // FIX: Normalize decimal tax rate (0.19) to percentage (19)
+            if (!isNaN(parsedTaxRate) && parsedTaxRate > 0 && parsedTaxRate < 1) {
+                parsedTaxRate = Math.round(parsedTaxRate * 10000) / 100;
+            }
+            // FIX: Reject unrealistic tax rates (> 30%) — fall back to derived rate
+            if (!isNaN(parsedTaxRate) && parsedTaxRate > 30) {
+                parsedTaxRate = NaN;
+            }
             const derivedTaxRate = subtotal > 0 ? Math.round((taxAmount / subtotal) * 10000) / 100 : 0;
             const fallbackTaxRate = !isNaN(parsedTaxRate) ? parsedTaxRate : derivedTaxRate;
 
@@ -204,6 +212,7 @@ export class GeminiAdapter implements IGeminiAdapter {
                 buyerAddress: data.buyerAddress || null,
                 buyerCity: data.buyerCity || null,
                 buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
+                buyerCountryCode: data.buyerCountryCode || null,
                 buyerTaxId: data.buyerTaxId || null,
                 buyerPhone: data.buyerPhone || null,
                 sellerName: data.sellerName || null,
@@ -211,6 +220,7 @@ export class GeminiAdapter implements IGeminiAdapter {
                 sellerAddress: data.sellerAddress || null,
                 sellerCity: data.sellerCity || null,
                 sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
+                sellerCountryCode: data.sellerCountryCode || null,
                 sellerTaxId: data.sellerTaxId || null,
                 sellerIban: normalizeIban(data.sellerIban),
                 sellerBic: data.sellerBic || null,
@@ -218,7 +228,14 @@ export class GeminiAdapter implements IGeminiAdapter {
                 bankName: data.bankName || null,
                 lineItems: rawItems.map((item: any) => {
                     const itemHasTaxRate = item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';
-                    const itemTaxRate = itemHasTaxRate ? Number(item.taxRate) : fallbackTaxRate;
+                    let itemTaxRate = itemHasTaxRate ? Number(item.taxRate) : fallbackTaxRate;
+                    // FIX: Normalize decimal (0.19 → 19) and reject unrealistic (> 30%)
+                    if (!isNaN(itemTaxRate) && itemTaxRate > 0 && itemTaxRate < 1) {
+                        itemTaxRate = Math.round(itemTaxRate * 10000) / 100;
+                    }
+                    if (!isNaN(itemTaxRate) && itemTaxRate > 30) {
+                        itemTaxRate = fallbackTaxRate;
+                    }
                     return {
                         description: item?.description || '',
                         quantity: Number(item?.quantity) || 1,

@@ -8,7 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import JSZip from 'jszip';
 import { batchService } from '@/services/batch.service';
+import { invoiceDbService } from '@/services/invoice.db.service';
+import { xrechnungService } from '@/services/xrechnung.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { verifySignedDownloadToken } from '@/lib/session';
@@ -82,8 +85,8 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Filter successful results
-        const successfulResults = status.results.filter(r => r.status === 'success');
+        // Filter successful results that have extractionIds
+        const successfulResults = status.results.filter(r => r.status === 'success' && r.extractionId);
 
         if (successfulResults.length === 0) {
             return NextResponse.json(
@@ -92,13 +95,87 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Generate ZIP with all successful XMLs
-        const zipBuffer = await batchService.generateOutputZip(successfulResults);
+        // Generate XML on-the-fly from extraction data (same approach as batch-download route)
+        const zip = new JSZip();
+        const errors: { extractionId: string; error: string }[] = [];
+        let successCount = 0;
+        const usedFileNames = new Set<string>();
+
+        for (const result of successfulResults) {
+            const extractionId = result.extractionId!;
+            try {
+                const extraction = await invoiceDbService.getExtractionById(extractionId);
+
+                if (extraction.userId !== user.id) {
+                    errors.push({ extractionId, error: 'Access denied' });
+                    continue;
+                }
+
+                const data = extraction.extractionData as Record<string, unknown>;
+                const serviceData = {
+                    ...data,
+                    supplierName: data.sellerName,
+                    supplierEmail: data.sellerEmail,
+                    supplierAddress: data.sellerAddress,
+                    supplierTaxId: data.sellerTaxId,
+                    items: data.lineItems,
+                    invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
+                    invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
+                    sellerName: data.sellerName || 'Unknown Seller',
+                    sellerCountryCode: data.sellerCountryCode || 'DE',
+                    buyerCountryCode: data.buyerCountryCode || 'DE',
+                    totalAmount: Number(data.totalAmount) || 0,
+                } as Record<string, unknown>;
+
+                const xmlResult = xrechnungService.generateXRechnung(serviceData as any);
+                let fileName = xmlResult.fileName.replace(/[<>:"/\\|?*]/g, '_');
+                // Deduplicate filenames to prevent ZIP overwrite
+                if (usedFileNames.has(fileName)) {
+                    const base = fileName.replace(/\.xml$/i, '');
+                    let counter = 2;
+                    while (usedFileNames.has(`${base}_${counter}.xml`)) counter++;
+                    fileName = `${base}_${counter}.xml`;
+                }
+                usedFileNames.add(fileName);
+                zip.file(fileName, xmlResult.xmlContent);
+                successCount++;
+
+                // Update extraction + conversion status to completed
+                const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+                if (existingConversion) {
+                    await invoiceDbService.updateConversion(existingConversion.id, {
+                        conversionStatus: 'completed',
+                        validationStatus: xmlResult.validationStatus,
+                    });
+                }
+                await invoiceDbService.updateExtraction(extractionId, { status: 'completed' });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Generation failed';
+                errors.push({ extractionId, error: msg });
+                logger.warn('Failed to generate XML for batch extraction', { extractionId, error: msg });
+            }
+        }
+
+        if (successCount === 0) {
+            return NextResponse.json(
+                { error: 'No invoices could be converted to XRechnung XML', details: errors },
+                { status: 422 }
+            );
+        }
+
+        // Add error summary if there were failures
+        if (errors.length > 0) {
+            const summary = errors.map(e => `${e.extractionId}: ${e.error}`).join('\n');
+            zip.file('_errors.txt', `Failed to convert ${errors.length} invoice(s):\n\n${summary}`);
+        }
+
+        const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
 
         logger.info('Batch download initiated', {
             userId: user.id,
             batchId,
-            fileCount: successfulResults.length
+            successful: successCount,
+            failed: errors.length,
         });
 
         // Return ZIP file

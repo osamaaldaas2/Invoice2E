@@ -10,17 +10,28 @@ import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { API_TIMEOUTS } from '@/lib/constants';
 
+export interface BatchResultItem {
+    filename: string;
+    status: string;
+    invoiceNumber?: string;
+    extractionId?: string;
+}
+
 export interface ConversionHistoryItem {
     id: string;
     invoice_number: string;
     file_name: string;
-    output_format: string; // Changed from format to match implementation/frontend
+    output_format: string;
     status: string;
     credits_used: number;
-    // processing_time_ms: number | null; // Commented out until column added
     created_at: string;
-    record_type?: 'conversion' | 'draft';
+    record_type?: 'conversion' | 'draft' | 'batch';
     extraction_id?: string;
+    // Batch-specific fields (only when record_type === 'batch')
+    total_files?: number;
+    completed_files?: number;
+    failed_files?: number;
+    batch_results?: BatchResultItem[];
 }
 
 export interface HistoryFilters {
@@ -98,6 +109,7 @@ export class AnalyticsService {
         const statusFilter = filters?.status;
         const wantsDrafts = !statusFilter || statusFilter === 'draft';
         const wantsConversions = !statusFilter || statusFilter === 'completed' || statusFilter === 'valid' || statusFilter === 'invalid';
+        const wantsBatches = !statusFilter || statusFilter === 'completed';
 
         const fetchEnd = offset + limit - 1;
         const combinedRange = { start: 0, end: fetchEnd };
@@ -131,11 +143,39 @@ export class AnalyticsService {
             };
         };
 
+        const mapBatch = (row: any): ConversionHistoryItem => {
+            const results = (row.results as any[]) || [];
+            const batchResults: BatchResultItem[] = results
+                .filter((r: any) => r.status === 'success' && r.extractionId)
+                .map((r: any) => ({
+                    filename: r.filename || '',
+                    status: r.status,
+                    invoiceNumber: r.invoiceNumber,
+                    extractionId: r.extractionId,
+                }));
+            return {
+                id: row.id,
+                invoice_number: `Batch (${row.total_files} files)`,
+                file_name: 'ZIP Upload',
+                output_format: 'XRechnung',
+                status: row.status,
+                credits_used: row.completed_files || 0,
+                created_at: row.created_at,
+                record_type: 'batch',
+                total_files: row.total_files,
+                completed_files: row.completed_files,
+                failed_files: row.failed_files,
+                batch_results: batchResults,
+            };
+        };
+
         try {
             let conversionItems: ConversionHistoryItem[] = [];
             let draftItems: ConversionHistoryItem[] = [];
+            let batchItems: ConversionHistoryItem[] = [];
             let conversionCount = 0;
             let draftCount = 0;
+            let batchCount = 0;
 
             if (wantsConversions) {
                 let conversionQuery = supabase
@@ -215,18 +255,87 @@ export class AnalyticsService {
                 }
             }
 
+            if (wantsBatches) {
+                let batchQuery = supabase
+                    .from('batch_jobs')
+                    .select('*', { count: 'exact' })
+                    .eq('user_id', userId)
+                    .in('status', ['completed', 'partial_success', 'failed']);
+
+                if (filters?.startDate) {
+                    batchQuery = batchQuery.gte('created_at', filters.startDate);
+                }
+                if (filters?.endDate) {
+                    batchQuery = batchQuery.lte('created_at', filters.endDate);
+                }
+
+                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
+                const batchResponse: any = await this.queryWithTimeout(
+                    batchQuery
+                        .order('created_at', { ascending: false })
+                        .range(range.start, range.end),
+                    API_TIMEOUTS.DATABASE_QUERY
+                );
+                const { data, count, error } = batchResponse;
+
+                if (error) {
+                    logger.error('Failed to get batch history', {
+                        error,
+                        code: error.code,
+                        message: error.message,
+                        userId
+                    });
+                } else {
+                    batchItems = (data || []).map(mapBatch);
+                    batchCount = count || 0;
+                }
+            }
+
+            // Collect ALL extraction IDs owned by batch jobs to deduplicate
+            const batchExtractionIds = new Set<string>();
+            try {
+                const allBatchResponse: any = await this.queryWithTimeout(
+                    supabase
+                        .from('batch_jobs')
+                        .select('results')
+                        .eq('user_id', userId),
+                    API_TIMEOUTS.DATABASE_QUERY
+                );
+                if (!allBatchResponse.error && allBatchResponse.data) {
+                    for (const row of allBatchResponse.data) {
+                        const results = (row.results as any[]) || [];
+                        for (const r of results) {
+                            if (r.extractionId) batchExtractionIds.add(r.extractionId);
+                        }
+                    }
+                }
+            } catch {
+                // Non-critical — worst case we show duplicates
+            }
+
+            // Filter out individual items that belong to a batch
+            if (batchExtractionIds.size > 0) {
+                const beforeDrafts = draftItems.length;
+                const beforeConversions = conversionItems.length;
+                draftItems = draftItems.filter(d => !d.extraction_id || !batchExtractionIds.has(d.extraction_id));
+                conversionItems = conversionItems.filter(c => !c.extraction_id || !batchExtractionIds.has(c.extraction_id));
+                draftCount -= (beforeDrafts - draftItems.length);
+                conversionCount -= (beforeConversions - conversionItems.length);
+            }
+
             let items: ConversionHistoryItem[] = [];
             if (!statusFilter) {
-                items = [...conversionItems, ...draftItems]
+                items = [...conversionItems, ...draftItems, ...batchItems]
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .slice(offset, offset + limit);
             } else if (statusFilter === 'draft') {
                 items = draftItems;
             } else {
-                items = conversionItems;
+                items = [...conversionItems, ...batchItems]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             }
 
-            const total = conversionCount + draftCount;
+            const total = conversionCount + draftCount + batchCount;
 
             return {
                 items,

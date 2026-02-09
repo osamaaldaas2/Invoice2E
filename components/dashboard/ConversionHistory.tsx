@@ -6,6 +6,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logger } from '@/lib/logger';
 
+interface BatchResultItem {
+    filename: string;
+    status: string;
+    invoiceNumber?: string;
+    extractionId?: string;
+}
+
 interface Conversion {
     id: string;
     invoice_number: string;
@@ -14,13 +21,134 @@ interface Conversion {
     created_at: string;
     output_format: string;
     processing_time_ms: number;
-    record_type?: 'conversion' | 'draft';
+    record_type?: 'conversion' | 'draft' | 'batch';
     extraction_id?: string;
+    total_files?: number;
+    completed_files?: number;
+    failed_files?: number;
+    batch_results?: BatchResultItem[];
 }
 
 interface Props {
     limit?: number;
     showPagination?: boolean;
+}
+
+function BatchRow({
+    conversion,
+    isExpanded,
+    onToggle,
+    onDownloadZip,
+    onDownloadSingle,
+    downloadingId,
+    formatDate,
+    getStatusBadge,
+    t,
+}: {
+    conversion: Conversion;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onDownloadZip: () => void;
+    onDownloadSingle: (result: BatchResultItem) => void;
+    downloadingId: string | null;
+    formatDate: (d: string) => string;
+    getStatusBadge: (s: string) => string;
+    t: (key: string) => string;
+}) {
+    const results = conversion.batch_results || [];
+
+    return (
+        <>
+            <tr className="hover:bg-white/5 bg-white/[0.02]">
+                <td className="px-4 py-3 text-sm font-medium text-white">
+                    <span className="inline-flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        {t('batchLabel')} ({conversion.total_files} {t('batchFiles')})
+                    </span>
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300">
+                    {t('batchUpload')}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300">
+                    XRechnung
+                </td>
+                <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}>
+                        {conversion.status === 'partial_success' ? 'partial' : conversion.status}
+                    </span>
+                    {conversion.failed_files && conversion.failed_files > 0 ? (
+                        <span className="ml-1 text-xs text-rose-400">
+                            ({conversion.failed_files} failed)
+                        </span>
+                    ) : null}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-300">
+                    {formatDate(conversion.created_at)}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center gap-2">
+                        {results.length > 0 && (
+                            <button
+                                onClick={onDownloadZip}
+                                disabled={downloadingId === conversion.id}
+                                className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                            >
+                                {downloadingId === conversion.id ? t('downloading') : t('downloadZip')}
+                            </button>
+                        )}
+                        <button
+                            onClick={onToggle}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-100 hover:bg-white/10"
+                        >
+                            {isExpanded ? t('hide') : t('show')}
+                            <svg
+                                className={`ml-1 w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {isExpanded && results.map((result, idx) => (
+                <tr key={`${conversion.id}-${idx}`} className="bg-white/[0.03] hover:bg-white/[0.06]">
+                    <td className="px-4 py-2 text-sm text-slate-300 pl-10">
+                        {result.invoiceNumber || '-'}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-slate-400">
+                        {result.filename}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-slate-400">
+                        XRechnung
+                    </td>
+                    <td className="px-4 py-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(result.status === 'success' ? 'completed' : result.status)}`}>
+                            {result.status === 'success' ? 'completed' : result.status}
+                        </span>
+                    </td>
+                    <td className="px-4 py-2 text-sm text-slate-400">
+                        -
+                    </td>
+                    <td className="px-4 py-2 text-sm">
+                        {result.extractionId && result.status === 'success' ? (
+                            <button
+                                onClick={() => onDownloadSingle(result)}
+                                disabled={downloadingId === result.extractionId}
+                                className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50 text-xs"
+                            >
+                                {downloadingId === result.extractionId ? t('downloading') : t('downloadXml')}
+                            </button>
+                        ) : (
+                            <span className="text-slate-500">-</span>
+                        )}
+                    </td>
+                </tr>
+            ))}
+        </>
+    );
 }
 
 export default function ConversionHistory({ limit = 10, showPagination = true }: Props) {
@@ -41,6 +169,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
     const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'completed'>(initialStatus);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
 
     const locale = useMemo(() => {
         const parts = pathname?.split('/') || [];
@@ -179,6 +308,57 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
         }
     };
 
+    const handleBatchDownload = async (conversion: Conversion) => {
+        const extractionIds = conversion.batch_results
+            ?.filter(r => r.status === 'success' && r.extractionId)
+            .map(r => r.extractionId!) || [];
+
+        if (extractionIds.length === 0) return;
+
+        setDownloadingId(conversion.id);
+        try {
+            const response = await fetch('/api/invoices/batch-download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ extractionIds }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to download batch ZIP');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `batch_${conversion.id.slice(0, 8)}_invoices.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to download batch ZIP');
+        } finally {
+            setDownloadingId(null);
+        }
+    };
+
+    const handleSingleFromBatch = async (result: BatchResultItem) => {
+        if (!result.extractionId) return;
+        const fakeConversion: Conversion = {
+            id: result.extractionId,
+            invoice_number: result.invoiceNumber || '',
+            file_name: result.filename,
+            status: 'completed',
+            created_at: '',
+            output_format: 'CII',
+            processing_time_ms: 0,
+            extraction_id: result.extractionId,
+        };
+        await handleDownload(fakeConversion);
+    };
+
     if (loading) {
         return (
             <div className="glass-card p-6">
@@ -262,49 +442,64 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                         </thead>
                         <tbody className="divide-y divide-white/10">
                             {conversions.map((conversion) => (
-                                <tr key={conversion.id} className="hover:bg-white/5">
-                                    <td className="px-4 py-3 text-sm font-medium text-white">
-                                        {conversion.invoice_number || '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-slate-300">
-                                        {conversion.file_name}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-slate-300">
-                                        {conversion.record_type === 'draft' ? '-' : (conversion.output_format || 'XRechnung')}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}>
-                                            {conversion.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-slate-300">
-                                        {formatDate(conversion.created_at)}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm">
-                                        {conversion.extraction_id ? (
-                                            conversion.status === 'draft' ? (
-                                                <Link
-                                                    href={withLocale(`/review/${conversion.extraction_id}`)}
-                                                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-100 hover:bg-white/10"
-                                                >
-                                                    {t('resume')}
-                                                </Link>
-                                            ) : conversion.status === 'completed' ? (
-                                                <button
-                                                    onClick={() => handleDownload(conversion)}
-                                                    disabled={downloadingId === conversion.id}
-                                                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
-                                                >
-                                                    {downloadingId === conversion.id ? t('downloading') : t('downloadXml')}
-                                                </button>
+                                conversion.record_type === 'batch' ? (
+                                    <BatchRow
+                                        key={conversion.id}
+                                        conversion={conversion}
+                                        isExpanded={expandedBatchId === conversion.id}
+                                        onToggle={() => setExpandedBatchId(expandedBatchId === conversion.id ? null : conversion.id)}
+                                        onDownloadZip={() => handleBatchDownload(conversion)}
+                                        onDownloadSingle={handleSingleFromBatch}
+                                        downloadingId={downloadingId}
+                                        formatDate={formatDate}
+                                        getStatusBadge={getStatusBadge}
+                                        t={t}
+                                    />
+                                ) : (
+                                    <tr key={conversion.id} className="hover:bg-white/5">
+                                        <td className="px-4 py-3 text-sm font-medium text-white">
+                                            {conversion.invoice_number || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-300">
+                                            {conversion.file_name}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-300">
+                                            {conversion.record_type === 'draft' ? '-' : (conversion.output_format || 'XRechnung')}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}>
+                                                {conversion.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-300">
+                                            {formatDate(conversion.created_at)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm">
+                                            {conversion.extraction_id ? (
+                                                conversion.status === 'draft' ? (
+                                                    <Link
+                                                        href={withLocale(`/review/${conversion.extraction_id}`)}
+                                                        className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-100 hover:bg-white/10"
+                                                    >
+                                                        {t('resume')}
+                                                    </Link>
+                                                ) : conversion.status === 'completed' ? (
+                                                    <button
+                                                        onClick={() => handleDownload(conversion)}
+                                                        disabled={downloadingId === conversion.id}
+                                                        className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                                                    >
+                                                        {downloadingId === conversion.id ? t('downloading') : t('downloadXml')}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-slate-500">-</span>
+                                                )
                                             ) : (
                                                 <span className="text-slate-500">-</span>
-                                            )
-                                        ) : (
-                                            <span className="text-slate-500">-</span>
-                                        )}
-                                    </td>
-                                </tr>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
                             ))}
                         </tbody>
                     </table>

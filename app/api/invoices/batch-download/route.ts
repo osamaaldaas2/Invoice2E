@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
         const zip = new JSZip();
         const errors: { extractionId: string; error: string }[] = [];
         let successCount = 0;
+        const usedFileNames = new Set<string>();
 
         for (const extractionId of extractionIds) {
             try {
@@ -73,7 +74,15 @@ export async function POST(request: NextRequest) {
                 } as Record<string, unknown>;
 
                 const result = xrechnungService.generateXRechnung(serviceData as any);
-                const fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');
+                let fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');
+                // Deduplicate filenames to prevent ZIP overwrite
+                if (usedFileNames.has(fileName)) {
+                    const base = fileName.replace(/\.xml$/i, '');
+                    let counter = 2;
+                    while (usedFileNames.has(`${base}_${counter}.xml`)) counter++;
+                    fileName = `${base}_${counter}.xml`;
+                }
+                usedFileNames.add(fileName);
                 zip.file(fileName, result.xmlContent);
                 successCount++;
 
