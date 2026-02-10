@@ -594,8 +594,9 @@ export class BatchService {
             return null;
         }
 
+        const processed = (job.completed_files || 0) + (job.failed_files || 0);
         const progress = job.total_files > 0
-            ? Math.round((job.completed_files / job.total_files) * 100)
+            ? Math.round((processed / job.total_files) * 100)
             : 0;
 
         return {

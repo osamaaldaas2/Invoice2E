@@ -109,7 +109,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             } catch {
                 // Silently ignore poll errors, will retry
             }
-            delay = Math.min(delay * 1.5, 20000);
+            delay = Math.min(delay * 1.3, 8000);
             pollRef.current = setTimeout(poll, delay);
         };
 
