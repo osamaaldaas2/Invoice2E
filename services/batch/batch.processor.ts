@@ -103,7 +103,7 @@ export class BatchProcessor {
                     invoiceCount: boundaryResult.totalInvoices,
                 });
 
-                // Process segments in parallel chunks
+                // Process all segments — extra credits settled in bulk at batch level
                 const segments = splitBuffers.map((buf, s) => ({ buf, s }));
                 for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
                     const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
@@ -153,29 +153,40 @@ export class BatchProcessor {
                         }
                     }));
                 }
-                return;
+
+                // Safety guard: if no segments were processed, mark as failed
+                if (results[index]?.status === 'pending') {
+                    results[index] = {
+                        filename: file.name,
+                        status: 'failed' as const,
+                        error: `Multi-invoice split produced no processable segments (detected ${boundaryResult.totalInvoices} invoices)`,
+                        reviewStatus: 'not_available',
+                        startedAt,
+                        completedAt: new Date().toISOString(),
+                    };
+                }
+            } else {
+                // Single invoice (existing flow)
+                const extractedData = await this.extractWithRetry(extractor, file.content, file.name, jobId);
+
+                const extraction = await invoiceDbService.createExtraction({
+                    userId,
+                    extractionData: extractedData as unknown as Record<string, unknown>,
+                    confidenceScore: extractedData.confidence,
+                    status: 'draft',
+                });
+
+                results[index] = {
+                    filename: file.name,
+                    status: 'success' as const,
+                    invoiceNumber: extractedData.invoiceNumber || undefined,
+                    extractionId: extraction.id,
+                    confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
+                    reviewStatus: 'pending_review',
+                    startedAt,
+                    completedAt: new Date().toISOString(),
+                };
             }
-
-            // Single invoice (existing flow)
-            const extractedData = await this.extractWithRetry(extractor, file.content, file.name, jobId);
-
-            const extraction = await invoiceDbService.createExtraction({
-                userId,
-                extractionData: extractedData as unknown as Record<string, unknown>,
-                confidenceScore: extractedData.confidence,
-                status: 'draft',
-            });
-
-            results[index] = {
-                filename: file.name,
-                status: 'success' as const,
-                invoiceNumber: extractedData.invoiceNumber || undefined,
-                extractionId: extraction.id,
-                confidenceScore: typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
-                reviewStatus: 'pending_review',
-                startedAt,
-                completedAt: new Date().toISOString(),
-            };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             logger.error('Failed to process file', {
@@ -194,13 +205,14 @@ export class BatchProcessor {
             };
         }
 
-        // Update progress after each file completes
+        // Update progress after each file completes (total_files adjusts for multi-invoice expansion)
         const successCount = results.filter(r => r.status === 'success').length;
         const failCount = results.filter(r => r.status === 'failed').length;
 
         await supabase
             .from('batch_jobs')
             .update({
+                total_files: results.length,
                 completed_files: successCount,
                 failed_files: failCount,
                 results: results,
@@ -313,10 +325,36 @@ export class BatchProcessor {
                 );
             }
 
-            // Credits were deducted upfront — refund for failed files
             const successCount = results.filter(r => r.status === 'success').length;
             const failCount = results.filter(r => r.status === 'failed').length;
 
+            // Deduct extra credits for multi-invoice expansion (1 record for entire batch)
+            const extraInvoices = results.length - totalFiles;
+            if (extraInvoices > 0) {
+                const extraDeducted = await creditsDbService.deductCredits(
+                    userId, extraInvoices, `batch_multi:${jobId}`
+                );
+                if (!extraDeducted) {
+                    // Deduct whatever credits remain
+                    const { data: credits } = await supabase
+                        .from('user_credits')
+                        .select('available_credits')
+                        .eq('user_id', userId)
+                        .single();
+                    const available = credits?.available_credits || 0;
+                    if (available > 0) {
+                        await creditsDbService.deductCredits(userId, available, `batch_multi:${jobId}`);
+                    }
+                    logger.warn('Insufficient credits for all multi-invoice extras', {
+                        jobId, userId, extraInvoices, availableCredits: available,
+                    });
+                }
+                logger.info('Deducted extra credits for multi-invoice expansion', {
+                    jobId, userId, extraInvoices,
+                });
+            }
+
+            // Refund credits for failed results
             if (failCount > 0) {
                 try {
                     await creditsDbService.addCredits(userId, failCount, 'batch_refund', jobId);
@@ -345,6 +383,7 @@ export class BatchProcessor {
                 .update({
                     status: finalStatus,
                     completed_at: new Date().toISOString(),
+                    total_files: results.length,
                     completed_files: successCount,
                     failed_files: failCount,
                     results: results,
@@ -375,6 +414,7 @@ export class BatchProcessor {
                 .update({
                     status: 'failed',
                     completed_at: new Date().toISOString(),
+                    total_files: results.length,
                     completed_files: results.filter(r => r.status === 'success').length,
                     failed_files: results.filter(r => r.status === 'failed').length,
                     results: results,

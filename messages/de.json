@@ -288,7 +288,13 @@
         "review": "Überprüfung",
         "action": "Aktion",
         "downloadAllXml": "Alle XML herunterladen",
-        "loadingDraft": "Laden..."
+        "loadingDraft": "Laden...",
+        "reviewed": "Überprüft",
+        "collapse": "Einklappen",
+        "reviewAndEdit": "Überprüfen & Bearbeiten",
+        "generatingZip": "ZIP wird erstellt...",
+        "downloadComplete": "Download abgeschlossen",
+        "invoices": "Rechnungen"
     },
     "upload": {
         "insufficientCredits": "Unzureichendes Guthaben",
@@ -315,12 +321,15 @@
         "retry": "Erneut versuchen",
         "uploadDifferentFile": "Andere Datei hochladen",
         "generatingZip": "ZIP wird erstellt...",
+        "downloadComplete": "Download abgeschlossen!",
         "downloadAllZip": "Alle als ZIP herunterladen",
         "confirmUpload": "Upload bestätigen",
         "confirmUploadDesc": "Dies verbraucht mindestens 1 Guthaben (1 pro erkannter Rechnung). Sie haben derzeit {credits} Guthaben.",
         "fileInfo": "Datei: {name} ({size}MB)",
         "continue": "Fortfahren",
-        "maxFileSize": "KI extrahiert Daten automatisch (PDF, JPG, PNG - Max {size}MB)"
+        "maxFileSize": "KI extrahiert Daten automatisch (PDF, JPG, PNG - Max {size}MB)",
+        "reviewed": "Überprüft",
+        "collapse": "Einklappen"
     },
     "pricing": {
         "title": "Preise",
@@ -416,6 +425,7 @@
         "notes": "Anmerkungen",
         "savingReview": "Wird gespeichert...",
         "saveAndContinue": "Speichern & zur Konvertierung",
+        "saveReview": "Überprüfung speichern",
         "invoiceDetails": "Rechnungsdetails",
         "invoiceNumber": "Rechnungsnummer",
         "invoiceDate": "Rechnungsdatum",

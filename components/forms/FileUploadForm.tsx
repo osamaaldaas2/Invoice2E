@@ -8,8 +8,9 @@ import { FILE_LIMITS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
 import { Button } from '@/components/ui/button';
+import InvoiceReviewForm from './invoice-review/InvoiceReviewForm';
 
-type UploadState = 'idle' | 'uploading' | 'extracting' | 'success' | 'error';
+type UploadState = 'idle' | 'uploading' | 'extracting' | 'success' | 'error' | 'downloading' | 'done';
 
 type ExtractedData = {
     extractionId: string;
@@ -19,7 +20,7 @@ type ExtractedData = {
 
 type MultiInvoiceResult = {
     totalInvoices: number;
-    extractions: { extractionId: string; label: string; confidence: number }[];
+    extractions: { extractionId: string; label: string; confidence: number; status?: 'success' | 'failed' | 'pending' }[];
 };
 
 
@@ -28,6 +29,8 @@ type FileUploadFormProps = {
     onExtractionComplete?: (extractionId: string, data: ExtractedData) => void;
     availableCredits?: number;
 };
+
+const MULTI_RESULT_KEY = 'multiInvoiceResult';
 
 export default function FileUploadForm({ userId, onExtractionComplete, availableCredits = 0 }: FileUploadFormProps) {
     const router = useRouter();
@@ -45,10 +48,15 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     const [backgroundJobId, setBackgroundJobId] = useState<string | null>(null);
     const [backgroundProgress, setBackgroundProgress] = useState(0);
     const [backgroundTotal, setBackgroundTotal] = useState(0);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [extractionCache, setExtractionCache] = useState<Record<string, any>>({});
+    const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
     const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastFileRef = useRef<File | null>(null);
+    const listScrollRef = useRef<HTMLDivElement>(null);
+    const savedScrollPos = useRef<number>(0);
 
     const hasCredits = availableCredits > 0;
 
@@ -84,25 +92,27 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     setBackgroundTotal(total);
                     setProgress(total > 0 ? Math.round((completed / total) * 100) : 0);
 
+                    // Build live extraction list from results during processing
+                    const results = payload.results || [];
+                    if (results.length > 0) {
+                        type PollResult = { filename?: string; extractionId?: string; confidenceScore?: number; status: string };
+                        const extractions = results.map((r: PollResult, idx: number) => ({
+                            extractionId: r.extractionId || '',
+                            label: r.filename || `Invoice ${idx + 1}`,
+                            confidence: r.confidenceScore || 0,
+                            status: r.status as 'success' | 'failed' | 'pending',
+                        }));
+                        setMultiResult({
+                            totalInvoices: total,
+                            extractions,
+                        });
+                    }
+
                     if (payload.status && completedStatuses.has(payload.status)) {
                         stopPolling();
                         setBackgroundJobId(null);
                         setState('success');
                         setProgress(100);
-
-                        const results = payload.results || [];
-                        const extractions = results
-                            .filter((r: { status: string }) => r.status === 'success' || r.status === 'failed')
-                            .map((r: { filename?: string; extractionId?: string; confidenceScore?: number; status: string }, idx: number) => ({
-                                extractionId: r.extractionId || '',
-                                label: r.filename || `Invoice ${idx + 1}`,
-                                confidence: r.confidenceScore || 0,
-                            }));
-
-                        setMultiResult({
-                            totalInvoices: total,
-                            extractions,
-                        });
                         return;
                     }
                 }
@@ -123,6 +133,59 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             abortRef.current?.abort();
         };
     }, [stopPolling]);
+
+    // Restore multi-result from sessionStorage on mount (survives navigation to /review)
+    useEffect(() => {
+        try {
+            const saved = sessionStorage.getItem(MULTI_RESULT_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved) as MultiInvoiceResult;
+                if (parsed.extractions?.length > 0) {
+                    setMultiResult(parsed);
+                    setState('success');
+                }
+            }
+        } catch {
+            // Ignore parse errors
+        }
+    }, []);
+
+    // Persist multi-result to sessionStorage when it changes
+    useEffect(() => {
+        if (multiResult) {
+            sessionStorage.setItem(MULTI_RESULT_KEY, JSON.stringify(multiResult));
+        }
+    }, [multiResult]);
+
+    // Restore reviewedIds from sessionStorage
+    useEffect(() => {
+        try {
+            const saved = sessionStorage.getItem('reviewedExtractionIds');
+            if (saved) {
+                setReviewedIds(new Set(JSON.parse(saved) as string[]));
+            }
+        } catch { /* ignore */ }
+    }, []);
+
+    // Persist reviewedIds
+    useEffect(() => {
+        if (reviewedIds.size > 0) {
+            sessionStorage.setItem('reviewedExtractionIds', JSON.stringify([...reviewedIds]));
+        }
+    }, [reviewedIds]);
+
+    const loadExtraction = useCallback(async (extractionId: string) => {
+        if (extractionCache[extractionId]) return;
+        try {
+            const res = await fetch(`/api/invoices/extractions/${extractionId}`);
+            const data = await res.json();
+            if (data.data) {
+                setExtractionCache(prev => ({ ...prev, [extractionId]: data.data }));
+            }
+        } catch {
+            // Silently fail — user can retry by collapsing/expanding
+        }
+    }, [extractionCache]);
 
     const validateClientSide = useCallback((file: File): string | null => {
         if (file.size > FILE_LIMITS.MAX_FILE_SIZE_BYTES) {
@@ -281,12 +344,17 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         }
     };
 
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         stopPolling();
         setState('idle');
         setError('');
         setResult(null);
         setMultiResult(null);
+        sessionStorage.removeItem(MULTI_RESULT_KEY);
+        sessionStorage.removeItem('reviewedExtractionIds');
+        setExpandedId(null);
+        setExtractionCache({});
+        setReviewedIds(new Set());
         setProgress(0);
         setBackgroundJobId(null);
         setBackgroundProgress(0);
@@ -294,7 +362,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    };
+    }, [stopPolling]);
 
     const handleDownloadZip = useCallback(async () => {
         if (!multiResult) return;
@@ -305,6 +373,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
 
         if (extractionIds.length === 0) return;
 
+        setState('downloading');
         setIsDownloading(true);
         try {
             const response = await fetch('/api/invoices/batch-download', {
@@ -327,18 +396,27 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
+
+            // Show checkmark briefly, then reset to idle
+            setState('done');
+            setIsDownloading(false);
+            setTimeout(() => {
+                resetForm();
+            }, 2000);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Download failed');
-        } finally {
+            setState('error');
             setIsDownloading(false);
         }
-    }, [multiResult]);
+    }, [multiResult, resetForm]);
 
     const getStatusIcon = () => {
         if (!hasCredits) return '🔒';
         switch (state) {
             case 'uploading': return '📤';
             case 'extracting': return '🤖';
+            case 'downloading': return '🤖';
+            case 'done': return '✅';
             case 'success': return '✅';
             case 'error': return '❌';
             default: return '📄';
@@ -350,17 +428,19 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         switch (state) {
             case 'uploading': return t('uploading');
             case 'extracting': return t('extracting');
+            case 'downloading': return t('generatingZip');
+            case 'done': return t('downloadComplete');
             case 'success': return t('extractionComplete');
             case 'error': return t('extractionFailed');
             default: return t('dragOrClick');
         }
     };
 
-    const isProcessing = state === 'uploading' || state === 'extracting';
-    const isDisabled = isProcessing || !hasCredits;
+    const isProcessing = state === 'uploading' || state === 'extracting' || state === 'downloading';
+    const isDisabled = isProcessing || state === 'done' || !hasCredits;
 
     return (
-        <div className="w-full max-w-lg mx-auto">
+        <div className="w-full mx-auto max-w-4xl">
             {!hasCredits && state === 'idle' && (
                 <div className="mb-4 p-4 rounded-xl border border-amber-400/30 bg-amber-500/10 flex items-center gap-3">
                     <span className="text-2xl">⚠️</span>
@@ -406,11 +486,13 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     {isProcessing ? (
                         <AILoadingSpinner
                             message={
-                                backgroundJobId
-                                    ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
-                                    : state === 'uploading'
-                                        ? t('uploading')
-                                        : t('aiExtracting')
+                                state === 'downloading'
+                                    ? t('generatingZip')
+                                    : backgroundJobId
+                                        ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
+                                        : state === 'uploading'
+                                            ? t('uploading')
+                                            : t('aiExtracting')
                             }
                         />
                     ) : (
@@ -447,13 +529,49 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 </div>
             </div>
 
-            {isProcessing && (
+            {isProcessing && state !== 'downloading' && (
                 <div className="mt-4">
                     <div className="w-full bg-white/10 rounded-full h-2.5">
                         <div
                             className="bg-gradient-to-r from-emerald-400 to-green-500 h-2.5 rounded-full transition-all duration-300"
                             style={{ width: `${backgroundJobId ? backgroundProgress : progress}%` }}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Live extraction list during background processing */}
+            {state === 'extracting' && backgroundJobId && multiResult && multiResult.extractions.length > 0 && (
+                <div className="mt-4 p-4 glass-panel border border-white/10 rounded-xl">
+                    <p className="text-sm text-faded mb-3">
+                        {t('processingInvoices', {
+                            count: multiResult.totalInvoices,
+                            progress: backgroundProgress,
+                        })}
+                    </p>
+                    <div className="space-y-1 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                        {multiResult.extractions.map((ext, idx) => (
+                            <div
+                                key={ext.extractionId || idx}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5"
+                            >
+                                {ext.status === 'success' ? (
+                                    <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
+                                ) : ext.status === 'failed' ? (
+                                    <span className="text-rose-400 text-sm flex-shrink-0">&#10007;</span>
+                                ) : (
+                                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-sky-400 border-t-transparent flex-shrink-0" />
+                                )}
+                                <span className={`text-sm truncate ${ext.status === 'pending' ? 'text-faded' : 'text-white'}`}>
+                                    {ext.label || `Invoice ${idx + 1}`}
+                                </span>
+                                {ext.status === 'success' && ext.confidence > 0 && (
+                                    <span className="text-xs text-faded ml-auto flex-shrink-0">
+                                        {Math.round(ext.confidence * 100)}%
+                                    </span>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
@@ -518,33 +636,99 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     <p className="text-emerald-200 font-medium mb-3">
                         ✅ {t('invoicesDetected', { count: multiResult.totalInvoices })}
                     </p>
-                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {multiResult.extractions.length > 5 && (() => {
+                        const reviewable = multiResult.extractions.filter(e => e.extractionId).length;
+                        return (
+                            <p className="text-xs text-faded mb-2">
+                                {reviewedIds.size}/{reviewable} {t('reviewed').toLowerCase()}
+                            </p>
+                        );
+                    })()}
+                    <div ref={listScrollRef} className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}>
                         {multiResult.extractions.map((ext, idx) => (
-                            <div
-                                key={ext.extractionId || idx}
-                                className="flex items-center justify-between glass-panel p-3 rounded-lg"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium text-white">
-                                        {ext.label || `Invoice ${idx + 1}`}
-                                    </span>
-                                    {ext.confidence > 0 && (
-                                        <span className="text-xs text-faded">
-                                            {Math.round(ext.confidence * 100)}% {t('confidence').toLowerCase()}
+                            <div key={ext.extractionId || idx}>
+                                <div className="flex items-center justify-between glass-panel p-2.5 rounded-lg">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        {reviewedIds.has(ext.extractionId) && (
+                                            <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
+                                        )}
+                                        <span className="text-sm font-medium text-white truncate">
+                                            {ext.label || `Invoice ${idx + 1}`}
                                         </span>
+                                        {ext.confidence > 0 && (
+                                            <span className="text-xs text-faded flex-shrink-0">
+                                                {Math.round(ext.confidence * 100)}%
+                                            </span>
+                                        )}
+                                    </div>
+                                    {ext.extractionId ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                const isCollapsing = expandedId === ext.extractionId;
+                                                if (isCollapsing) {
+                                                    setReviewedIds(prev => new Set(prev).add(ext.extractionId));
+                                                    setExpandedId(null);
+                                                    // Restore scroll position after collapse renders
+                                                    requestAnimationFrame(() => {
+                                                        if (listScrollRef.current) {
+                                                            listScrollRef.current.scrollTop = savedScrollPos.current;
+                                                        }
+                                                    });
+                                                } else {
+                                                    // Save scroll position before expanding
+                                                    if (listScrollRef.current) {
+                                                        savedScrollPos.current = listScrollRef.current.scrollTop;
+                                                    }
+                                                    setExpandedId(ext.extractionId);
+                                                    loadExtraction(ext.extractionId);
+                                                }
+                                            }}
+                                            className={
+                                                reviewedIds.has(ext.extractionId)
+                                                    ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                                                    : expandedId === ext.extractionId
+                                                        ? 'bg-white/10 text-slate-200 hover:bg-white/15'
+                                                        : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                                            }
+                                        >
+                                            {reviewedIds.has(ext.extractionId)
+                                                ? t('reviewed')
+                                                : expandedId === ext.extractionId
+                                                    ? t('collapse')
+                                                    : t('reviewAndEdit')}
+                                        </Button>
+                                    ) : (
+                                        <span className="text-xs text-rose-300">{tCommon('error')}</span>
                                     )}
                                 </div>
-                                {ext.extractionId ? (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => router.push(`/review/${ext.extractionId}`)}
-                                        className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
-                                    >
-                                        {t('reviewAndEdit')}
-                                    </Button>
-                                ) : (
-                                    <span className="text-xs text-rose-300">{tCommon('error')}</span>
+                                {expandedId === ext.extractionId && (
+                                    <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
+                                        {extractionCache[ext.extractionId] ? (
+                                            <InvoiceReviewForm
+                                                extractionId={ext.extractionId}
+                                                userId={userId || ''}
+                                                initialData={extractionCache[ext.extractionId].extractionData || extractionCache[ext.extractionId]}
+                                                confidence={extractionCache[ext.extractionId].confidenceScore || ext.confidence || 0}
+                                                compact
+                                                onSubmitSuccess={() => {
+                                                    setReviewedIds(prev => new Set(prev).add(ext.extractionId));
+                                                    setExpandedId(null);
+                                                    requestAnimationFrame(() => {
+                                                        if (listScrollRef.current) {
+                                                            listScrollRef.current.scrollTop = savedScrollPos.current;
+                                                        }
+                                                    });
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="flex items-center justify-center py-8">
+                                                <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
+                                                <span className="ml-3 text-sm text-faded">{tCommon('loading')}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         ))}

@@ -13,6 +13,8 @@ interface InvoiceReviewFormProps {
     userId: string;
     initialData: any;
     confidence: number;
+    onSubmitSuccess?: () => void;
+    compact?: boolean;
 }
 
 const COUNTRY_CODES = [
@@ -31,18 +33,21 @@ export default function InvoiceReviewForm({
     userId,
     initialData,
     confidence,
+    onSubmitSuccess,
+    compact,
 }: InvoiceReviewFormProps) {
     const t = useTranslations('invoiceReview');
     const { form, onSubmit, isSubmitting, submitError, submitSuccess } = useInvoiceReviewForm({
         extractionId,
         userId,
-        initialData
+        initialData,
+        onSubmitSuccess,
     });
 
     const { register, control, formState: { errors }, watch, setValue } = form;
 
     return (
-        <form onSubmit={onSubmit} className="space-y-6 max-w-4xl">
+        <form onSubmit={onSubmit} className={compact ? "space-y-4" : "space-y-6 max-w-4xl"}>
             {/* Confidence Alert */}
             {(() => {
                 const missingFields: string[] = [];
@@ -120,7 +125,7 @@ export default function InvoiceReviewForm({
                 disabled={isSubmitting}
                 className="w-full px-6 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-semibold hover:brightness-110 disabled:opacity-50"
             >
-                {isSubmitting ? t('savingReview') : t('saveAndContinue')}
+                {isSubmitting ? t('savingReview') : (onSubmitSuccess ? t('saveReview') : t('saveAndContinue'))}
             </button>
         </form>
     );

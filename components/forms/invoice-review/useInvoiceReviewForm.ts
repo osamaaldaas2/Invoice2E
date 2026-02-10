@@ -61,9 +61,10 @@ interface UseInvoiceReviewFormProps {
     extractionId: string;
     userId: string;
     initialData: any;
+    onSubmitSuccess?: () => void;
 }
 
-export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseInvoiceReviewFormProps) => {
+export const useInvoiceReviewForm = ({ extractionId, userId, initialData, onSubmitSuccess }: UseInvoiceReviewFormProps) => {
     const router = useRouter();
     const [submitError, setSubmitError] = useState('');
     const [submitSuccess, setSubmitSuccess] = useState('');
@@ -242,9 +243,13 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
 
             sessionStorage.setItem(`review_${extractionId}`, JSON.stringify(payload));
 
-            setTimeout(() => {
-                router.push(`/convert/${extractionId}`);
-            }, 2000);
+            if (onSubmitSuccess) {
+                onSubmitSuccess();
+            } else {
+                setTimeout(() => {
+                    router.push(`/convert/${extractionId}`);
+                }, 2000);
+            }
 
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Review failed';

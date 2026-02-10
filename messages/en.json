@@ -288,7 +288,13 @@
         "review": "Review",
         "action": "Action",
         "downloadAllXml": "Download All XML",
-        "loadingDraft": "Loading..."
+        "loadingDraft": "Loading...",
+        "reviewed": "Reviewed",
+        "collapse": "Collapse",
+        "reviewAndEdit": "Review & Edit",
+        "generatingZip": "Generating ZIP...",
+        "downloadComplete": "Download Complete",
+        "invoices": "Invoices"
     },
     "upload": {
         "insufficientCredits": "Insufficient Credits",
@@ -315,12 +321,15 @@
         "retry": "Retry",
         "uploadDifferentFile": "Upload Different File",
         "generatingZip": "Generating ZIP...",
+        "downloadComplete": "Download complete!",
         "downloadAllZip": "Download All as ZIP",
         "confirmUpload": "Confirm Upload",
         "confirmUploadDesc": "This will use at least 1 credit (1 per invoice detected in the file). You currently have {credits} credit{plural}.",
         "fileInfo": "File: {name} ({size}MB)",
         "continue": "Continue",
-        "maxFileSize": "AI extracts data automatically (PDF, JPG, PNG - Max {size}MB)"
+        "maxFileSize": "AI extracts data automatically (PDF, JPG, PNG - Max {size}MB)",
+        "reviewed": "Reviewed",
+        "collapse": "Collapse"
     },
     "pricing": {
         "title": "Pricing",
@@ -416,6 +425,7 @@
         "notes": "Notes",
         "savingReview": "Saving Review...",
         "saveAndContinue": "Save & Continue to Conversion",
+        "saveReview": "Save Review",
         "invoiceDetails": "Invoice Details",
         "invoiceNumber": "Invoice Number",
         "invoiceDate": "Invoice Date",

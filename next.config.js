@@ -6,6 +6,7 @@ const nextConfig = {
     pageExtensions: ['ts', 'tsx'],
     experimental: {
         optimizePackageImports: ['@/lib', '@/components'],
+        proxyClientMaxBodySize: '200mb',
     },
     async headers() {
         return [
