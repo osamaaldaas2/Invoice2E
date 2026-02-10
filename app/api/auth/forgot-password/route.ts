@@ -34,7 +34,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (result) {
             // Build reset URL
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-            const resetUrl = `${appUrl}/en/reset-password?token=${result.token}`;
+            const resetUrl = `${appUrl}/reset-password?token=${result.token}`;
 
             // Send email
             await emailService.sendPasswordResetEmail(email, {

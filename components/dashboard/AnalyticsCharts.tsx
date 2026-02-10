@@ -23,10 +23,14 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
     const fetchChartData = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/invoices/analytics?period=${selectedPeriod}`);
+            // Map UI periods to API periods
+            const apiPeriod = selectedPeriod === '7d' ? 'week' : selectedPeriod === '90d' ? 'year' : 'month';
+            const response = await fetch(`/api/invoices/analytics?type=charts&period=${apiPeriod}`);
             if (!response.ok) throw new Error('Failed to fetch analytics');
             const data = await response.json();
-            setChartData(data.chartData || []);
+            // Map API response shape { date, conversions } to chart shape { date, count }
+            const daily = data.charts?.dailyConversions || [];
+            setChartData(daily.map((d: { date: string; conversions: number }) => ({ date: d.date, count: d.conversions })));
             setError(null);
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to fetch chart data';
@@ -87,13 +91,13 @@ export default function AnalyticsCharts({ period = '30d' }: Props) {
                         {t('noData')}
                     </div>
                 ) : (
-                    <div className="h-64 flex items-end gap-1">
+                    <div className="h-64 flex items-stretch gap-1">
                         {chartData.map((item, index) => {
                             const height = (item.count / maxCount) * 100;
                             return (
                                 <div
                                     key={index}
-                                    className="flex-1 flex flex-col items-center group"
+                                    className="flex-1 flex flex-col items-center justify-end group"
                                 >
                                     <div className="relative w-full flex justify-center mb-1">
                                         <div

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
+import { LOCALE_COOKIE_NAME, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@/lib/constants';
 import { checkRateLimitAsync, getRequestIdentifier, resetRateLimit } from '@/lib/rate-limiter';
 import { setSessionCookie } from '@/lib/session';
 import { LoginSchema } from '@/lib/validators';
@@ -53,6 +55,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // SECURITY FIX: Use signed session token instead of plain user ID
         await setSessionCookie(user);
+
+        // Set locale cookie from user's language preference
+        const userLocale = SUPPORTED_LOCALES.includes(user.language as 'en' | 'de')
+            ? user.language
+            : DEFAULT_LOCALE;
+        const cookieStore = await cookies();
+        cookieStore.set(LOCALE_COOKIE_NAME, userLocale, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: 'lax',
+        });
 
         return NextResponse.json(
             {

@@ -8,7 +8,6 @@ import { AppError, ValidationError } from '@/lib/errors';
 import { MAX_CONCURRENT_BATCH_JOBS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { creditsDbService } from '@/services/credits.db.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
 
 type BatchJobRow = {
@@ -372,10 +371,8 @@ export class BatchService {
             }
         }
 
-        // Deduct credits once for all successful extractions
-        if (completedFiles > 0) {
-            await creditsDbService.deductCredits(userId, completedFiles, `batch:${jobId}`);
-        }
+        // Credits already deducted upfront in extract/route.ts (extraction:multi)
+        // No second deduction needed here
 
         // Final status
         const finalStatus = failedFiles === 0

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { xrechnungService } from '@/services/xrechnung.service';
+import { xrechnungService, type XRechnungInvoiceData } from '@/services/xrechnung.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
                     totalAmount: Number(data.totalAmount) || 0,
                 } as Record<string, unknown>;
 
-                const result = xrechnungService.generateXRechnung(serviceData as any);
+                const result = xrechnungService.generateXRechnung(serviceData as unknown as XRechnungInvoiceData);
                 let fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');
                 // Deduplicate filenames to prevent ZIP overwrite
                 if (usedFileNames.has(fileName)) {

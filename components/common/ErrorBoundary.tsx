@@ -2,6 +2,7 @@
 
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { logger } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     children: ReactNode;
@@ -35,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
             const isDev = process.env.NODE_ENV !== 'production';
             return this.props.fallback || (
                 <div className="min-h-screen flex items-center justify-center bg-slate-950">
-                    <div className="text-center glass-card p-8 max-w-md">
+                    <div className="text-center glass-card p-4 sm:p-8 max-w-md mx-4 sm:mx-0">
                         <h1 className="text-2xl font-bold text-white mb-3">
                             Something went wrong
                         </h1>
@@ -44,13 +45,12 @@ export class ErrorBoundary extends Component<Props, State> {
                                 ? (this.state.error?.message || 'An unexpected error occurred')
                                 : 'An unexpected error occurred. Please try again.'}
                         </p>
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
                             onClick={() => window.location.reload()}
-                            className="px-4 py-2 bg-sky-500 text-white rounded-full hover:brightness-110"
                         >
                             Reload Page
-                        </button>
+                        </Button>
                     </div>
                 </div>
             );

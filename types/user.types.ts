@@ -14,12 +14,6 @@ export type UserProfile = {
     updatedAt: Date;
 };
 
-export type UserCredits = {
-    availableCredits: number;
-    usedCredits: number;
-    creditsExpiryDate: Date | null;
-};
-
 export type UpdateProfileRequest = {
     firstName?: string;
     lastName?: string;

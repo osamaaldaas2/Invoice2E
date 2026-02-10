@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
-import { useEffect, useMemo, useState } from 'react';
-import { emitAuthChanged, fetchSessionUser } from '@/lib/client-auth';
+import { useTranslations } from 'next-intl';
+import { useMemo, useState } from 'react';
+import { emitAuthChanged } from '@/lib/client-auth';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
+import { useUser } from '@/lib/user-context';
 
 // Admin navigation items
 const adminNavItems = [
@@ -18,45 +20,15 @@ const adminNavItems = [
     { href: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
 ];
 
-type AdminUser = {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-};
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const locale = useLocale();
-    const [user, setUser] = useState<AdminUser | null>(null);
+
+    const t = useTranslations('admin');
+    const { user } = useUser();
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [loggingOut, setLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const loadUser = async () => {
-            try {
-                const sessionUser = await fetchSessionUser();
-                if (sessionUser) {
-                    setUser({
-                        id: sessionUser.id,
-                        email: sessionUser.email,
-                        firstName: sessionUser.firstName,
-                        lastName: sessionUser.lastName,
-                        role: sessionUser.role || 'user',
-                    });
-                } else {
-                    setUser(null);
-                }
-            } catch {
-                setUser(null);
-            }
-        };
-
-        void loadUser();
-    }, []);
 
     const handleLogout = async () => {
         try {
@@ -67,7 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 throw new Error(`Logout failed (${response.status})`);
             }
             emitAuthChanged();
-            router.push(`/${locale}/login`);
+            router.push('/login');
         } catch (error) {
             setLogoutError('Failed to sign out. Please try again.');
             logger.error('Admin logout failed', error);
@@ -76,15 +48,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
     };
 
+    const userRole = user?.role || 'user';
+
     const visibleNavItems = useMemo(() => {
-        if (user?.role === 'super_admin') {
+        if (userRole === 'super_admin') {
             return adminNavItems;
         }
         return adminNavItems.filter((item) => item.href !== '/admin/vouchers');
-    }, [user?.role]);
+    }, [userRole]);
 
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen overflow-x-hidden">
             {/* Sidebar */}
             <aside
                 className={`fixed left-0 top-0 z-40 h-screen transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -92,23 +66,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
                 {/* Logo / Header */}
                 <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
-                    <Link href={`/${locale}/admin`} className="flex items-center">
+                    <Link href="/admin" className="flex items-center">
                         <span className="text-2xl">🛡️</span>
                         <span className="ml-2 text-xl font-bold text-white font-display">Admin</span>
                     </Link>
-                    <button
-                        type="button"
-                        onClick={() => setSidebarOpen(false)}
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         className="lg:hidden text-slate-400 hover:text-white"
+                        onClick={() => setSidebarOpen(false)}
                     >
                         ✕
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Navigation */}
                 <nav className="p-4 space-y-2">
                     {visibleNavItems.map((item) => {
-                        const fullHref = `/${locale}${item.href}`;
+                        const fullHref = item.href;
                         const isActive =
                             pathname === fullHref ||
                             (item.href !== '/admin' && pathname?.startsWith(fullHref));
@@ -143,18 +118,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 {user?.firstName} {user?.lastName}
                             </p>
                             <p className="text-xs text-slate-400 capitalize">
-                                {user?.role?.replace('_', ' ')}
+                                {userRole.replace('_', ' ')}
                             </p>
                         </div>
                     </div>
-                    <button
-                        type="button"
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-3 w-full border border-white/10"
                         onClick={handleLogout}
                         disabled={loggingOut}
-                        className="mt-3 w-full px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors border border-white/10"
                     >
-                        {loggingOut ? 'Signing out...' : 'Sign out'}
-                    </button>
+                        {loggingOut ? t('signingOut') : t('signOut')}
+                    </Button>
                     {logoutError ? (
                         <p className="mt-2 text-xs text-rose-300" role="alert">{logoutError}</p>
                     ) : null}
@@ -162,14 +138,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </aside>
 
             {/* Mobile sidebar toggle */}
-            <button
-                type="button"
+            <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setSidebarOpen(true)}
-                className={`fixed top-4 left-4 z-30 lg:hidden p-2 rounded-xl bg-slate-950/80 text-white border border-white/10 ${sidebarOpen ? 'hidden' : ''
-                    }`}
+                className={`fixed top-4 left-4 z-30 lg:hidden bg-slate-950/80 border border-white/10 ${sidebarOpen ? 'hidden' : ''}`}
             >
                 ☰
-            </button>
+            </Button>
 
             {/* Backdrop for mobile */}
             {sidebarOpen && (
@@ -180,35 +156,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
 
             {/* Main content */}
-            <div className={`transition-all ${sidebarOpen ? 'lg:ml-64' : ''}`}>
+            <div className={`transition-all lg:ml-64 min-w-0`}>
                 {/* Top header */}
                 <header className="sticky top-0 z-20 bg-slate-950/80 border-b border-white/10 backdrop-blur-xl">
-                    <div className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center justify-between px-3 md:px-6 py-4">
                         <div className="flex items-center">
-                            <button
-                                type="button"
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="hidden lg:block"
                                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="hidden lg:block p-2 rounded-xl hover:bg-white/10"
                             >
                                 ☰
-                            </button>
+                            </Button>
                             <h1 className="ml-4 text-xl font-semibold text-white font-display">
-                                Admin Panel
+                                {t('panelTitle')}
                             </h1>
                         </div>
                         <div className="flex items-center space-x-4">
                             <Link
-                                href={`/${locale}/dashboard`}
+                                href="/dashboard"
                                 className="text-sm text-slate-300 hover:text-white"
                             >
-                                ← Back to App
+                                ← {t('backToApp')}
                             </Link>
                         </div>
                     </div>
                 </header>
 
                 {/* Page content */}
-                <main className="p-6">
+                <main className="p-3 md:p-6 min-w-0">
                     <ErrorBoundary>
                         {children}
                     </ErrorBoundary>
@@ -217,4 +194,3 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
     );
 }
-

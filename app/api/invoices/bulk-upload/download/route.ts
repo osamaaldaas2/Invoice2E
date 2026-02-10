@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { batchService } from '@/services/batch.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { xrechnungService } from '@/services/xrechnung.service';
+import { xrechnungService, type XRechnungInvoiceData } from '@/services/xrechnung.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { verifySignedDownloadToken } from '@/lib/session';
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
                         totalAmount: Number(data.totalAmount) || 0,
                     } as Record<string, unknown>;
 
-                    const xmlResult = xrechnungService.generateXRechnung(serviceData as any);
+                    const xmlResult = xrechnungService.generateXRechnung(serviceData as unknown as XRechnungInvoiceData);
                     xmlContent = xmlResult.xmlContent;
                     xmlFileName = xmlResult.fileName;
                     validationStatus = xmlResult.validationStatus;

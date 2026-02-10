@@ -192,7 +192,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
                         aria-describedby={ids.descriptionId}
                         tabIndex={-1}
                         className={cn(
-                            'relative z-10 w-full max-w-lg rounded-2xl border border-white/15 bg-slate-950/95 p-6 text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.45)]',
+                            'relative z-10 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg rounded-2xl border border-white/15 bg-slate-950/95 p-4 sm:p-6 text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.45)]',
                             className
                         )}
                         onClick={(event) => {

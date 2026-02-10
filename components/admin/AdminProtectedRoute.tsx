@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useLocale } from 'next-intl';
-import { fetchSessionUser } from '@/lib/client-auth';
+import { useUser } from '@/lib/user-context';
 
 type AdminProtectedRouteProps = {
     children: React.ReactNode;
@@ -21,16 +20,13 @@ export default function AdminProtectedRoute({
 }: AdminProtectedRouteProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const locale = useLocale();
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const { user, loading } = useUser();
 
-    const dashboardPath = useMemo(() => `/${locale}/dashboard`, [locale]);
-    const loginPath = useMemo(() => `/${locale}/login`, [locale]);
-    const adminPath = useMemo(() => `/${locale}/admin`, [locale]);
+    const dashboardPath = '/dashboard';
+    const loginPath = '/login';
+    const adminPath = '/admin';
 
     const redirectUnauthorized = useCallback(() => {
-        // Redirect non-admins to dashboard
         router.push(dashboardPath);
     }, [dashboardPath, router]);
 
@@ -40,38 +36,25 @@ export default function AdminProtectedRoute({
     }, [adminPath, loginPath, pathname, router]);
 
     useEffect(() => {
-        const checkAdminAuth = async () => {
-            try {
-                const sessionUser = await fetchSessionUser();
-                if (!sessionUser) {
-                    redirectToLogin();
-                    return;
-                }
+        if (loading) return;
 
-                // Check role
-                const isAdmin = ['admin', 'super_admin'].includes(sessionUser.role || '');
-                const isSuperAdmin = sessionUser.role === 'super_admin';
+        if (!user) {
+            redirectToLogin();
+            return;
+        }
 
-                if (!isAdmin) {
-                    redirectUnauthorized();
-                    return;
-                }
+        const isAdmin = ['admin', 'super_admin'].includes(user.role || '');
+        const isSuperAdmin = user.role === 'super_admin';
 
-                if (requireSuperAdmin && !isSuperAdmin) {
-                    redirectUnauthorized();
-                    return;
-                }
+        if (!isAdmin) {
+            redirectUnauthorized();
+            return;
+        }
 
-                setIsAuthorized(true);
-            } catch {
-                redirectUnauthorized();
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        checkAdminAuth();
-    }, [redirectToLogin, redirectUnauthorized, requireSuperAdmin]);
+        if (requireSuperAdmin && !isSuperAdmin) {
+            redirectUnauthorized();
+        }
+    }, [loading, user, redirectToLogin, redirectUnauthorized, requireSuperAdmin]);
 
     if (loading) {
         return (
@@ -86,7 +69,10 @@ export default function AdminProtectedRoute({
         );
     }
 
-    if (!isAuthorized) {
+    const isAdmin = ['admin', 'super_admin'].includes(user?.role || '');
+    const isSuperAdmin = user?.role === 'super_admin';
+
+    if (!user || !isAdmin || (requireSuperAdmin && !isSuperAdmin)) {
         return null;
     }
 

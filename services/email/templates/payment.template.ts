@@ -32,11 +32,11 @@ export const getPaymentEmailHtml = (data: PaymentEmailData): string => {
         <p>Amount Paid: ${data.amountPaid.toFixed(2)} ${data.currency}</p>
         <p>Credits Purchased: ${data.creditsPurchased}</p>
         <p>Available Credits: ${data.availableCredits}</p>
-        ${data.receiptUrl ? `<p><a href="${data.receiptUrl}">View Receipt</a></p>` : ''}
+        ${data.receiptUrl && data.receiptUrl.startsWith('https://') ? `<p><a href="${data.receiptUrl}">View Receipt</a></p>` : ''}
       </div>
       
       <p style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/dashboard" class="button">Start Converting Invoices</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">Start Converting Invoices</a>
       </p>
     </div>
     <div class="footer">

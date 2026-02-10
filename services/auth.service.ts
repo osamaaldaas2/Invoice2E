@@ -31,6 +31,7 @@ type AuthUser = {
     firstName: string;
     lastName: string;
     role: UserRole;
+    language: string;
 };
 
 type DbUser = {
@@ -148,6 +149,7 @@ export class AuthService {
             firstName: user.first_name,
             lastName: user.last_name,
             role: 'user', // New users always start as regular users
+            language: 'en',
         };
     }
 
@@ -193,6 +195,7 @@ export class AuthService {
             firstName: user.first_name,
             lastName: user.last_name,
             role: user.role || 'user',
+            language: user.language || 'en',
         };
     }
 

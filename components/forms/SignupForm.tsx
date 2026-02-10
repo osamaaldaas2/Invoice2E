@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { emitAuthChanged } from '@/lib/client-auth';
 
 export default function SignupForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const t = useTranslations('auth');
-    const locale = useLocale();
+    const tErr = useTranslations('errors');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
@@ -27,7 +27,7 @@ export default function SignupForm() {
     });
 
     const redirectTarget = useMemo(() => {
-        const fallback = `/${locale}/dashboard`;
+        const fallback = '/dashboard';
         const returnUrl = searchParams?.get('returnUrl');
         if (!returnUrl) {
             return fallback;
@@ -45,7 +45,7 @@ export default function SignupForm() {
         }
 
         return decoded;
-    }, [locale, searchParams]);
+    }, [searchParams]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -62,14 +62,14 @@ export default function SignupForm() {
 
         // Validate passwords match
         if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
+            setError(t('passwordsNoMatch'));
             setLoading(false);
             return;
         }
 
         // Validate password length
         if (formData.password.length < 8) {
-            setError('Password must be at least 8 characters');
+            setError(t('passwordMinLength'));
             setLoading(false);
             return;
         }
@@ -95,14 +95,14 @@ export default function SignupForm() {
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error || 'Signup failed');
+                setError(data.error || tErr('signupFailed'));
                 return;
             }
 
             emitAuthChanged();
             router.push(redirectTarget);
         } catch {
-            setError('An error occurred. Please try again.');
+            setError(tErr('generic'));
         } finally {
             setLoading(false);
         }
@@ -110,7 +110,7 @@ export default function SignupForm() {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label htmlFor="firstName" className="block text-sm font-medium text-slate-300 mb-1">
                         {t('first_name')}
@@ -195,7 +195,7 @@ export default function SignupForm() {
                 />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label htmlFor="postalCode" className="block text-sm font-medium text-slate-300 mb-1">
                         {t('postal_code')}
@@ -230,7 +230,7 @@ export default function SignupForm() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label htmlFor="country" className="block text-sm font-medium text-slate-300 mb-1">
                         {t('country')}
@@ -282,7 +282,7 @@ export default function SignupForm() {
                     placeholder="********"
                     disabled={loading}
                 />
-                <p className="text-xs text-faded mt-1">Minimum 8 characters</p>
+                <p className="text-xs text-faded mt-1">{t('passwordMinChars')}</p>
             </div>
 
             <div>
@@ -316,7 +316,7 @@ export default function SignupForm() {
                 {loading ? (
                     <span className="flex items-center justify-center gap-2">
                         <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        Creating account...
+                        {t('creatingAccount')}
                     </span>
                 ) : (
                     t('create_account')

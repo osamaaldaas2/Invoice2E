@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/confirm-context';
+import { useToast } from '@/lib/toast-context';
 
 interface Template {
     id: string;
@@ -18,11 +20,13 @@ interface Props {
 
 export default function TemplateManager({ onApplyTemplate }: Props) {
     const t = useTranslations('templates');
+    const tConfirm = useTranslations('confirm');
+    const confirm = useConfirm();
+    const { toast } = useToast();
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -44,7 +48,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
             const data = await response.json();
             setTemplates(data.templates || []);
         } catch {
-            setError('Failed to load templates');
+            toast({ title: 'Failed to load templates', variant: 'error' });
         } finally {
             setLoading(false);
         }
@@ -56,7 +60,6 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
 
     const handleSave = async () => {
         try {
-            setError(null);
             const method = editingTemplate ? 'PUT' : 'POST';
             const url = editingTemplate
                 ? `/api/invoices/templates/${editingTemplate.id}`
@@ -89,19 +92,27 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                 sellerPostalCode: '',
                 sellerCountry: 'DE',
             });
+            toast({ title: editingTemplate ? 'Template updated' : 'Template saved', variant: 'success' });
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to save');
+            toast({ title: err instanceof Error ? err.message : 'Failed to save', variant: 'error' });
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm(t('confirmDelete'))) return;
+        const confirmed = await confirm({
+            title: tConfirm('deleteTitle'),
+            description: t('confirmDelete'),
+            variant: 'destructive',
+            confirmLabel: t('delete'),
+        });
+        if (!confirmed) return;
 
         try {
             await fetch(`/api/invoices/templates/${id}`, { method: 'DELETE' });
             await fetchTemplates();
+            toast({ title: 'Template deleted', variant: 'success' });
         } catch {
-            setError('Failed to delete template');
+            toast({ title: 'Failed to delete template', variant: 'error' });
         }
     };
 
@@ -158,12 +169,6 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
                     {t('newTemplate')}
                 </button>
             </div>
-
-            {error && (
-                <div className="m-4 p-4 glass-panel text-rose-200 rounded-lg border border-rose-400/30">
-                    {error}
-                </div>
-            )}
 
             {showForm && (
                 <div className="p-4 border-b border-white/10 bg-white/5">

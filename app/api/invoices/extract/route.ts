@@ -93,24 +93,7 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Check credits before processing
-        try {
-            const credits = await creditsDbService.getUserCredits(userId);
-            if (credits.availableCredits < 1) {
-                return NextResponse.json(
-                    { success: false, error: 'Insufficient credits. Please purchase more credits.' },
-                    { status: 402 }
-                );
-            }
-        } catch (e) {
-            logger.error('Failed to check credits during extraction', { userId, error: e });
-            // Fail safe - if we can't check credits, don't allow processing to be safe, 
-            // or allow it? Let's be safe and block.
-            return NextResponse.json(
-                { success: false, error: 'Failed to verify credits' },
-                { status: 500 }
-            );
-        }
+        // Credit check removed — deduction happens atomically before AI call (see below)
 
         // Determine AI provider from env or default
         const aiProvider = process.env.AI_PROVIDER || 'deepseek';
@@ -145,20 +128,20 @@ export async function POST(request: NextRequest) {
         const boundaryResult = await boundaryDetectionService.detect(buffer, file.type);
 
         if (boundaryResult.totalInvoices > 1) {
-            // Multi-invoice PDF: check credits
+            // Multi-invoice PDF: deduct all credits atomically upfront
             const requiredCredits = boundaryResult.totalInvoices;
             try {
-                const credits = await creditsDbService.getUserCredits(userId);
-                if (credits.availableCredits < requiredCredits) {
+                const deducted = await creditsDbService.deductCredits(userId, requiredCredits, `extraction:multi`);
+                if (!deducted) {
                     return NextResponse.json(
-                        { success: false, error: `This PDF contains ${requiredCredits} invoices but you only have ${credits.availableCredits} credits.` },
+                        { success: false, error: `This PDF contains ${requiredCredits} invoices but you don't have enough credits.` },
                         { status: 402 }
                     );
                 }
             } catch (e) {
-                logger.error('Failed to re-check credits for multi-invoice', { userId, error: e });
+                logger.error('Failed to deduct credits for multi-invoice', { userId, error: e });
                 return NextResponse.json(
-                    { success: false, error: 'Failed to verify credits' },
+                    { success: false, error: 'Failed to deduct credits' },
                     { status: 500 }
                 );
             }
@@ -220,7 +203,7 @@ export async function POST(request: NextRequest) {
                             status: 'draft',
                         });
 
-                        await creditsDbService.deductCredits(userId, 1, 'extraction');
+                        // Credits already deducted upfront — no per-segment deduction
 
                         extractions[i] = {
                             extractionId: extraction.id,
@@ -242,9 +225,22 @@ export async function POST(request: NextRequest) {
                 }));
             }
 
+            // Refund credits for failed segments
+            const failCount = extractions.filter(e => !e.extractionId).length;
+            if (failCount > 0) {
+                try {
+                    await creditsDbService.addCredits(userId, failCount, 'extraction_refund:multi');
+                } catch (refundErr) {
+                    logger.error('Failed to refund credits for failed multi-invoice segments', {
+                        userId, failCount, error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+                    });
+                }
+            }
+
             logger.info('Multi-invoice extraction completed', {
                 totalInvoices: boundaryResult.totalInvoices,
                 successful: extractions.filter(e => e.extractionId).length,
+                failed: failCount,
                 userId,
             });
 
@@ -262,12 +258,29 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Single invoice flow (existing behavior)
+        // Single invoice flow — deduct credit BEFORE AI call to prevent double-spend
+        const deducted = await creditsDbService.deductCredits(userId, 1, 'extraction');
+        if (!deducted) {
+            return NextResponse.json(
+                { success: false, error: 'Insufficient credits. Please purchase more credits.' },
+                { status: 402 }
+            );
+        }
+
         const startTime = Date.now();
         let extractedData;
         try {
             extractedData = await extractor.extractFromFile(buffer, file.name, file.type);
         } catch (extractionError) {
+            // Refund the pre-deducted credit on AI failure
+            try {
+                await creditsDbService.addCredits(userId, 1, 'extraction_refund');
+            } catch (refundErr) {
+                logger.error('Failed to refund credit after extraction failure', {
+                    userId, error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+                });
+            }
+
             logger.error('Detailed extraction error information', {
                 provider: extractor.getProviderName(),
                 errorName: extractionError instanceof Error ? extractionError.constructor.name : 'Unknown',
@@ -300,36 +313,7 @@ export async function POST(request: NextRequest) {
             status: 'draft',
         });
 
-        // Deduct credits AFTER successful extraction and save
-        try {
-            const deducted = await creditsDbService.deductCredits(userId, 1, 'extraction');
-            if (!deducted) {
-                try {
-                    await invoiceDbService.deleteExtraction(extraction.id);
-                } catch (cleanupError) {
-                    logger.warn('Failed to cleanup extraction after credit deduction failure', {
-                        extractionId: extraction.id,
-                        userId,
-                        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-                    });
-                }
-
-                return NextResponse.json(
-                    { success: false, error: 'Insufficient credits. Please purchase more credits.' },
-                    { status: 402 }
-                );
-            }
-        } catch (deductError) {
-            logger.error('Failed to deduct credits after extraction', {
-                extractionId: extraction.id,
-                userId,
-                error: deductError instanceof Error ? deductError.message : String(deductError),
-            });
-            return NextResponse.json(
-                { success: false, error: 'Failed to deduct credits. Please try again.' },
-                { status: 500 }
-            );
-        }
+        // Credits already deducted before AI call — no post-extraction deduction needed
 
         logger.info('Invoice extraction and storage completed', {
             extractionId: extraction.id,

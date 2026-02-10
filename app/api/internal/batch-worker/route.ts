@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { batchService } from '@/services/batch.service';
 import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export const maxDuration = 120;
+
+function safeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 function isWorkerAuthorized(request: NextRequest): boolean {
     const configuredSecret = process.env.BATCH_WORKER_SECRET;
     const provided = request.headers.get('x-internal-worker-key');
 
     if (configuredSecret) {
-        return provided === configuredSecret;
+        if (!provided) return false;
+        return safeCompare(provided, configuredSecret);
     }
 
     // In production, require the secret — never fall back to open access
@@ -29,6 +37,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
                 { success: false, error: 'Unauthorized worker request' },
                 { status: 401 }
+            );
+        }
+
+        const rateLimitId = `worker:${getRequestIdentifier(request)}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'worker');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: 'Too many worker requests' },
+                { status: 429, headers: { 'Retry-After': String(rateLimit.resetInSeconds) } }
             );
         }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 
 interface PaymentSectionProps {
     register: UseFormRegister<any>;
@@ -7,22 +8,23 @@ interface PaymentSectionProps {
 }
 
 export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors }) => {
+    const t = useTranslations('invoiceReview');
     return (
         <div className="glass-card p-6">
-            <h3 className="text-lg font-medium text-white mb-4 font-display">Payment Information</h3>
+            <h3 className="text-lg font-medium text-white mb-4 font-display">{t('paymentInfo')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        IBAN <span className="text-red-500">*</span>
-                        <span className="text-xs text-faded ml-1">(BR-DE-23-a)</span>
+                        {t('iban')} <span className="text-red-500">*</span>
+                        <span className="text-xs text-faded ml-1">{t('ibanHint')}</span>
                     </label>
                     <input
                         type="text"
                         {...register('sellerIban', {
-                            required: 'IBAN is required for bank transfers (BR-DE-23-a)',
+                            required: t('ibanRequired'),
                             pattern: {
                                 value: /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/,
-                                message: 'Invalid IBAN format (e.g., DE89370400440532013000)'
+                                message: t('ibanInvalid')
                             },
                             setValueAs: (value) =>
                                 typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value
@@ -37,7 +39,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        BIC (Swift)
+                        {t('bic')}
                     </label>
                     <input
                         type="text"
@@ -48,7 +50,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Bank Name
+                        {t('bankName')}
                     </label>
                     <input
                         type="text"
@@ -59,7 +61,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({ register, errors
 
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Payment Terms / Notes
+                        {t('paymentTerms')}
                     </label>
                     <textarea
                         {...register('paymentTerms')}

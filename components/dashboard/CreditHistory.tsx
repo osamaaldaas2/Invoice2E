@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 type CreditTransaction = {
     id: string;
@@ -13,50 +13,46 @@ type CreditTransaction = {
     created_at: string;
 };
 
-const SOURCE_CONFIG: Record<string, { label: string; labelDe: string; icon: string }> = {
-    payment: { label: 'Purchase', labelDe: 'Kauf', icon: '💳' },
-    stripe: { label: 'Purchase (Stripe)', labelDe: 'Kauf (Stripe)', icon: '💳' },
-    paypal: { label: 'Purchase (PayPal)', labelDe: 'Kauf (PayPal)', icon: '💳' },
-    extraction: { label: 'Invoice Extraction', labelDe: 'Rechnungsextraktion', icon: '📄' },
-    batch_extraction: { label: 'Batch Extraction', labelDe: 'Batch-Extraktion', icon: '📦' },
-    conversion: { label: 'Conversion', labelDe: 'Konvertierung', icon: '🔄' },
-    voucher: { label: 'Voucher Redeemed', labelDe: 'Gutschein eingelöst', icon: '🎟️' },
-    refund: { label: 'Refund', labelDe: 'Rückerstattung', icon: '↩️' },
-    gift: { label: 'Gift', labelDe: 'Geschenk', icon: '🎁' },
-    signup: { label: 'Welcome Bonus', labelDe: 'Willkommensbonus', icon: '🎉' },
-    admin: { label: 'Admin Adjustment', labelDe: 'Admin-Anpassung', icon: '⚙️' },
+const SOURCE_KEYS: Record<string, { key: string; icon: string }> = {
+    payment: { key: 'purchase', icon: '💳' },
+    'payment.verified': { key: 'purchase', icon: '💳' },
+    payment_verify: { key: 'purchase', icon: '💳' },
+    stripe: { key: 'purchaseStripe', icon: '💳' },
+    paypal: { key: 'purchasePaypal', icon: '💳' },
+    extraction: { key: 'extraction', icon: '📄' },
+    'extraction:multi': { key: 'multiExtraction', icon: '📄' },
+    batch_extraction: { key: 'batchExtraction', icon: '📦' },
+    conversion: { key: 'conversion', icon: '🔄' },
+    voucher: { key: 'voucher', icon: '🎟️' },
+    refund: { key: 'refund', icon: '↩️' },
+    gift: { key: 'gift', icon: '🎁' },
+    signup: { key: 'signup', icon: '🎉' },
+    admin: { key: 'admin', icon: '⚙️' },
 };
 
-function getSourceDisplay(source: string, isGerman: boolean): { label: string; icon: string } {
-    const config = SOURCE_CONFIG[source];
-    if (config) {
-        return { label: isGerman ? config.labelDe : config.label, icon: config.icon };
-    }
-    // Handle refund:transactionId pattern
-    if (source.startsWith('refund')) {
-        const refundConfig = SOURCE_CONFIG['refund']!;
-        return { label: isGerman ? refundConfig.labelDe : refundConfig.label, icon: refundConfig.icon };
-    }
-    // Handle batch:jobId pattern
-    if (source.startsWith('batch:')) {
-        const batchConfig = SOURCE_CONFIG['batch_extraction']!;
-        return { label: isGerman ? batchConfig.labelDe : batchConfig.label, icon: batchConfig.icon };
-    }
-    return { label: source, icon: '📝' };
-}
-
-type CreditHistoryProps = {
-    locale?: string;
-};
-
-export default function CreditHistory({ locale = 'en' }: CreditHistoryProps) {
+export default function CreditHistory() {
     const t = useTranslations('credits');
-    const isGerman = locale === 'de';
+    const tHistory = useTranslations('creditHistory');
+    const locale = useLocale();
     const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const limit = 10;
+
+    const getSourceDisplay = useCallback((source: string): { label: string; icon: string } => {
+        const config = SOURCE_KEYS[source];
+        if (config) {
+            return { label: tHistory(config.key), icon: config.icon };
+        }
+        if (source.startsWith('refund') || source.includes('_refund') || source.includes('refund:')) {
+            return { label: tHistory('refund'), icon: '↩️' };
+        }
+        if (source.startsWith('batch:')) {
+            return { label: tHistory('batchExtraction'), icon: '📦' };
+        }
+        return { label: source, icon: '📝' };
+    }, [tHistory]);
 
     const fetchHistory = useCallback(async (p: number) => {
         setLoading(true);
@@ -72,7 +68,9 @@ export default function CreditHistory({ locale = 'en' }: CreditHistoryProps) {
         } finally {
             setLoading(false);
         }
-    }, [limit]);
+    // limit is a constant (10) — excluding from deps to prevent unnecessary re-creations
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         fetchHistory(page);
@@ -88,7 +86,7 @@ export default function CreditHistory({ locale = 'en' }: CreditHistoryProps) {
     const totalPages = Math.ceil(total / limit);
 
     const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString(isGerman ? 'de-DE' : 'en-GB', {
+        return new Date(dateStr).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -98,7 +96,7 @@ export default function CreditHistory({ locale = 'en' }: CreditHistoryProps) {
     };
 
     return (
-        <div className="glass-card p-6">
+        <div className="glass-card p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-white font-display mb-4">
                 {t('historyTitle')}
             </h3>
@@ -120,7 +118,7 @@ export default function CreditHistory({ locale = 'en' }: CreditHistoryProps) {
                         {transactions.map((tx) => {
                             const isCredit = tx.transaction_type === 'credit' || tx.amount > 0;
                             const absAmount = Math.abs(tx.amount);
-                            const { label, icon } = getSourceDisplay(tx.source, isGerman);
+                            const { label, icon } = getSourceDisplay(tx.source);
 
                             return (
                                 <div

@@ -274,6 +274,22 @@ export class BatchProcessor {
                 .update({ results })
                 .eq('id', jobId);
 
+            // Deduct credits upfront for all files (prevents extraction without payment)
+            const totalFiles = files.filter(f => !!f).length;
+            const creditsDeducted = await creditsDbService.deductCredits(userId, totalFiles, `batch:${jobId}`);
+            if (!creditsDeducted) {
+                logger.warn('Insufficient credits for batch', { jobId, userId, totalFiles });
+                await supabase
+                    .from('batch_jobs')
+                    .update({
+                        status: 'failed',
+                        completed_at: new Date().toISOString(),
+                        error_message: 'Insufficient credits',
+                    })
+                    .eq('id', jobId);
+                throw new Error('Insufficient credits for batch processing');
+            }
+
             // Process files concurrently with a pool of `concurrency` workers
             const validFiles = files
                 .map((file, index) => ({ file, index }))
@@ -297,14 +313,19 @@ export class BatchProcessor {
                 );
             }
 
-            // Deduct credits once for all successful extractions in this batch
+            // Credits were deducted upfront — refund for failed files
             const successCount = results.filter(r => r.status === 'success').length;
             const failCount = results.filter(r => r.status === 'failed').length;
 
-            if (successCount > 0) {
-                const deducted = await creditsDbService.deductCredits(userId, successCount, `batch:${jobId}`);
-                if (!deducted) {
-                    logger.warn('Insufficient credits for batch deduction', { jobId, userId, successCount });
+            if (failCount > 0) {
+                try {
+                    await creditsDbService.addCredits(userId, failCount, 'batch_refund', jobId);
+                    logger.info('Refunded credits for failed batch files', { jobId, userId, failCount });
+                } catch (refundErr) {
+                    logger.error('Failed to refund credits for failed batch files', {
+                        jobId, userId, failCount,
+                        error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+                    });
                 }
             }
 

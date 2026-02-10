@@ -28,10 +28,10 @@ export const getWelcomeEmailHtml = (userName: string): string => {
       <div class="feature">✅ Download XRechnung XML</div>
       
       <p style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/dashboard" class="button">Convert Your First Invoice</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">Convert Your First Invoice</a>
       </p>
       
-      <p>Need help? Check our <a href="${process.env.NEXT_PUBLIC_APP_URL}/en/help">documentation</a> or contact us at support@invoice2e.de</p>
+      <p>Need help? Check our <a href="${process.env.NEXT_PUBLIC_APP_URL}/help">documentation</a> or contact us at support@invoice2e.de</p>
     </div>
     <div class="footer">
       <p>© 2026 Invoice2E. All rights reserved.</p>

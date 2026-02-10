@@ -2,21 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { emitAuthChanged } from '@/lib/client-auth';
 import Link from 'next/link';
 
 export default function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const locale = useLocale();
+    const t = useTranslations('auth');
+    const tErr = useTranslations('errors');
+    const tCommon = useTranslations('common');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
     const redirectTarget = useMemo(() => {
-        const fallback = `/${locale}/dashboard`;
+        const fallback = '/dashboard';
         const returnUrl = searchParams?.get('returnUrl');
         if (!returnUrl) {
             return fallback;
@@ -34,7 +36,7 @@ export default function LoginForm() {
         }
 
         return decoded;
-    }, [locale, searchParams]);
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -51,14 +53,14 @@ export default function LoginForm() {
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error || 'Login failed');
+                setError(data.error || tErr('loginFailed'));
                 return;
             }
 
             emitAuthChanged();
             router.push(redirectTarget);
         } catch {
-            setError('An error occurred. Please try again.');
+            setError(tErr('generic'));
         } finally {
             setLoading(false);
         }
@@ -68,7 +70,7 @@ export default function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-6" aria-label="Login form">
             <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-                    Email
+                    {t('email')}
                 </label>
                 <input
                     id="email"
@@ -88,7 +90,7 @@ export default function LoginForm() {
 
             <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
-                    Password
+                    {t('password')}
                 </label>
                 <input
                     id="password"
@@ -106,10 +108,10 @@ export default function LoginForm() {
                 />
                 <div className="mt-1 text-right">
                     <Link
-                        href={`/${locale}/forgot-password`}
+                        href="/forgot-password"
                         className="text-xs text-sky-300 hover:text-sky-200 transition-colors"
                     >
-                        Forgot password?
+                        {t('forgot_password')}
                     </Link>
                 </div>
             </div>
@@ -134,10 +136,10 @@ export default function LoginForm() {
                 {loading ? (
                     <span className="flex items-center justify-center gap-2">
                         <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" aria-hidden="true" />
-                        <span>Logging in...</span>
+                        <span>{t('loggingIn')}</span>
                     </span>
                 ) : (
-                    'Login'
+                    tCommon('login')
                 )}
             </button>
         </form>

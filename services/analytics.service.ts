@@ -111,9 +111,6 @@ export class AnalyticsService {
         const wantsConversions = !statusFilter || statusFilter === 'completed' || statusFilter === 'valid' || statusFilter === 'invalid';
         const wantsBatches = !statusFilter || statusFilter === 'completed';
 
-        const fetchEnd = offset + limit - 1;
-        const combinedRange = { start: 0, end: fetchEnd };
-
         const mapConversion = (row: any): ConversionHistoryItem => ({
             id: row.id,
             invoice_number: row.invoice_number || 'N/A',
@@ -143,28 +140,31 @@ export class AnalyticsService {
             };
         };
 
-        const mapBatch = (row: any): ConversionHistoryItem => {
-            const results = (row.results as any[]) || [];
+        type BatchRow = Record<string, unknown>;
+        type BatchResultRecord = Record<string, unknown>;
+
+        const mapBatch = (row: BatchRow): ConversionHistoryItem => {
+            const results = (row.results as BatchResultRecord[]) || [];
             const batchResults: BatchResultItem[] = results
-                .filter((r: any) => r.status === 'success' && r.extractionId)
-                .map((r: any) => ({
-                    filename: r.filename || '',
-                    status: r.status,
-                    invoiceNumber: r.invoiceNumber,
-                    extractionId: r.extractionId,
+                .filter((r) => r.status === 'success' && r.extractionId)
+                .map((r) => ({
+                    filename: String(r.filename || ''),
+                    status: String(r.status),
+                    invoiceNumber: r.invoiceNumber as string | undefined,
+                    extractionId: r.extractionId as string,
                 }));
             return {
-                id: row.id,
+                id: row.id as string,
                 invoice_number: `Batch (${row.total_files} files)`,
                 file_name: 'ZIP Upload',
                 output_format: 'XRechnung',
-                status: row.status,
-                credits_used: row.completed_files || 0,
-                created_at: row.created_at,
+                status: row.status as string,
+                credits_used: (row.completed_files as number) || 0,
+                created_at: row.created_at as string,
                 record_type: 'batch',
-                total_files: row.total_files,
-                completed_files: row.completed_files,
-                failed_files: row.failed_files,
+                total_files: row.total_files as number | undefined,
+                completed_files: row.completed_files as number | undefined,
+                failed_files: row.failed_files as number | undefined,
                 batch_results: batchResults,
             };
         };
@@ -175,7 +175,6 @@ export class AnalyticsService {
             let batchItems: ConversionHistoryItem[] = [];
             let conversionCount = 0;
             let draftCount = 0;
-            let batchCount = 0;
 
             if (wantsConversions) {
                 let conversionQuery = supabase
@@ -196,11 +195,10 @@ export class AnalyticsService {
                     conversionQuery = conversionQuery.lte('created_at', filters.endDate);
                 }
 
-                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
+                // Fetch all rows (no .range()) — pagination happens after dedup in memory
                 const conversionResponse: any = await this.queryWithTimeout(
                     conversionQuery
-                        .order('created_at', { ascending: false })
-                        .range(range.start, range.end),
+                        .order('created_at', { ascending: false }),
                     API_TIMEOUTS.DATABASE_QUERY
                 );
                 const { data, count, error } = conversionResponse;
@@ -232,11 +230,9 @@ export class AnalyticsService {
                     extractionQuery = extractionQuery.lte('created_at', filters.endDate);
                 }
 
-                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
                 const extractionResponse: any = await this.queryWithTimeout(
                     extractionQuery
-                        .order('created_at', { ascending: false })
-                        .range(range.start, range.end),
+                        .order('created_at', { ascending: false }),
                     API_TIMEOUTS.DATABASE_QUERY
                 );
                 const { data, count, error } = extractionResponse;
@@ -268,14 +264,12 @@ export class AnalyticsService {
                     batchQuery = batchQuery.lte('created_at', filters.endDate);
                 }
 
-                const range = statusFilter ? { start: offset, end: fetchEnd } : combinedRange;
                 const batchResponse: any = await this.queryWithTimeout(
                     batchQuery
-                        .order('created_at', { ascending: false })
-                        .range(range.start, range.end),
+                        .order('created_at', { ascending: false }),
                     API_TIMEOUTS.DATABASE_QUERY
                 );
-                const { data, count, error } = batchResponse;
+                const { data, error } = batchResponse;
 
                 if (error) {
                     logger.error('Failed to get batch history', {
@@ -286,7 +280,6 @@ export class AnalyticsService {
                     });
                 } else {
                     batchItems = (data || []).map(mapBatch);
-                    batchCount = count || 0;
                 }
             }
 
@@ -302,9 +295,9 @@ export class AnalyticsService {
                 );
                 if (!allBatchResponse.error && allBatchResponse.data) {
                     for (const row of allBatchResponse.data) {
-                        const results = (row.results as any[]) || [];
+                        const results = (row.results as BatchResultRecord[]) || [];
                         for (const r of results) {
-                            if (r.extractionId) batchExtractionIds.add(r.extractionId);
+                            if (r.extractionId) batchExtractionIds.add(r.extractionId as string);
                         }
                     }
                 }
@@ -333,19 +326,22 @@ export class AnalyticsService {
                 draftCount -= (beforeDrafts - draftItems.length);
             }
 
-            let items: ConversionHistoryItem[] = [];
+            // Combine all items based on filter, then paginate in memory
+            let allItems: ConversionHistoryItem[];
             if (!statusFilter) {
-                items = [...conversionItems, ...draftItems, ...batchItems]
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .slice(offset, offset + limit);
+                allItems = [...conversionItems, ...draftItems, ...batchItems];
             } else if (statusFilter === 'draft') {
-                items = draftItems;
+                allItems = draftItems;
             } else {
-                items = [...conversionItems, ...batchItems]
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                allItems = [...conversionItems, ...batchItems];
             }
 
-            const total = conversionCount + draftCount + batchCount;
+            // Sort by date descending
+            allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            // Use actual post-dedup count for consistent pagination
+            const total = allItems.length;
+            const items = allItems.slice(offset, offset + limit);
 
             return {
                 items,

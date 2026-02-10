@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { ValidationError } from '@/lib/errors';
+import { creditsDbService } from '@/services/credits.db.service';
 
 /**
  * POST /api/payments/verify
@@ -130,41 +131,18 @@ export async function POST(req: NextRequest) {
         }
 
         if (verified && credits > 0) {
-            // Idempotency guard: check transaction state and verify marker before mutating balances.
-            const [transactionResult, verifyEventResult] = await Promise.all([
-                supabase
-                    .from('payment_transactions')
-                    .select('id, payment_status, credits_purchased')
-                    .eq('user_id', user.id)
-                    .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle(),
-                supabase
-                    .from('webhook_events')
-                    .select('id')
-                    .eq('event_id', `verify_${paymentId}`)
-                    .maybeSingle(),
-            ]);
-
-            const transaction = transactionResult.data;
-            const verifyEvent = verifyEventResult.data;
-
-            if (verifyEvent) {
-                logger.info('Payment already processed via verify marker', { paymentId, userId: user.id });
-                return NextResponse.json({
-                    success: true,
-                    verified: true,
-                    credits,
-                    message: 'Already processed',
-                });
-            }
+            // Look up transaction for status update (record-keeping only)
+            const { data: transaction } = await supabase
+                .from('payment_transactions')
+                .select('id, payment_status')
+                .eq('user_id', user.id)
+                .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
             if (!transaction) {
                 logger.error('Transaction not found for payment', { paymentId, userId: user.id });
-                // If not found, it might be a timing issue or manual call.
-                // In strict mode we fail, but we could create it here if we trusted the provider enough.
-                // For now, fail to alert admin/user.
                 return NextResponse.json({
                     success: false,
                     error: 'Transaction record not found',
@@ -172,8 +150,28 @@ export async function POST(req: NextRequest) {
                 }, { status: 404 });
             }
 
-            if (transaction.payment_status === 'completed') {
-                logger.info('Payment already processed via transaction', { userId: user.id, paymentId });
+            // Check for expired transaction
+            if (transaction.payment_status === 'expired') {
+                logger.warn('Attempt to verify expired transaction', { paymentId, userId: user.id });
+                return NextResponse.json({
+                    success: false,
+                    error: 'This payment has expired. Please start a new checkout.',
+                }, { status: 410 });
+            }
+
+            // Atomic credit addition with idempotency — single RPC call replaces
+            // separate idempotency check + add_credits + webhook_events insert
+            const verifyResult = await creditsDbService.verifyAndAddCredits(
+                user.id,
+                credits,
+                `verify_${paymentId}`,
+                sessionId ? 'stripe' : 'paypal',
+                'payment.verified',
+                paymentId,
+            );
+
+            if (verifyResult.alreadyProcessed) {
+                logger.info('Payment already processed via atomic verify', { paymentId, userId: user.id });
                 return NextResponse.json({
                     success: true,
                     verified: true,
@@ -182,133 +180,29 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            // Update transaction status using ID if available
-            if (transaction.id) {
+            // Update transaction status (record-keeping, not credit-critical)
+            if (transaction.id && transaction.payment_status !== 'completed') {
                 const updateData: Record<string, unknown> = {
                     payment_status: 'completed',
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
                 };
-
                 if (sessionId && stripePaymentIntentId) {
                     updateData.stripe_payment_id = stripePaymentIntentId;
                 }
-
                 const { error: updateError } = await supabase
                     .from('payment_transactions')
                     .update(updateData)
                     .eq('id', transaction.id)
-                    .eq('user_id', user.id); // Security check
+                    .eq('user_id', user.id);
 
                 if (updateError) {
-                    logger.error('Failed to update transaction by ID', { transactionId: transaction.id, error: updateError });
-                } else {
-                    logger.info('Transaction updated by ID', { transactionId: transaction.id });
-                }
-            } else {
-                // Fallback: Look up by provider ID (stripe_payment_id or paypal_order_id)
-                // This is the main path for Stripe since we don't update metadata after creation
-                logger.info('Updating transaction by provider ID', { paymentId, userId: user.id });
-
-                const { data: pendingTx } = await supabase
-                    .from('payment_transactions')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .or(`stripe_session_id.eq.${paymentId},stripe_payment_id.eq.${paymentId},paypal_order_id.eq.${paymentId}`)
-                    .eq('payment_status', 'pending')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (pendingTx) {
-                    const pendingUpdateData: Record<string, unknown> = {
-                        payment_status: 'completed',
-                        updated_at: new Date().toISOString()
-                    };
-
-                    if (sessionId && stripePaymentIntentId) {
-                        pendingUpdateData.stripe_payment_id = stripePaymentIntentId;
-                    }
-
-                    await supabase
-                        .from('payment_transactions')
-                        .update(pendingUpdateData)
-                        .eq('id', pendingTx.id);
-                    logger.info('Transaction updated by provider ID', { transactionId: pendingTx.id });
-                } else {
-                    logger.warn('No pending transaction found for provider ID', { paymentId });
+                    logger.error('Failed to update transaction status', { transactionId: transaction.id, error: updateError });
                 }
             }
 
-            // Add credits to user account using atomic RPC (BUG-016 fix)
-            // Try atomic RPC first, fall back to direct update if RPC not available
-            let creditAddSuccess = false;
-
-            try {
-                const { data: newBalance, error: rpcError } = await supabase.rpc('add_credits', {
-                    p_user_id: user.id,
-                    p_amount: credits,
-                    p_source: 'payment_verify',
-                    p_reference_id: paymentId,
-                });
-
-                if (!rpcError && newBalance !== null) {
-                    creditAddSuccess = true;
-                    logger.info('Credits added via atomic RPC', { userId: user.id, credits, newBalance, paymentId });
-                } else if (rpcError) {
-                    logger.warn('RPC add_credits failed, falling back to direct update', { error: rpcError.message });
-                }
-            } catch (rpcErr) {
-                logger.warn('RPC add_credits not available, using fallback', { error: rpcErr });
-            }
-
-            // Fallback: Direct update if RPC failed
-            if (!creditAddSuccess) {
-                const { data: currentCredits } = await supabase
-                    .from('user_credits')
-                    .select('available_credits')
-                    .eq('user_id', user.id)
-                    .single();
-
-                if (currentCredits) {
-                    const { error: updateErr } = await supabase
-                        .from('user_credits')
-                        .update({ available_credits: currentCredits.available_credits + credits })
-                        .eq('user_id', user.id);
-
-                    if (updateErr) {
-                        logger.error('Failed to update credits', { userId: user.id, error: updateErr });
-                        throw new Error('Failed to add credits');
-                    }
-                } else {
-                    const { error: insertErr } = await supabase
-                        .from('user_credits')
-                        .insert({ user_id: user.id, available_credits: credits });
-
-                    if (insertErr) {
-                        logger.error('Failed to create credits', { userId: user.id, error: insertErr });
-                        throw new Error('Failed to create credits record');
-                    }
-                }
-                logger.info('Credits added via fallback method', { userId: user.id, credits, paymentId });
-            }
-
-            // IDEMPOTENCY FIX: Record in webhook_events to prevent webhook from adding credits again
-            // Use a unique event_id based on session/order ID with 'verify_' prefix
-            const verifyEventId = `verify_${paymentId}`;
-            try {
-                const { error: eventErr } = await supabase.from('webhook_events').insert({
-                    event_id: verifyEventId,
-                    provider: sessionId ? 'stripe' : 'paypal',
-                    event_type: 'payment.verified',
-                    user_id: user.id,
-                    credits_added: credits,
-                });
-                if (eventErr) {
-                    logger.warn('Failed to insert verify event (may be duplicate)', { error: eventErr.message });
-                }
-            } catch (err) {
-                logger.warn('Failed to insert verify event (may be duplicate)', { error: err });
-            }
+            logger.info('Credits added via atomic verify_and_add_credits', {
+                userId: user.id, credits, paymentId, newBalance: verifyResult.newBalance,
+            });
 
             return NextResponse.json({
                 success: true,

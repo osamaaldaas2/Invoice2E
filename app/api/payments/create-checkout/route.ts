@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
 
         // Build URLs
         const baseUrl = req.nextUrl.origin;
-        const successUrl = `${baseUrl}/en/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-        const cancelUrl = `${baseUrl}/en/checkout/cancel`;
+        const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = `${baseUrl}/checkout/cancel`;
 
         // Convert price to cents (Stripe expects cents)
         const amountInCents = Math.round(Number(pkg.price) * 100);

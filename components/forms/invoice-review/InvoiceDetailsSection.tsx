@@ -1,5 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 
 interface InvoiceDetailsSectionProps {
     register: UseFormRegister<any>;
@@ -8,13 +9,14 @@ interface InvoiceDetailsSectionProps {
 }
 
 export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ register, errors }) => {
+    const t = useTranslations('invoiceReview');
     return (
         <div className="glass-card p-6">
-            <h3 className="text-lg font-medium text-white mb-4 font-display">Invoice Details</h3>
+            <h3 className="text-lg font-medium text-white mb-4 font-display">{t('invoiceDetails')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Invoice Number
+                        {t('invoiceNumber')}
                     </label>
                     <input
                         type="text"
@@ -28,7 +30,7 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ re
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Invoice Date
+                        {t('invoiceDate')}
                     </label>
                     <input
                         type="date"
@@ -42,7 +44,7 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({ re
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Currency (e.g. EUR)
+                        {t('currency')}
                     </label>
                     <input
                         type="text"

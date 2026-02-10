@@ -2,19 +2,19 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useToast } from '@/lib/toast-context';
 
 export default function VoucherRedeemForm() {
     const t = useTranslations('credits');
+    const { toast } = useToast();
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         setLoading(true);
         setError('');
-        setSuccess('');
 
         try {
             const response = await fetch('/api/vouchers/redeem', {
@@ -29,16 +29,19 @@ export default function VoucherRedeemForm() {
                 throw new Error(data.error || t('redeemError'));
             }
 
-            setSuccess(
-                t('redeemSuccess', {
+            toast({
+                title: t('redeemSuccess', {
                     credits: data?.data?.creditsAdded ?? 0,
                     balance: data?.data?.newBalance ?? 0,
-                })
-            );
+                }),
+                variant: 'success',
+            });
             setCode('');
             window.dispatchEvent(new Event('credits-updated'));
         } catch (err) {
-            setError(err instanceof Error ? err.message : t('redeemError'));
+            const message = err instanceof Error ? err.message : t('redeemError');
+            setError(message);
+            toast({ title: message, variant: 'error' });
         } finally {
             setLoading(false);
         }
@@ -74,15 +77,7 @@ export default function VoucherRedeemForm() {
                 </div>
 
                 {error && (
-                    <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm">
-                        {error}
-                    </div>
-                )}
-
-                {success && (
-                    <div className="p-3 glass-panel border border-emerald-400/30 rounded-xl text-emerald-200 text-sm">
-                        {success}
-                    </div>
+                    <p className="text-sm text-rose-300">{error}</p>
                 )}
             </form>
         </div>

@@ -2,17 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import { CreditPackage } from '@/types/credit-package';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 
-interface PricingCardsProps {
-    locale?: string;
-}
-
-export function PricingCards({ locale = 'en' }: PricingCardsProps) {
+export function PricingCards() {
     const router = useRouter();
+    const t = useTranslations('pricing');
+    const locale = useLocale();
     const [packages, setPackages] = useState<CreditPackage[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -43,7 +42,12 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
 
     const handleSelectPackage = (slug: string) => {
         setSelectedSlug(slug);
-        router.push(`/${locale}/checkout?package=${slug}`);
+        try {
+            router.push(`/checkout?package=${slug}`);
+        } catch {
+            // Recovery: clear selection after timeout if navigation fails
+            setTimeout(() => setSelectedSlug(null), 5000);
+        }
     };
 
     const getLocalizedName = (pkg: CreditPackage) =>
@@ -54,9 +58,9 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
 
     if (loading) {
         return (
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 max-w-5xl mx-auto">
                 {[1, 2, 3].map((i) => (
-                    <div key={i} className="glass-card p-6 animate-pulse">
+                    <div key={i} className="glass-card p-4 md:p-6 animate-pulse">
                         <div className="h-8 bg-white/10 rounded w-32 mb-4" />
                         <div className="h-4 bg-white/10 rounded w-48 mb-6" />
                         <div className="h-12 bg-white/10 rounded w-24 mb-6" />
@@ -78,18 +82,18 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                     {error}
                 </div>
             ) : null}
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 max-w-5xl mx-auto">
                 {packages.map((pkg) => (
                 <div
                     key={pkg.id}
                     className={cn(
-                        'relative glass-card border border-white/10 p-6 transition-all',
-                        pkg.is_popular && 'border-sky-300/40 shadow-[0_0_32px_rgba(56,189,248,0.25)] scale-105 z-10'
+                        'relative glass-card border border-white/10 p-4 md:p-6 transition-all',
+                        pkg.is_popular && 'border-sky-300/40 shadow-[0_0_32px_rgba(56,189,248,0.25)] md:scale-105 z-10'
                     )}
                 >
                     {pkg.is_popular && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-sky-500/20 text-sky-100 border border-sky-300/30 text-xs font-medium px-3 py-1 rounded-full">
-                            {locale === 'de' ? 'Am beliebtesten' : 'Most Popular'}
+                            {t('mostPopular')}
                         </span>
                     )}
 
@@ -98,11 +102,11 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
 
                     <div className="mb-6">
                         <span className="text-4xl font-bold">
-                            {pkg.currency === 'EUR' ? '€' : '$'}{pkg.price}
+                            {pkg.currency === 'EUR' ? '\u20ac' : '$'}{pkg.price}
                         </span>
                         {pkg.savings_percent && (
                             <span className="ml-2 bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 text-xs font-medium px-2 py-1 rounded">
-                                {locale === 'de' ? 'Spare' : 'Save'} {pkg.savings_percent}%
+                                {t('save')} {pkg.savings_percent}%
                             </span>
                         )}
                     </div>
@@ -110,11 +114,11 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                     <ul className="space-y-2 mb-6">
                         <li className="flex items-center text-sm">
                             <CheckIcon />
-                            {pkg.credits} {locale === 'de' ? 'Konvertierungen' : 'conversions'}
+                            {pkg.credits} {t('conversions')}
                         </li>
                         <li className="flex items-center text-sm">
                             <CheckIcon />
-                            {locale === 'de' ? '1 Jahr gültig' : 'Valid for 1 year'}
+                            {t('validOneYear')}
                         </li>
                         <li className="flex items-center text-sm">
                             <CheckIcon />
@@ -122,20 +126,20 @@ export function PricingCards({ locale = 'en' }: PricingCardsProps) {
                         </li>
                         <li className="flex items-center text-sm">
                             <CheckIcon />
-                            {locale === 'de' ? 'E-Mail Support' : 'Email support'}
+                            {t('emailSupport')}
                         </li>
                     </ul>
 
                     <Button
                         className="w-full"
                         variant={pkg.is_popular ? 'default' : 'outline'}
-                        disabled={selectedSlug !== null}
+                        disabled={!!selectedSlug && selectedSlug !== pkg.slug}
                         onClick={() => handleSelectPackage(pkg.slug)}
                     >
                         {selectedSlug === pkg.slug ? (
-                            <span className="animate-spin mr-2">⏳</span>
+                            <span className="animate-spin mr-2">{'\u23f3'}</span>
                         ) : null}
-                        {locale === 'de' ? 'Paket wählen' : 'Select Package'}
+                        {t('selectPackage')}
                     </Button>
                 </div>
                 ))}

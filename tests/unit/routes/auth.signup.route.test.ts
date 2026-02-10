@@ -14,6 +14,10 @@ const loggerMock = vi.hoisted(() => ({
 const sessionMock = vi.hoisted(() => ({
     setSessionCookie: vi.fn(),
 }));
+const cookieStoreMock = vi.hoisted(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+}));
 
 vi.mock('@/services/auth.service', () => ({
     authService: authServiceMock,
@@ -24,6 +28,10 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/session', () => sessionMock);
+
+vi.mock('next/headers', () => ({
+    cookies: vi.fn(() => Promise.resolve(cookieStoreMock)),
+}));
 
 vi.mock('@/lib/api-helpers', () => ({
     handleApiError: vi.fn((error) => {

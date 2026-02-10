@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url);
         const periodParam = searchParams.get('period') || 'month';
-        const validPeriods = ['week', 'month', 'year'] as const;
-        const period = validPeriods.includes(periodParam as any)
+        const validPeriods: readonly string[] = ['week', 'month', 'year'];
+        const period = validPeriods.includes(periodParam)
             ? (periodParam as 'week' | 'month' | 'year')
             : 'month';
         const type = searchParams.get('type'); // 'stats', 'charts', or both

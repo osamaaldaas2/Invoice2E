@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
+import { LOCALE_COOKIE_NAME, DEFAULT_LOCALE } from '@/lib/constants';
 import { setSessionCookie } from '@/lib/session';
 import { SignupSchema } from '@/lib/validators';
 import { authService } from '@/services/auth.service';
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const signupInput = { ...validatedData, email: validatedData.email.toLowerCase() };
 
         const rateLimitId = `${getRequestIdentifier(request, signupInput.email)}:auth-signup`;
-        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'signup');
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
@@ -35,6 +37,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Set session cookie so backend recognizes the new user as logged in
         await setSessionCookie(user);
+
+        // Set locale cookie to English for new signups
+        const cookieStore = await cookies();
+        cookieStore.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: 'lax',
+        });
 
         return NextResponse.json(
             {

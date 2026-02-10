@@ -2,11 +2,12 @@
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 
 import { FILE_LIMITS } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
+import { Button } from '@/components/ui/button';
 
 type UploadState = 'idle' | 'uploading' | 'extracting' | 'success' | 'error';
 
@@ -30,7 +31,8 @@ type FileUploadFormProps = {
 
 export default function FileUploadForm({ userId, onExtractionComplete, availableCredits = 0 }: FileUploadFormProps) {
     const router = useRouter();
-    const locale = useLocale();
+    const t = useTranslations('upload');
+    const tCommon = useTranslations('common');
     const [state, setState] = useState<UploadState>('idle');
     const [error, setError] = useState('');
     const [result, setResult] = useState<ExtractedData | null>(null);
@@ -44,23 +46,9 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     const [backgroundProgress, setBackgroundProgress] = useState(0);
     const [backgroundTotal, setBackgroundTotal] = useState(0);
     const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastFileRef = useRef<File | null>(null);
-
-    const withLocale = useMemo(() => {
-        return (path: string) => {
-            if (!path.startsWith('/')) {
-                return `/${locale}/${path}`;
-            }
-            if (path === '/') {
-                return `/${locale}`;
-            }
-            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
-                return path;
-            }
-            return `/${locale}${path}`;
-        };
-    }, [locale]);
 
     const hasCredits = availableCredits > 0;
 
@@ -71,15 +59,23 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             clearTimeout(pollRef.current);
             pollRef.current = null;
         }
+        abortRef.current?.abort();
+        abortRef.current = null;
     }, []);
 
     const startPolling = useCallback((jobId: string) => {
         stopPolling();
+        const controller = new AbortController();
+        abortRef.current = controller;
         let delay = 2000;
 
         const poll = async () => {
+            if (controller.signal.aborted) return;
             try {
-                const response = await fetch(`/api/invoices/extract?jobId=${jobId}`);
+                const response = await fetch(`/api/invoices/extract?jobId=${jobId}`, {
+                    signal: controller.signal,
+                });
+                if (controller.signal.aborted) return;
                 const payload = await response.json();
                 if (payload.success) {
                     const completed = (payload.completedFiles || 0) + (payload.failedFiles || 0);
@@ -120,9 +116,12 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
         pollRef.current = setTimeout(poll, delay);
     }, [stopPolling, completedStatuses]);
 
-    // Cleanup polling on unmount
+    // Cleanup polling and active fetches on unmount
     useEffect(() => {
-        return () => stopPolling();
+        return () => {
+            stopPolling();
+            abortRef.current?.abort();
+        };
     }, [stopPolling]);
 
     const validateClientSide = useCallback((file: File): string | null => {
@@ -130,16 +129,16 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             return `File size exceeds ${FILE_LIMITS.MAX_FILE_SIZE_MB}MB limit`;
         }
         if (!(FILE_LIMITS.ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
-            return 'File type not allowed. Use PDF, JPG, or PNG';
+            return t('fileTypeNotAllowed');
         }
         return null;
-    }, []);
+    }, [t]);
 
     const handleFileUpload = useCallback(async (file: File) => {
         lastFileRef.current = file;
 
         if (!hasCredits) {
-            setError('Insufficient credits. Please purchase more credits.');
+            setError(t('insufficientCredits'));
             setState('error');
             return;
         }
@@ -165,6 +164,9 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             });
         }, 500);
 
+        const uploadController = new AbortController();
+        abortRef.current = uploadController;
+
         try {
             // FIX-026: Don't send userId in request body, server gets it from session
             const formData = new FormData();
@@ -175,6 +177,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             const response = await fetch('/api/invoices/extract', {
                 method: 'POST',
                 body: formData,
+                signal: uploadController.signal,
             });
 
             const data = await response.json();
@@ -182,9 +185,9 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             if (!response.ok) {
                 // Check specifically for insufficient credits error from API (402)
                 if (response.status === 402) {
-                    throw new Error(data.error || 'Insufficient credits');
+                    throw new Error(data.error || t('insufficientCredits'));
                 }
-                throw new Error(data.error || 'Extraction failed');
+                throw new Error(data.error || t('extractionFailed'));
             }
 
             clearInterval(progressInterval);
@@ -226,11 +229,13 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 fileInputRef.current.value = '';
             }
         } catch (err) {
-            clearInterval(progressInterval);
+            if (err instanceof Error && err.name === 'AbortError') return;
             setState('error');
-            setError(err instanceof Error ? err.message : 'Extraction failed');
+            setError(err instanceof Error ? err.message : t('extractionFailed'));
+        } finally {
+            clearInterval(progressInterval);
         }
-    }, [validateClientSide, userId, onExtractionComplete, hasCredits]);
+    }, [validateClientSide, userId, onExtractionComplete, hasCredits, t, startPolling]);
 
     const confirmAndUpload = useCallback(() => {
         if (pendingFile) {
@@ -341,13 +346,13 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
     };
 
     const getStatusMessage = () => {
-        if (!hasCredits) return 'Insufficient Credits';
+        if (!hasCredits) return t('insufficientCredits');
         switch (state) {
-            case 'uploading': return 'Uploading file...';
-            case 'extracting': return 'AI is extracting invoice data...';
-            case 'success': return 'Extraction complete!';
-            case 'error': return 'Extraction failed';
-            default: return 'Drag invoice or click to select';
+            case 'uploading': return t('uploading');
+            case 'extracting': return t('extracting');
+            case 'success': return t('extractionComplete');
+            case 'error': return t('extractionFailed');
+            default: return t('dragOrClick');
         }
     };
 
@@ -360,16 +365,17 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                 <div className="mb-4 p-4 rounded-xl border border-amber-400/30 bg-amber-500/10 flex items-center gap-3">
                     <span className="text-2xl">⚠️</span>
                     <div className="flex-1">
-                        <p className="text-amber-200 font-medium text-sm">No credits remaining</p>
-                        <p className="text-amber-200/70 text-xs">Purchase credits to start converting invoices.</p>
+                        <p className="text-amber-200 font-medium text-sm">{t('noCreditsRemaining')}</p>
+                        <p className="text-amber-200/70 text-xs">{t('purchaseCreditsPrompt')}</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => router.push(withLocale('/pricing'))}
-                        className="px-3 py-1.5 bg-amber-500 text-white rounded-full text-xs font-semibold hover:bg-amber-400 transition-colors whitespace-nowrap"
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push('/pricing')}
+                        className="bg-amber-500 text-white hover:bg-amber-400 whitespace-nowrap"
                     >
-                        Get Credits
-                    </button>
+                        {t('getCredits')}
+                    </Button>
                 </div>
             )}
             <div
@@ -381,7 +387,7 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     fileInputRef.current?.click();
                 }}
                 className={`
-                    border-2 border-dashed rounded-2xl p-8 text-center transition-all
+                    border-2 border-dashed rounded-2xl p-4 sm:p-8 text-center transition-all
                     ${isDisabled ? 'cursor-not-allowed opacity-70 bg-white/5 border-white/10' : 'cursor-pointer hover:border-sky-400/60'}
                     ${isDragging ? 'border-sky-400 bg-sky-500/10' : 'border-white/20'}
                 `}
@@ -403,13 +409,13 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                                 backgroundJobId
                                     ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
                                     : state === 'uploading'
-                                        ? 'Uploading...'
-                                        : 'AI extracting invoice data...'
+                                        ? t('uploading')
+                                        : t('aiExtracting')
                             }
                         />
                     ) : (
                         <>
-                            <div className="text-5xl mb-4">{getStatusIcon()}</div>
+                            <div className="text-4xl sm:text-5xl mb-4">{getStatusIcon()}</div>
                             <p className={`text-lg font-semibold ${!hasCredits ? 'text-rose-300' : 'text-white'}`}>
                                 {getStatusMessage()}
                             </p>
@@ -419,23 +425,23 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     {!isProcessing && !hasCredits && (
                         <div className="mt-4 pointer-events-auto">
                             <p className="text-sm text-faded mb-3">
-                                You need at least 1 credit to upload.
+                                {t('needOneCredit')}
                             </p>
                             <button
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(withLocale('/pricing'));
+                                    router.push('/pricing');
                                 }}
                                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition-colors shadow-sm"
                             >
-                                Buy Credits
+                                {t('buyCredits')}
                             </button>
                         </div>
                     )}
                     {!isProcessing && hasCredits && (
                         <p className="text-sm text-faded mt-2">
-                            AI extracts data automatically (PDF, JPG, PNG - Max {FILE_LIMITS.MAX_FILE_SIZE_MB}MB)
+                            {t('maxFileSize', { size: FILE_LIMITS.MAX_FILE_SIZE_MB })}
                         </p>
                     )}
                 </div>
@@ -457,53 +463,52 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                     <p className="text-rose-200 font-medium">❌ {error}</p>
                     <div className="flex gap-3 mt-3">
                         {lastFileRef.current && hasCredits && (
-                            <button
-                                type="button"
+                            <Button
+                                variant="default"
+                                size="sm"
                                 onClick={() => lastFileRef.current && handleFileUpload(lastFileRef.current)}
-                                className="px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white text-sm font-semibold hover:brightness-110 transition-colors"
                             >
-                                Retry
-                            </button>
+                                {t('retry')}
+                            </Button>
                         )}
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={resetForm}
-                            className="px-4 py-2 rounded-full border border-white/15 text-slate-200 text-sm bg-white/5 hover:bg-white/10 transition-colors"
                         >
-                            Upload Different File
-                        </button>
+                            {t('uploadDifferentFile')}
+                        </Button>
                     </div>
                 </div>
             )}
 
             {state === 'success' && result && !multiResult && (
                 <div className="mt-4 p-4 glass-panel border border-emerald-400/30 rounded-xl">
-                    <p className="text-emerald-200 font-medium mb-3">✅ Invoice extracted successfully!</p>
+                    <p className="text-emerald-200 font-medium mb-3">✅ {t('invoiceExtracted')}</p>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="glass-panel p-3 rounded-lg">
-                            <p className="text-faded">Confidence</p>
+                            <p className="text-faded">{t('confidence')}</p>
                             <p className="text-xl font-bold text-emerald-200">{result.confidenceScore}%</p>
                         </div>
                         <div className="glass-panel p-3 rounded-lg">
-                            <p className="text-faded">Response Time</p>
+                            <p className="text-faded">{t('responseTime')}</p>
                             <p className="text-xl font-bold text-sky-200">{(result.responseTime / 1000).toFixed(1)}s</p>
                         </div>
                     </div>
                     <div className="flex gap-2 mt-4">
                         <button
                             type="button"
-                            onClick={() => router.push(withLocale(`/review/${result.extractionId}`))}
+                            onClick={() => router.push(`/review/${result.extractionId}`)}
                             className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 text-white font-semibold hover:brightness-110 transition-colors"
                         >
-                            Review & Edit Data
+                            {t('reviewAndEdit')}
                         </button>
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
                             onClick={resetForm}
-                            className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
-                            New Upload
-                        </button>
+                            {t('newUpload')}
+                        </Button>
                     </div>
                 </div>
             )}
@@ -511,9 +516,9 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             {state === 'success' && multiResult && (
                 <div className="mt-4 p-4 glass-panel border border-emerald-400/30 rounded-xl">
                     <p className="text-emerald-200 font-medium mb-3">
-                        ✅ {multiResult.totalInvoices} invoices detected and extracted
+                        ✅ {t('invoicesDetected', { count: multiResult.totalInvoices })}
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                         {multiResult.extractions.map((ext, idx) => (
                             <div
                                 key={ext.extractionId || idx}
@@ -525,20 +530,21 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                                     </span>
                                     {ext.confidence > 0 && (
                                         <span className="text-xs text-faded">
-                                            {Math.round(ext.confidence * 100)}% confidence
+                                            {Math.round(ext.confidence * 100)}% {t('confidence').toLowerCase()}
                                         </span>
                                     )}
                                 </div>
                                 {ext.extractionId ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push(withLocale(`/review/${ext.extractionId}`))}
-                                        className="px-3 py-1 text-sm rounded-full bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition-colors"
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.push(`/review/${ext.extractionId}`)}
+                                        className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
                                     >
-                                        Review
-                                    </button>
+                                        {t('reviewAndEdit')}
+                                    </Button>
                                 ) : (
-                                    <span className="text-xs text-rose-300">Failed</span>
+                                    <span className="text-xs text-rose-300">{tCommon('error')}</span>
                                 )}
                             </div>
                         ))}
@@ -550,15 +556,14 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                             disabled={isDownloading}
                             className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors disabled:opacity-50"
                         >
-                            {isDownloading ? 'Generating ZIP...' : 'Download All as ZIP'}
+                            {isDownloading ? t('generatingZip') : t('downloadAllZip')}
                         </button>
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
                             onClick={resetForm}
-                            className="px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
-                            New Upload
-                        </button>
+                            {t('newUpload')}
+                        </Button>
                     </div>
                 </div>
             )}
@@ -570,15 +575,14 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
             }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirm Upload</DialogTitle>
+                        <DialogTitle>{t('confirmUpload')}</DialogTitle>
                         <DialogDescription>
-                            This will use at least 1 credit (1 per invoice detected in the file).
-                            You currently have {availableCredits} credit{availableCredits !== 1 ? 's' : ''}.
+                            {t('confirmUploadDesc', { credits: availableCredits, plural: availableCredits !== 1 ? 's' : '' })}
                         </DialogDescription>
                     </DialogHeader>
                     {pendingFile && (
                         <p className="text-sm text-faded mt-2">
-                            File: {pendingFile.name} ({(pendingFile.size / 1024 / 1024).toFixed(1)}MB)
+                            {t('fileInfo', { name: pendingFile.name, size: (pendingFile.size / 1024 / 1024).toFixed(1) })}
                         </p>
                     )}
                     <div className="flex gap-3 mt-6">
@@ -587,12 +591,12 @@ export default function FileUploadForm({ userId, onExtractionComplete, available
                             onClick={confirmAndUpload}
                             className="flex-1 px-4 py-2 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 transition-colors"
                         >
-                            Continue
+                            {t('continue')}
                         </button>
                         <DialogClose
                             className="flex-1 px-4 py-2 rounded-full border border-white/15 text-slate-100 bg-white/5 hover:bg-white/10 transition-colors"
                         >
-                            Cancel
+                            {tCommon('cancel')}
                         </DialogClose>
                     </div>
                 </DialogContent>

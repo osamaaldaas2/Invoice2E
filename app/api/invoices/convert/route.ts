@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { xrechnungService } from '@/services/xrechnung.service';
 import { ublService } from '@/services/ubl.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
@@ -9,6 +10,24 @@ import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 
 export type ConversionFormat = 'CII' | 'UBL';
+
+const ConvertRequestSchema = z.object({
+    conversionId: z.string().min(1, 'Extraction ID is required'),
+    invoiceData: z.record(z.string(), z.unknown()).refine(
+        (data) => typeof data.invoiceNumber === 'string' && data.invoiceNumber.trim().length > 0,
+        { message: 'Invoice number is required' }
+    ).refine(
+        (data) => typeof data.buyerName === 'string' && data.buyerName.trim().length > 0,
+        { message: 'Buyer name is required' }
+    ).refine(
+        (data) => typeof data.sellerName === 'string' && data.sellerName.trim().length > 0,
+        { message: 'Seller name is required' }
+    ).refine(
+        (data) => Array.isArray(data.lineItems) && data.lineItems.length > 0,
+        { message: 'At least one line item is required' }
+    ),
+    format: z.enum(['CII', 'UBL']).default('CII'),
+});
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -39,60 +58,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         const body = await request.json();
-        // FIX-024: Rename to extractionId for clarity (body field kept as conversionId for backward compat)
-        const { conversionId: extractionId, invoiceData, format = 'CII' } = body;
-        const outputFormat = (format as ConversionFormat) || 'CII';
+        const parsed = ConvertRequestSchema.safeParse(body);
 
-        logger.info('Parsing request body', {
-            hasExtractionId: !!extractionId,
-            userId,
-            hasInvoiceData: !!invoiceData,
-        });
-
-        if (!extractionId || !invoiceData) {
-            logger.warn('Missing required fields', {
-                extractionId: !!extractionId,
-                invoiceData: !!invoiceData,
-            });
+        if (!parsed.success) {
+            const firstError = parsed.error.errors[0]?.message || 'Invalid request body';
+            logger.warn('Convert validation failed', { errors: parsed.error.errors });
             return NextResponse.json(
-                {
-                    success: false,
-                    error: 'Missing required fields: extractionId or invoiceData',
-                },
+                { success: false, error: firstError },
                 { status: 400 }
             );
         }
+
+        // Zod validated required fields. Use raw body for downstream access
+        // since invoiceData has 20+ optional fields used by UBL/CII generators.
+        const extractionId = parsed.data.conversionId;
+        const invoiceData = body.invoiceData;
+        const outputFormat = parsed.data.format;
 
         logger.info('Starting XRechnung conversion', {
             extractionId,
-            invoiceNumber: invoiceData?.invoiceNumber,
+            invoiceNumber: invoiceData.invoiceNumber,
             userId,
         });
-
-        // Validate invoice data structure
-        if (!invoiceData.invoiceNumber) {
-            logger.error('Invoice data missing invoiceNumber', { invoiceData });
-            return NextResponse.json(
-                { success: false, error: 'Invoice number is required' },
-                { status: 400 }
-            );
-        }
-
-        if (!invoiceData.buyerName || !invoiceData.sellerName) {
-            logger.error('Invoice data missing buyer or seller', { invoiceData });
-            return NextResponse.json(
-                { success: false, error: 'Buyer and seller names are required' },
-                { status: 400 }
-            );
-        }
-
-        if (!invoiceData.lineItems || !Array.isArray(invoiceData.lineItems) || invoiceData.lineItems.length === 0) {
-            logger.error('Invoice data has no line items', { invoiceData });
-            return NextResponse.json(
-                { success: false, error: 'At least one line item is required' },
-                { status: 400 }
-            );
-        }
 
 
         // Generate XML based on format
@@ -187,7 +174,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 errorType: generationError instanceof Error ? generationError.constructor.name : typeof generationError,
                 errorMessage: generationError instanceof Error ? generationError.message : String(generationError),
                 errorStack: generationError instanceof Error ? generationError.stack : undefined,
-                invoiceData: serviceData,
+                invoiceNumber: serviceData?.invoiceNumber,
             });
 
             if (generationError instanceof ValidationError) {
@@ -225,6 +212,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 return NextResponse.json(
                     { success: false, error: 'Conversion record not found. Please review the invoice again.' },
                     { status: 404 }
+                );
+            }
+
+            // Ownership check: verify the conversion belongs to this user
+            if (conversion.userId !== userId) {
+                logger.warn('Convert ownership mismatch', { extractionId, userId, conversionUserId: conversion.userId });
+                return NextResponse.json(
+                    { success: false, error: 'Unauthorized' },
+                    { status: 403 }
                 );
             }
 

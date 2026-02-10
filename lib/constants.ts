@@ -47,6 +47,7 @@ export const REDUCED_VAT_RATE = 7;  // Reduced German VAT rate
 export const SUPPORTED_LOCALES = ['en', 'de'] as const;
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 export const DEFAULT_LOCALE = 'en';
+export const LOCALE_COOKIE_NAME = 'locale';
 
 // Pagination defaults
 export const DEFAULT_PAGE_SIZE = 10;

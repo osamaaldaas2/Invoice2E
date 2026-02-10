@@ -582,6 +582,23 @@ class AdminUserService {
             }
         }
 
+        // Insert into credit_transactions so user sees it in credit history
+        const { error: txError } = await supabase.from('credit_transactions').insert({
+            user_id: input.userId,
+            amount: Math.abs(input.amount),
+            transaction_type: input.amount > 0 ? 'credit' : 'debit',
+            source: 'admin',
+            reference_id: result?.audit_log_id || null,
+            balance_after: newBalance,
+        });
+
+        if (txError) {
+            logger.warn('Failed to insert credit_transaction for admin modify', {
+                userId: input.userId,
+                error: txError.message,
+            });
+        }
+
         logger.info('Credits modified', {
             userId: input.userId,
             adminId,
@@ -648,6 +665,23 @@ class AdminUserService {
             ipAddress,
             userAgent,
         });
+
+        // Insert into credit_transactions so user sees it in credit history
+        const { error: txError } = await supabase.from('credit_transactions').insert({
+            user_id: input.userId,
+            amount: Math.abs(input.amount),
+            transaction_type: input.amount >= 0 ? 'credit' : 'debit',
+            source: 'admin',
+            reference_id: auditLogId || null,
+            balance_after: newCredits,
+        });
+
+        if (txError) {
+            logger.warn('Failed to insert credit_transaction for admin modify (manual)', {
+                userId: input.userId,
+                error: txError.message,
+            });
+        }
 
         return { newBalance: newCredits, auditLogId };
     }

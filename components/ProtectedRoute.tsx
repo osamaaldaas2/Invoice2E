@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useLocale } from 'next-intl';
-import { fetchSessionUser } from '@/lib/client-auth';
+import { useUser } from '@/lib/user-context';
 
 type ProtectedRouteProps = {
     children: React.ReactNode;
@@ -22,45 +21,20 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const locale = useLocale();
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const { user, loading } = useUser();
 
-    const localizedFallback = useMemo(() => {
-        if (!fallbackUrl.startsWith('/')) {
-            return `/${locale}/${fallbackUrl}`;
-        }
-        if (fallbackUrl.startsWith(`/${locale}/`) || fallbackUrl === `/${locale}`) {
-            return fallbackUrl;
-        }
-        return `/${locale}${fallbackUrl}`;
-    }, [fallbackUrl, locale]);
+    const localizedFallback = fallbackUrl.startsWith('/') ? fallbackUrl : '/' + fallbackUrl;
 
     const redirectToLogin = useCallback(() => {
-        // Redirect with return URL so user can continue after login
-        const returnUrl = encodeURIComponent(pathname || `/${locale}/dashboard`);
+        const returnUrl = encodeURIComponent(pathname || '/dashboard');
         router.push(`${localizedFallback}?returnUrl=${returnUrl}`);
     }, [localizedFallback, pathname, router]);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const sessionUser = await fetchSessionUser();
-                if (!sessionUser) {
-                    redirectToLogin();
-                    return;
-                }
-
-                setIsAuthorized(true);
-            } catch {
-                redirectToLogin();
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        checkAuth();
-    }, [redirectToLogin]);
+        if (!loading && !user) {
+            redirectToLogin();
+        }
+    }, [loading, user, redirectToLogin]);
 
     if (loading) {
         return (
@@ -70,7 +44,7 @@ export default function ProtectedRoute({
         );
     }
 
-    if (!isAuthorized) {
+    if (!user) {
         return null;
     }
 

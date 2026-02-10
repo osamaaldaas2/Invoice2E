@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { reviewService } from '@/services/review.service';
+import { reviewService, type ReviewedInvoiceData } from '@/services/review.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
@@ -65,29 +65,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 }
 
                 const reviewedData = item.reviewedData;
-                reviewService.validateReviewedData(reviewedData as any);
+                reviewService.validateReviewedData(reviewedData as ReviewedInvoiceData);
 
                 const extractionData = extraction.extractionData as Record<string, unknown>;
-                const accuracy = reviewService.calculateAccuracy(extractionData, reviewedData as any);
+                const accuracy = reviewService.calculateAccuracy(extractionData, reviewedData as ReviewedInvoiceData);
 
                 await invoiceDbService.updateExtraction(item.extractionId, {
                     extractionData: reviewedData,
                     status: 'draft',
                 });
 
+                const invoiceNumber = String(reviewedData.invoiceNumber || '');
+                const buyerName = String(reviewedData.buyerName || '');
+
                 const existingConversion = await invoiceDbService.getConversionByExtractionId(item.extractionId);
                 const conversion = existingConversion
                     ? await invoiceDbService.updateConversion(existingConversion.id, {
-                        invoiceNumber: String((reviewedData as any).invoiceNumber || ''),
-                        buyerName: String((reviewedData as any).buyerName || ''),
+                        invoiceNumber,
+                        buyerName,
                         conversionFormat: 'xrechnung',
                         conversionStatus: 'draft',
                     })
                     : await invoiceDbService.createConversion({
                         userId: user.id,
                         extractionId: item.extractionId,
-                        invoiceNumber: String((reviewedData as any).invoiceNumber || ''),
-                        buyerName: String((reviewedData as any).buyerName || ''),
+                        invoiceNumber,
+                        buyerName,
                         conversionFormat: 'xrechnung',
                         conversionStatus: 'draft',
                     });
@@ -115,14 +118,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 const supabase = createServerClient();
                 const { data: batchJob } = await supabase
                     .from('batch_jobs')
-                    .select('results')
+                    .select('results, updated_at')
                     .eq('id', parsed.batchId)
                     .eq('user_id', user.id)
                     .maybeSingle();
 
+                type BatchResultEntry = Record<string, unknown>;
+
                 if (batchJob && Array.isArray(batchJob.results)) {
-                    const updatedResults = batchJob.results.map((entry: any) => {
-                        if (entry?.extractionId && reviewedExtractionIds.has(entry.extractionId)) {
+                    const updatedResults = (batchJob.results as BatchResultEntry[]).map((entry) => {
+                        if (entry.extractionId && reviewedExtractionIds.has(entry.extractionId as string)) {
                             return {
                                 ...entry,
                                 status: 'success',
@@ -134,8 +139,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     });
 
                     // Recompute batch-level counts and status
-                    const successCount = updatedResults.filter((r: any) => r.status === 'success').length;
-                    const failCount = updatedResults.filter((r: any) => r.status === 'failed').length;
+                    const successCount = updatedResults.filter((r) => r.status === 'success').length;
+                    const failCount = updatedResults.filter((r) => r.status === 'failed').length;
                     let batchStatus: string;
                     if (failCount === 0) {
                         batchStatus = 'completed';
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                         batchStatus = 'partial_success';
                     }
 
-                    await supabase
+                    const { data: updateResult } = await supabase
                         .from('batch_jobs')
                         .update({
                             results: updatedResults,
@@ -154,7 +159,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                             status: batchStatus,
                         })
                         .eq('id', parsed.batchId)
-                        .eq('user_id', user.id);
+                        .eq('user_id', user.id)
+                        .eq('updated_at', batchJob.updated_at)  // optimistic lock
+                        .select('id');
+
+                    if (!updateResult || updateResult.length === 0) {
+                        logger.warn('Batch review optimistic lock conflict — concurrent update detected', {
+                            batchId: parsed.batchId,
+                        });
+                    }
                 }
             } catch (batchUpdateError) {
                 logger.warn('Failed to update batch review statuses', {

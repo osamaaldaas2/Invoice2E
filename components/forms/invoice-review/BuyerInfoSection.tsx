@@ -1,5 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 
 interface BuyerInfoSectionProps {
     register: UseFormRegister<any>;
@@ -8,13 +9,14 @@ interface BuyerInfoSectionProps {
 }
 
 export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, errors, countryCodes }) => {
+    const t = useTranslations('invoiceReview');
     return (
         <div className="glass-card p-6">
-            <h3 className="text-lg font-medium text-white mb-4 font-display">Buyer Information (To)</h3>
+            <h3 className="text-lg font-medium text-white mb-4 font-display">{t('buyerInfo')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Buyer Name
+                        {t('buyerName')}
                     </label>
                     <input
                         type="text"
@@ -28,15 +30,15 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
 
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Buyer Email
+                        {t('buyerEmail')}
                     </label>
                     <input
                         type="email"
                         {...register('buyerEmail')}
                         className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors.buyerEmail ? 'border-rose-400/60' : 'border-white/10'} text-white`}
-                        placeholder="buyer@example.de"
+                        placeholder={t('buyerEmailPlaceholder')}
                     />
-                    <p className="mt-1 text-xs text-slate-500">Optional, but recommended for XRechnung processing.</p>
+                    <p className="mt-1 text-xs text-slate-500">{t('buyerEmailHint')}</p>
                     {errors.buyerEmail && (
                         <p className="mt-1 text-sm text-red-500">{errors.buyerEmail.message as string}</p>
                     )}
@@ -44,7 +46,7 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Street
+                        {t('street')}
                     </label>
                     <input
                         type="text"
@@ -54,7 +56,7 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Postal Code
+                        {t('postalCode')}
                     </label>
                     <input
                         type="text"
@@ -64,7 +66,7 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        City
+                        {t('city')}
                     </label>
                     <input
                         type="text"
@@ -74,7 +76,7 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Country
+                        {t('country')}
                     </label>
                     <select
                         {...register('buyerParsedAddress.country')}
@@ -90,7 +92,7 @@ export const BuyerInfoSection: React.FC<BuyerInfoSectionProps> = ({ register, er
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Tax ID (Steuernummer/VAT ID)
+                        {t('taxId')}
                     </label>
                     <input
                         type="text"

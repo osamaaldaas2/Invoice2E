@@ -1,5 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 
 interface SellerInfoSectionProps {
     register: UseFormRegister<any>;
@@ -8,13 +9,14 @@ interface SellerInfoSectionProps {
 }
 
 export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, errors, countryCodes }) => {
+    const t = useTranslations('invoiceReview');
     return (
         <div className="glass-card p-6">
-            <h3 className="text-lg font-medium text-white mb-4 font-display">Seller Information (From)</h3>
+            <h3 className="text-lg font-medium text-white mb-4 font-display">{t('sellerInfo')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Seller Name
+                        {t('sellerName')}
                     </label>
                     <input
                         type="text"
@@ -29,8 +31,8 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Seller Email <span className="text-red-500">*</span>
-                        <span className="text-xs text-faded ml-1">(XRechnung required)</span>
+                        {t('sellerEmail')} <span className="text-red-500">*</span>
+                        <span className="text-xs text-faded ml-1">{t('sellerEmailHint')}</span>
                     </label>
                     <input
                         type="email"
@@ -45,16 +47,16 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Seller Phone <span className="text-red-500">*</span>
-                        <span className="text-xs text-faded ml-1">(BR-DE-6)</span>
+                        {t('sellerPhone')} <span className="text-red-500">*</span>
+                        <span className="text-xs text-faded ml-1">{t('sellerPhoneHint')}</span>
                     </label>
                     <input
                         type="tel"
                         {...register('sellerPhone', {
-                            required: 'Seller phone is required for German XRechnung (BR-DE-6)',
+                            required: t('sellerPhoneRequired'),
                             pattern: {
                                 value: /^[\d\s\+\-()]{3,}$/,
-                                message: 'Phone must contain at least 3 digits (BR-DE-27)'
+                                message: t('sellerPhoneMinDigits')
                             }
                         })}
                         className={`w-full p-2 rounded-xl bg-slate-950/60 border ${errors.sellerPhone ? 'border-rose-400/60' : 'border-white/10'} text-white`}
@@ -67,7 +69,7 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Street
+                        {t('street')}
                     </label>
                     <input
                         type="text"
@@ -77,7 +79,7 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Postal Code
+                        {t('postalCode')}
                     </label>
                     <input
                         type="text"
@@ -87,7 +89,7 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        City
+                        {t('city')}
                     </label>
                     <input
                         type="text"
@@ -97,7 +99,7 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Country
+                        {t('country')}
                     </label>
                     <select
                         {...register('sellerParsedAddress.country')}
@@ -114,7 +116,7 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({ register, 
 
                 <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Tax ID (Steuernummer/VAT ID)
+                        {t('taxId')}
                     </label>
                     <input
                         type="text"

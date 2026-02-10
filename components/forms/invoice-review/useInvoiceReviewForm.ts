@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
 import { logger } from '@/lib/logger';
 
 export interface InvoiceReviewFormValues {
@@ -66,24 +65,8 @@ interface UseInvoiceReviewFormProps {
 
 export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseInvoiceReviewFormProps) => {
     const router = useRouter();
-    const locale = useLocale();
     const [submitError, setSubmitError] = useState('');
     const [submitSuccess, setSubmitSuccess] = useState('');
-
-    const withLocale = useMemo(() => {
-        return (path: string) => {
-            if (!path.startsWith('/')) {
-                return `/${locale}/${path}`;
-            }
-            if (path === '/') {
-                return `/${locale}`;
-            }
-            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
-                return path;
-            }
-            return `/${locale}${path}`;
-        };
-    }, [locale]);
 
     // AI now returns separate fields (sellerAddress=street, sellerCity, sellerPostalCode)
     // so we use them directly instead of parsing a combined address string.
@@ -260,7 +243,7 @@ export const useInvoiceReviewForm = ({ extractionId, userId, initialData }: UseI
             sessionStorage.setItem(`review_${extractionId}`, JSON.stringify(payload));
 
             setTimeout(() => {
-                router.push(withLocale(`/convert/${extractionId}`));
+                router.push(`/convert/${extractionId}`);
             }, 2000);
 
         } catch (err) {

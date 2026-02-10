@@ -8,9 +8,9 @@ interface Stats {
     successfulConversions: number;
     failedConversions: number;
     successRate: number;
-    averageProcessingTime: number;
-    thisMonthConversions: number;
-    creditsRemaining: number;
+    avgProcessingTime: number;
+    totalCreditsUsed: number;
+    availableCredits: number;
 }
 
 export default function DashboardStats() {
@@ -25,7 +25,7 @@ export default function DashboardStats() {
             const response = await fetch('/api/invoices/analytics?period=all');
             if (!response.ok) throw new Error('Failed to fetch stats');
             const data = await response.json();
-            setStats(data.stats);
+            setStats(data.statistics);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load stats');
         } finally {
@@ -39,7 +39,7 @@ export default function DashboardStats() {
 
     if (loading) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="glass-card p-6 animate-pulse">
                         <div className="h-4 bg-white/10 rounded w-1/2 mb-2"></div>
@@ -72,21 +72,21 @@ export default function DashboardStats() {
             color: 'from-green-500 to-green-600',
         },
         {
-            label: t('thisMonth'),
-            value: stats?.thisMonthConversions || 0,
+            label: t('creditsUsed'),
+            value: stats?.totalCreditsUsed || 0,
             icon: '📅',
             color: 'from-purple-500 to-purple-600',
         },
         {
             label: t('creditsRemaining'),
-            value: stats?.creditsRemaining || 0,
+            value: stats?.availableCredits || 0,
             icon: '💳',
             color: 'from-amber-500 to-amber-600',
         },
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {statCards.map((card, index) => (
                 <div
                     key={index}

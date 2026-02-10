@@ -1,13 +1,6 @@
-import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
-import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from './lib/constants';
+import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, SUPPORTED_LOCALES } from './lib/constants';
 import { getCorsHeaders, isOriginAllowed } from './lib/cors';
-
-const intlMiddleware = createMiddleware({
-    locales: [...SUPPORTED_LOCALES],
-    defaultLocale: DEFAULT_LOCALE,
-    localePrefix: 'always',
-});
 
 export default function middleware(request: NextRequest) {
     // Handle CORS for API routes
@@ -44,7 +37,21 @@ export default function middleware(request: NextRequest) {
         return response;
     }
 
-    return intlMiddleware(request);
+    // For non-API routes: ensure locale cookie exists
+    const localeCookie = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+    const isValidLocale = SUPPORTED_LOCALES.includes(localeCookie as 'en' | 'de');
+
+    if (!isValidLocale) {
+        const response = NextResponse.next();
+        response.cookies.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 365, // 1 year
+            sameSite: 'lax',
+        });
+        return response;
+    }
+
+    return NextResponse.next();
 }
 
 export const config = {

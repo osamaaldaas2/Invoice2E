@@ -51,6 +51,16 @@ export const RATE_LIMIT_PRESETS = {
         windowMs: 60 * 1000,            // 1 minute
         blockDurationMs: 60 * 1000,     // 1 minute
     },
+    signup: {
+        maxAttempts: 10,
+        windowMs: 15 * 60 * 1000,       // 15 minutes
+        blockDurationMs: 15 * 60 * 1000, // 15 minutes
+    },
+    worker: {
+        maxAttempts: 30,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 2 * 60 * 1000, // 2 minutes
+    },
 };
 
 // Check if Redis is configured

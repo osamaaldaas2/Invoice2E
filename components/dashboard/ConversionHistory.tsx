@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logger } from '@/lib/logger';
+import { useToast } from '@/lib/toast-context';
 
 interface BatchResultItem {
     filename: string;
@@ -155,7 +156,7 @@ function BatchRow({
 
 export default function ConversionHistory({ limit = 10, showPagination = true }: Props) {
     const t = useTranslations('history');
-    const locale = useLocale();
+    const { toast } = useToast();
     const searchParams = useSearchParams();
     const initialStatus = useMemo<'all' | 'draft' | 'completed'>(() => {
         const statusParam = searchParams.get('status');
@@ -168,25 +169,9 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
-    const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'completed'>(initialStatus);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
-
-    const withLocale = useMemo(() => {
-        return (path: string) => {
-            if (!path.startsWith('/')) {
-                return `/${locale}/${path}`;
-            }
-            if (path === '/') {
-                return `/${locale}`;
-            }
-            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
-                return path;
-            }
-            return `/${locale}${path}`;
-        };
-    }, [locale]);
 
     const fetchHistory = useCallback(async () => {
         try {
@@ -213,7 +198,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
             setTotal(statusFilter === 'all' ? (data.total || 0) : filtered.length);
         } catch (err: unknown) {
             logger.error('Fetch history exception', err);
-            setError(err instanceof Error ? err.message : 'Failed to load history');
+            toast({ title: err instanceof Error ? err.message : 'Failed to load history', variant: 'error' });
         } finally {
             setLoading(false);
         }
@@ -312,7 +297,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
 
             downloadXml(data.data.xmlContent, data.data.fileName);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to download XML');
+            toast({ title: err instanceof Error ? err.message : 'Failed to download XML', variant: 'error' });
         } finally {
             setDownloadingId(null);
         }
@@ -348,7 +333,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to download batch ZIP');
+            toast({ title: err instanceof Error ? err.message : 'Failed to download batch ZIP', variant: 'error' });
         } finally {
             setDownloadingId(null);
         }
@@ -377,14 +362,6 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                         <div key={i} className="h-12 bg-white/10 rounded"></div>
                     ))}
                 </div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="glass-panel text-rose-200 p-4 rounded-xl border border-rose-400/30">
-                {error}
             </div>
         );
     }
@@ -489,7 +466,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                                             {conversion.extraction_id ? (
                                                 conversion.status === 'draft' ? (
                                                     <Link
-                                                        href={withLocale(`/review/${conversion.extraction_id}`)}
+                                                        href={`/review/${conversion.extraction_id}`}
                                                         className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-100 hover:bg-white/10"
                                                     >
                                                         {t('resume')}

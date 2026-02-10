@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-let serverClient: any = null;
-let userClient: any = null;
+let serverClient: SupabaseClient | null = null;
+let userClient: SupabaseClient | null = null;
 
 const getSupabaseUrl = () => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,20 +11,20 @@ const getSupabaseUrl = () => {
     return url;
 };
 
-const buildClient = (key: string): any =>
+const buildClient = (key: string): SupabaseClient =>
     createClient(getSupabaseUrl(), key, {
         auth: {
             autoRefreshToken: false,
             persistSession: false,
             detectSessionInUrl: false,
         },
-    }) as any;
+    });
 
 /**
  * Server-side admin client.
  * This app uses custom JWT sessions, not Supabase Auth cookies.
  */
-export const createServerClient = (): any => {
+export const createServerClient = (): SupabaseClient => {
     if (serverClient) {
         return serverClient;
     }
@@ -42,7 +42,7 @@ export const createServerClient = (): any => {
  * User-scoped helper for existing call sites.
  * Falls back to service role for server routes that rely on custom auth.
  */
-export const createUserClient = (): any => {
+export const createUserClient = (): SupabaseClient => {
     if (userClient) {
         return userClient;
     }

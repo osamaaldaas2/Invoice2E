@@ -48,8 +48,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const search = searchParams.get('search') || undefined;
         const role = searchParams.get('role') as UserRole | undefined;
         const isBanned = searchParams.get('isBanned');
-        const sortBy = searchParams.get('sortBy') as AdminUsersFilter['sortBy'];
-        const sortOrder = searchParams.get('sortOrder') as 'asc' | 'desc';
+
+        // Validate sort parameters to prevent SQL injection via column names
+        const ALLOWED_SORTS = ['created_at', 'email', 'role', 'is_banned'] as const;
+        const rawSort = searchParams.get('sortBy');
+        const sortBy = (ALLOWED_SORTS as readonly string[]).includes(rawSort || '')
+            ? (rawSort as AdminUsersFilter['sortBy'])
+            : ('created_at' as AdminUsersFilter['sortBy']);
+        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' as const : 'desc' as const;
 
         const filters: AdminUsersFilter = {
             search,

@@ -129,8 +129,63 @@ export class CreditsDatabaseService {
             newBalance,
         });
 
+        // credit_transactions insert is handled by the add_credits RPC (migration 027)
+
         // Return updated credits
         return this.getUserCredits(userId);
+    }
+
+    /**
+     * Atomically verify a payment and add credits with idempotency.
+     * Uses verify_and_add_credits RPC — the idempotency marker (webhook_events insert)
+     * happens inside the same transaction as the credit addition.
+     */
+    async verifyAndAddCredits(
+        userId: string,
+        amount: number,
+        eventId: string,
+        provider: string,
+        eventType: string,
+        referenceId?: string
+    ): Promise<{ success: boolean; alreadyProcessed: boolean; newBalance?: number }> {
+        if (amount <= 0) {
+            throw new ValidationError('Amount must be positive');
+        }
+
+        const supabase = this.getSupabase();
+
+        const { data, error } = await supabase.rpc('verify_and_add_credits', {
+            p_user_id: userId,
+            p_amount: amount,
+            p_event_id: eventId,
+            p_provider: provider,
+            p_event_type: eventType,
+            p_reference_id: referenceId || null,
+        });
+
+        if (error) {
+            logger.error('verify_and_add_credits RPC failed', {
+                userId, amount, eventId, provider, error: error.message,
+            });
+            throw new AppError('DB_ERROR', 'Failed to verify and add credits', 500);
+        }
+
+        const result = data as { success: boolean; already_processed: boolean; new_balance?: number; error?: string };
+
+        if (!result.success) {
+            logger.error('verify_and_add_credits returned failure', {
+                userId, eventId, error: result.error,
+            });
+            throw new AppError('DB_ERROR', result.error || 'Failed to add credits', 500);
+        }
+
+        // credit_transactions insert is handled by the verify_and_add_credits RPC (migration 027)
+
+        return {
+            success: true,
+            alreadyProcessed: result.already_processed,
+            newBalance: result.new_balance,
+        };
     }
 }
 

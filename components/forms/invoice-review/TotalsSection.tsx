@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 
 interface TotalsSectionProps {
     register: UseFormRegister<any>;
@@ -8,6 +9,7 @@ interface TotalsSectionProps {
 }
 
 export const TotalsSection: React.FC<TotalsSectionProps> = ({ register, watch, setValue }) => {
+    const t = useTranslations('invoiceReview');
     const items = watch('items') || [];
 
     // FIX-028: Use integer cents to avoid floating point errors
@@ -31,7 +33,7 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({ register, watch, s
             <div className="flex justify-end">
                 <div className="w-full md:w-1/3 space-y-3">
                     <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-slate-300">Subtotal (Net)</label>
+                        <label className="text-sm font-medium text-slate-300">{t('subtotal')}</label>
                         <input
                             type="number"
                             step="0.01"
@@ -40,7 +42,7 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({ register, watch, s
                         />
                     </div>
                     <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-slate-300">Tax Amount</label>
+                        <label className="text-sm font-medium text-slate-300">{t('taxAmount')}</label>
                         <input
                             type="number"
                             step="0.01"
@@ -49,7 +51,7 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({ register, watch, s
                         />
                     </div>
                     <div className="flex justify-between items-center pt-3 border-t border-white/10">
-                        <label className="text-base font-bold text-white">Total Amount (Gross)</label>
+                        <label className="text-base font-bold text-white">{t('totalAmount')}</label>
                         <input
                             type="number"
                             step="0.01"

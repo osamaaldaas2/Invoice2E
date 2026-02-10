@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 
 export default function ForgotPasswordForm() {
-    const locale = useLocale();
+    const t = useTranslations('auth');
+    const tErr = useTranslations('errors');
+    const tCommon = useTranslations('common');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -26,13 +28,13 @@ export default function ForgotPasswordForm() {
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error || 'Failed to send reset link');
+                setError(data.error || tErr('sendResetFailed'));
                 return;
             }
 
             setSuccess(true);
         } catch {
-            setError('An error occurred. Please try again.');
+            setError(tErr('generic'));
         } finally {
             setLoading(false);
         }
@@ -42,14 +44,13 @@ export default function ForgotPasswordForm() {
         return (
             <div className="text-center space-y-4">
                 <div className="p-4 glass-panel border border-emerald-400/30 rounded-xl text-emerald-200 text-sm">
-                    If an account with that email exists, we&apos;ve sent a password reset link.
-                    Please check your inbox.
+                    {t('reset_link_sent')}
                 </div>
                 <Link
-                    href={`/${locale}/login`}
+                    href="/login"
                     className="text-sky-200 hover:text-sky-100 font-medium text-sm"
                 >
-                    Back to Login
+                    {tCommon('backToLogin')}
                 </Link>
             </div>
         );
@@ -59,7 +60,7 @@ export default function ForgotPasswordForm() {
         <form onSubmit={handleSubmit} className="space-y-6" aria-label="Forgot password form">
             <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-                    Email
+                    {t('email')}
                 </label>
                 <input
                     id="email"
@@ -94,19 +95,19 @@ export default function ForgotPasswordForm() {
                 {loading ? (
                     <span className="flex items-center justify-center gap-2">
                         <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" aria-hidden="true" />
-                        <span>Sending...</span>
+                        <span>{t('sending')}</span>
                     </span>
                 ) : (
-                    'Send Reset Link'
+                    t('send_reset_link')
                 )}
             </button>
 
             <div className="text-center">
                 <Link
-                    href={`/${locale}/login`}
+                    href="/login"
                     className="text-sky-200 hover:text-sky-100 font-medium text-sm"
                 >
-                    Back to Login
+                    {tCommon('backToLogin')}
                 </Link>
             </div>
         </form>

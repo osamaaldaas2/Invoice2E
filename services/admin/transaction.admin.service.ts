@@ -95,8 +95,8 @@ class AdminTransactionService {
                 userName: user
                     ? `${user.first_name} ${user.last_name}`
                     : 'Unknown',
-                stripePaymentId: row.stripe_payment_id,
-                paypalOrderId: row.paypal_order_id,
+                stripePaymentId: row.stripe_payment_id ?? undefined,
+                paypalOrderId: row.paypal_order_id ?? undefined,
                 amount: parseFloat(row.amount) || 0,
                 currency: row.currency || 'EUR',
                 creditsPurchased: row.credits_purchased || 0,

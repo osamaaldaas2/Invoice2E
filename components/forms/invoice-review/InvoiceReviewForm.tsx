@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 import { useInvoiceReviewForm } from './useInvoiceReviewForm';
 import { InvoiceDetailsSection } from './InvoiceDetailsSection';
 import { SellerInfoSection } from './SellerInfoSection';
@@ -31,6 +32,7 @@ export default function InvoiceReviewForm({
     initialData,
     confidence,
 }: InvoiceReviewFormProps) {
+    const t = useTranslations('invoiceReview');
     const { form, onSubmit, isSubmitting, submitError, submitSuccess } = useInvoiceReviewForm({
         extractionId,
         userId,
@@ -44,27 +46,27 @@ export default function InvoiceReviewForm({
             {/* Confidence Alert */}
             {(() => {
                 const missingFields: string[] = [];
-                if (!initialData?.invoiceNumber) missingFields.push('Invoice Number');
-                if (!initialData?.invoiceDate) missingFields.push('Invoice Date');
-                if (!initialData?.sellerName) missingFields.push('Seller Name');
-                if (!initialData?.sellerEmail) missingFields.push('Seller Email');
-                if (!initialData?.sellerAddress) missingFields.push('Seller Address');
-                if (!initialData?.sellerTaxId) missingFields.push('Seller Tax ID');
-                if (!initialData?.buyerName) missingFields.push('Buyer Name');
-                if (!initialData?.buyerEmail) missingFields.push('Buyer Email');
-                if (!initialData?.buyerAddress) missingFields.push('Buyer Address');
-                if (!initialData?.buyerTaxId) missingFields.push('Buyer Tax ID');
+                if (!initialData?.invoiceNumber) missingFields.push(t('invoiceNumber'));
+                if (!initialData?.invoiceDate) missingFields.push(t('invoiceDate'));
+                if (!initialData?.sellerName) missingFields.push(t('sellerName'));
+                if (!initialData?.sellerEmail) missingFields.push(t('sellerEmail'));
+                if (!initialData?.sellerAddress) missingFields.push(t('street'));
+                if (!initialData?.sellerTaxId) missingFields.push(t('taxId'));
+                if (!initialData?.buyerName) missingFields.push(t('buyerName'));
+                if (!initialData?.buyerEmail) missingFields.push(t('buyerEmail'));
+                if (!initialData?.buyerAddress) missingFields.push(t('street'));
+                if (!initialData?.buyerTaxId) missingFields.push(t('taxId'));
                 const pct = (confidence * 100).toFixed(0);
                 const isHigh = confidence >= 0.8;
                 return (
                     <div className={`p-4 rounded-2xl border ${isHigh ? 'bg-emerald-500/15 border-emerald-400/30' : 'bg-amber-500/15 border-amber-400/30'}`}>
                         <p className={isHigh ? 'text-emerald-200' : 'text-amber-200'}>
-                            Extraction Confidence: <strong>{pct}%</strong>
-                            {!isHigh && ' — Please review carefully'}
+                            {t('confidence', { score: pct })}
+                            {!isHigh && ` — ${t('reviewCarefully')}`}
                         </p>
                         {missingFields.length > 0 && (
                             <p className="text-sm text-slate-400 mt-1">
-                                Missing: {missingFields.join(', ')}
+                                {t('missing', { fields: missingFields.join(', ') })}
                             </p>
                         )}
                     </div>
@@ -93,7 +95,7 @@ export default function InvoiceReviewForm({
 
             {/* Notes */}
             <div className="border-t border-white/10 pt-4">
-                <label className="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">{t('notes')}</label>
                 <textarea
                     {...register('notes')}
                     rows={3}
@@ -118,7 +120,7 @@ export default function InvoiceReviewForm({
                 disabled={isSubmitting}
                 className="w-full px-6 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white rounded-full font-semibold hover:brightness-110 disabled:opacity-50"
             >
-                {isSubmitting ? 'Saving Review...' : 'Save & Continue to Conversion'}
+                {isSubmitting ? t('savingReview') : t('saveAndContinue')}
             </button>
         </form>
     );

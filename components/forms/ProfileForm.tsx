@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { emitAuthChanged } from '@/lib/client-auth';
+import { useToast } from '@/lib/toast-context';
+import { LOCALE_COOKIE_NAME } from '@/lib/constants';
 
 type ProfileFormData = {
     firstName: string;
@@ -34,11 +36,10 @@ const emptyForm: ProfileFormData = {
 
 export default function ProfileForm() {
     const t = useTranslations('profile');
+    const { toast } = useToast();
     const [form, setForm] = useState<ProfileFormData>(emptyForm);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -63,7 +64,7 @@ export default function ProfileForm() {
                     language: profile.language === 'de' ? 'de' : 'en',
                 });
             } catch {
-                setError(t('loadError'));
+                toast({ title: t('loadError'), variant: 'error' });
             } finally {
                 setLoading(false);
             }
@@ -86,8 +87,6 @@ export default function ProfileForm() {
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         setSaving(true);
-        setError('');
-        setSuccess('');
 
         try {
             const normalizedCountry = form.addressCountry.trim().toUpperCase();
@@ -112,12 +111,22 @@ export default function ProfileForm() {
                 throw new Error(data?.error || t('saveError'));
             }
 
-            setSuccess(t('saveSuccess'));
+            toast({ title: t('saveSuccess'), variant: 'success' });
 
             emitAuthChanged();
             window.dispatchEvent(new Event('profile-updated'));
+
+            // If language changed, update locale cookie and reload to reflect new translations
+            const currentCookieLocale = document.cookie
+                .split('; ')
+                .find(row => row.startsWith(`${LOCALE_COOKIE_NAME}=`))
+                ?.split('=')[1];
+            if (form.language !== currentCookieLocale) {
+                document.cookie = `${LOCALE_COOKIE_NAME}=${form.language};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+                window.location.reload();
+            }
         } catch (err) {
-            setError(err instanceof Error ? err.message : t('saveError'));
+            toast({ title: err instanceof Error ? err.message : t('saveError'), variant: 'error' });
         } finally {
             setSaving(false);
         }
@@ -206,18 +215,6 @@ export default function ProfileForm() {
                     <Input value={form.taxId} onChange={updateField('taxId')} />
                 </div>
             </div>
-
-            {error && (
-                <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm">
-                    {error}
-                </div>
-            )}
-
-            {success && (
-                <div className="p-3 glass-panel border border-emerald-400/30 rounded-xl text-emerald-200 text-sm">
-                    {success}
-                </div>
-            )}
 
             <div className="flex items-center justify-end">
                 <Button type="submit" disabled={saving}>

@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 import { stripeService, CREDIT_PACKAGES } from './stripe.service';
 import { paypalService } from './paypal.service';
 import { emailService } from './email.service';
+import { creditsDbService } from './credits.db.service';
 import { AppError, ValidationError } from '@/lib/errors';
 
 export type PaymentMethod = 'stripe' | 'paypal';
@@ -257,22 +258,24 @@ export class PaymentProcessor {
             }
         }
 
-        // Add credits to user using atomic RPC
-        await this.addCreditsToUser(userId, credits, 'stripe', paymentIntent);
+        // Atomic credit addition with idempotency — single RPC call replaces
+        // separate addCreditsToUser + webhook_events insert
+        const verifyResult = await creditsDbService.verifyAndAddCredits(
+            userId,
+            credits,
+            eventId,
+            'stripe',
+            event.type,
+            paymentIntent,
+        );
 
-        // Record the processed webhook event for idempotency
-        await supabase.from('webhook_events').insert({
-            event_id: eventId,
-            provider: 'stripe',
-            event_type: event.type,
-            user_id: userId,
-            credits_added: credits,
-            payment_amount: (session.amount_total as number) / 100,
-            currency: (session.currency as string || 'EUR').toUpperCase(),
-        });
+        if (verifyResult.alreadyProcessed) {
+            logger.info('Stripe webhook credits already processed', { eventId, userId });
+            return { success: true, message: 'Already processed' };
+        }
 
-        // Update transaction status
-        await supabase
+        // Update transaction status — filter by session ID to avoid updating wrong transaction
+        const txUpdate = supabase
             .from('payment_transactions')
             .update({
                 payment_status: 'completed',
@@ -282,6 +285,12 @@ export class PaymentProcessor {
             .eq('payment_status', 'pending')
             .eq('payment_method', 'stripe');
 
+        if (sessionId) {
+            txUpdate.eq('stripe_session_id', sessionId);
+        }
+
+        await txUpdate;
+
         // Send confirmation email
         const { data: userData } = await supabase
             .from('users')
@@ -290,17 +299,11 @@ export class PaymentProcessor {
             .single();
 
         if (userData?.email) {
-            const { data: creditData } = await supabase
-                .from('user_credits')
-                .select('available_credits')
-                .eq('user_id', userId)
-                .single();
-
             await emailService.sendPaymentConfirmationEmail(userData.email, {
                 creditsPurchased: credits,
                 amountPaid: (session.amount_total as number) / 100,
                 currency: (session.currency as string || 'EUR').toUpperCase(),
-                availableCredits: creditData?.available_credits || credits,
+                availableCredits: verifyResult.newBalance || credits,
             });
         }
 
@@ -437,17 +440,20 @@ export class PaymentProcessor {
             return { success: true, message: 'Transaction already completed' };
         }
 
-        // Add credits using atomic RPC
-        await this.addCreditsToUser(userId, credits, 'paypal', orderId);
+        // Atomic credit addition with idempotency — single RPC call
+        const verifyResult = await creditsDbService.verifyAndAddCredits(
+            userId,
+            credits,
+            eventId,
+            'paypal',
+            event.event_type,
+            orderId,
+        );
 
-        // Record the processed webhook event for idempotency
-        await supabase.from('webhook_events').insert({
-            event_id: eventId,
-            provider: 'paypal',
-            event_type: event.event_type,
-            user_id: userId,
-            credits_added: credits,
-        });
+        if (verifyResult.alreadyProcessed) {
+            logger.info('PayPal webhook credits already processed', { eventId, userId });
+            return { success: true, message: 'Already processed' };
+        }
 
         // Update transaction
         await supabase

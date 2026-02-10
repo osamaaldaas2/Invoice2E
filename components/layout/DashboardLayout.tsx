@@ -1,26 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { fetchSessionUser } from '@/lib/client-auth';
-
-type User = {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-};
-
-const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
-    { href: '/dashboard/history', label: 'History', icon: '📋' },
-    { href: '/dashboard/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/dashboard/templates', label: 'Templates', icon: '📝' },
-    { href: '/dashboard/credits', label: 'Credits', icon: '💳' },
-    { href: '/invoices/bulk-upload', label: 'Bulk Upload', icon: '📦' },
-];
+import { useTranslations } from 'next-intl';
+import { useUser } from '@/lib/user-context';
 
 interface Props {
     children: React.ReactNode;
@@ -29,54 +13,23 @@ interface Props {
 export default function DashboardLayout({ children }: Props) {
     const router = useRouter();
     const pathname = usePathname();
-    const locale = useLocale();
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { user, loading } = useUser();
+    const t = useTranslations('dashboard');
 
-    const withLocale = useMemo(() => {
-        return (path: string) => {
-            if (!path.startsWith('/')) {
-                return `/${locale}/${path}`;
-            }
-            if (path === '/') {
-                return `/${locale}`;
-            }
-            if (path.startsWith(`/${locale}/`) || path === `/${locale}`) {
-                return path;
-            }
-            return `/${locale}${path}`;
-        };
-    }, [locale]);
+    const navItems = [
+        { href: '/dashboard', label: t('navDashboard'), icon: '🏠' },
+        { href: '/dashboard/history', label: t('navHistory'), icon: '📋' },
+        { href: '/dashboard/analytics', label: t('navAnalytics'), icon: '📊' },
+        { href: '/dashboard/templates', label: t('navTemplates'), icon: '📝' },
+        { href: '/dashboard/credits', label: t('navCredits'), icon: '💳' },
+        { href: '/invoices/bulk-upload', label: t('navBulkUpload'), icon: '📦' },
+    ];
 
     useEffect(() => {
-        const loadUser = async () => {
-            try {
-                const sessionUser = await fetchSessionUser();
-                if (!sessionUser) {
-                    setUser(null);
-                    router.replace(withLocale('/login'));
-                    return;
-                }
-                setUser(sessionUser);
-            } catch {
-                setUser(null);
-                router.replace(withLocale('/login'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        void loadUser();
-
-        const handleAuthChanged = () => void loadUser();
-        window.addEventListener('auth-changed', handleAuthChanged);
-        window.addEventListener('profile-updated', handleAuthChanged);
-
-        return () => {
-            window.removeEventListener('auth-changed', handleAuthChanged);
-            window.removeEventListener('profile-updated', handleAuthChanged);
-        };
-    }, [router, withLocale]);
+        if (!loading && !user) {
+            router.replace('/login');
+        }
+    }, [loading, user, router]);
 
     if (loading) {
         return (
@@ -91,19 +44,19 @@ export default function DashboardLayout({ children }: Props) {
     }
 
     return (
-        <div className="min-h-screen">
-            <div className="flex">
+        <div className="min-h-screen overflow-x-hidden">
+            <div className="flex min-w-0">
                 {/* Sidebar Navigation */}
                 <aside className="hidden md:block w-64 min-h-screen fixed left-0 top-16 border-r border-white/10 bg-slate-950/70 backdrop-blur-xl">
                     <div className="p-4">
                         <div className="mb-6 pb-4 border-b border-white/10">
-                            <p className="text-xs uppercase tracking-[0.2em] text-faded">Welcome back</p>
+                            <p className="text-xs uppercase tracking-[0.2em] text-faded">{t('welcomeBack')}</p>
                             <p className="font-semibold text-white mt-2">{user.firstName} {user.lastName}</p>
                             <p className="text-xs text-faded">{user.email}</p>
                         </div>
                         <nav className="space-y-2">
                             {navItems.map((item) => {
-                                const fullPath = withLocale(item.href);
+                                const fullPath = item.href;
                                 const isActive = pathname === fullPath;
                                 return (
                                     <Link
@@ -124,16 +77,16 @@ export default function DashboardLayout({ children }: Props) {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8">
-                    <div className="max-w-6xl mx-auto">
+                <main className="flex-1 min-w-0 ml-0 md:ml-64 p-3 md:p-8">
+                    <div className="max-w-6xl mx-auto overflow-hidden">
                         <div className="md:hidden mb-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="chip">{user.firstName}</span>
-                                <span className="text-faded text-sm">{user.email}</span>
+                            <div className="flex items-center gap-2 mb-4 min-w-0">
+                                <span className="chip shrink-0">{user.firstName}</span>
+                                <span className="text-faded text-sm truncate min-w-0">{user.email}</span>
                             </div>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
+                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                 {navItems.map((item) => {
-                                    const fullPath = withLocale(item.href);
+                                    const fullPath = item.href;
                                     const isActive = pathname === fullPath;
                                     return (
                                         <Link
