@@ -3,84 +3,88 @@ import { GeminiAdapter } from '@/adapters/gemini.adapter';
 import { AppError } from '@/lib/errors';
 const mockGenerateContent = vi.hoisted(() => vi.fn());
 const mockGetGenerativeModel = vi.hoisted(() =>
-    vi.fn(() => ({
-        generateContent: mockGenerateContent
-    }))
+  vi.fn(() => ({
+    generateContent: mockGenerateContent,
+  }))
 );
-const GoogleGenerativeAIMock = vi.hoisted(() =>
+const GoogleGenerativeAIMock = vi.hoisted(
+  () =>
     class GoogleGenerativeAIMock {
-        getGenerativeModel = mockGetGenerativeModel;
+      getGenerativeModel = mockGetGenerativeModel;
     }
 );
 
 vi.mock('@google/generative-ai', () => ({
-    GoogleGenerativeAI: GoogleGenerativeAIMock
+  GoogleGenerativeAI: GoogleGenerativeAIMock,
+}));
+
+vi.mock('@/lib/api-throttle', () => ({
+  geminiThrottle: { acquire: vi.fn().mockResolvedValue(undefined) },
 }));
 
 describe('GeminiAdapter', () => {
-    let adapter: GeminiAdapter;
-    beforeEach(() => {
-        vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  let adapter: GeminiAdapter;
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
 
-        mockGenerateContent.mockReset();
-        mockGetGenerativeModel.mockReset();
-        mockGetGenerativeModel.mockReturnValue({
-            generateContent: mockGenerateContent
-        });
-
-        adapter = new GeminiAdapter();
+    mockGenerateContent.mockReset();
+    mockGetGenerativeModel.mockReset();
+    mockGetGenerativeModel.mockReturnValue({
+      generateContent: mockGenerateContent,
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
+    adapter = new GeminiAdapter();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should validate configuration correctly', () => {
+    expect(adapter.validateConfiguration()).toBe(true);
+  });
+
+  it('should return false when API key is missing', () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    const adapterWithoutKey = new GeminiAdapter();
+    expect(adapterWithoutKey.validateConfiguration()).toBe(false);
+  });
+  it('should extract invoice data successfully', async () => {
+    const mockData = {
+      invoiceNumber: 'INV-001',
+      totalAmount: 150.0,
+      currency: 'EUR',
+    };
+
+    mockGenerateContent.mockResolvedValue({
+      response: {
+        text: () => JSON.stringify(mockData),
+      },
     });
 
-    it('should validate configuration correctly', () => {
-        expect(adapter.validateConfiguration()).toBe(true);
+    const result = await adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf');
+
+    expect(result.data.invoiceNumber).toBe('INV-001');
+    expect(mockGenerateContent).toHaveBeenCalled();
+  });
+
+  it('should handle invalid JSON response', async () => {
+    mockGenerateContent.mockResolvedValue({
+      response: {
+        text: () => 'Invalid JSON',
+      },
     });
 
-    it('should return false when API key is missing', () => {
-        vi.stubEnv('GEMINI_API_KEY', '');
-        const adapterWithoutKey = new GeminiAdapter();
-        expect(adapterWithoutKey.validateConfiguration()).toBe(false);
-    });
-    it('should extract invoice data successfully', async () => {
-        const mockData = {
-            invoiceNumber: 'INV-001',
-            totalAmount: 150.00,
-            currency: 'EUR'
-        };
+    await expect(
+      adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf')
+    ).rejects.toThrow(AppError);
+  });
 
-        mockGenerateContent.mockResolvedValue({
-            response: {
-                text: () => JSON.stringify(mockData)
-            }
-        });
+  it('should handle API errors', async () => {
+    mockGenerateContent.mockRejectedValue(new Error('API Error'));
 
-        const result = await adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf');
-
-
-        expect(result.data.invoiceNumber).toBe('INV-001');
-        expect(mockGenerateContent).toHaveBeenCalled();
-    });
-
-    it('should handle invalid JSON response', async () => {
-        mockGenerateContent.mockResolvedValue({
-            response: {
-                text: () => 'Invalid JSON'
-            }
-        });
-
-        await expect(adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf'))
-            .rejects
-            .toThrow(AppError);
-    });
-
-    it('should handle API errors', async () => {
-        mockGenerateContent.mockRejectedValue(new Error('API Error'));
-
-        await expect(adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf'))
-            .rejects
-            .toThrow('Gemini extraction failed'); // Or checking specific AppError wrapping
-    });
+    await expect(
+      adapter.extractInvoiceData(Buffer.from('test'), 'application/pdf')
+    ).rejects.toThrow('Gemini extraction failed'); // Or checking specific AppError wrapping
+  });
 });

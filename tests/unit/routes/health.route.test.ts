@@ -3,99 +3,132 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies before imports
 const createServerClientMock = vi.hoisted(() => vi.fn());
 const loggerMock = vi.hoisted(() => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase.server', () => ({
-    createServerClient: () => createServerClientMock(),
+  createServerClient: () => createServerClientMock(),
 }));
 
 vi.mock('@/lib/logger', () => ({
-    logger: loggerMock,
+  logger: loggerMock,
 }));
 
 vi.mock('@/lib/constants', () => ({
-    APP_VERSION: '1.0.0',
+  APP_VERSION: '1.0.0',
+}));
+
+vi.mock('@/lib/rate-limiter', () => ({
+  isUsingRedis: () => false,
 }));
 
 // Import after mocks
 import { GET } from '@/app/api/health/route';
 
+function createMockRequest(url = 'http://localhost:3000/api/health'): Request {
+  return new Request(url);
+}
+
 describe('Health API Route', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('GET /api/health', () => {
+    it('should return ok status when database is healthy', async () => {
+      createServerClientMock.mockReturnValue({
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ error: null })),
+          })),
+        })),
+      });
+
+      const response = await GET(createMockRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('ok');
+      expect(data.version).toBe('1.0.0');
+      expect(data.checks).toBeDefined();
+      expect(data.checks.database).toBe('ok');
+      expect(typeof data.checks.uptime).toBe('number');
     });
 
-    describe('GET /api/health', () => {
-        it('should return ok status when database is healthy', async () => {
-            createServerClientMock.mockReturnValue({
-                from: vi.fn(() => ({
-                    select: vi.fn(() => ({
-                        limit: vi.fn(() => Promise.resolve({ error: null })),
-                    })),
-                })),
-            });
+    it('should return degraded status when database has errors', async () => {
+      createServerClientMock.mockReturnValue({
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ error: new Error('DB error') })),
+          })),
+        })),
+      });
 
-            const response = await GET();
-            const data = await response.json();
+      const response = await GET(createMockRequest());
+      const data = await response.json();
 
-            expect(response.status).toBe(200);
-            expect(data.status).toBe('ok');
-            expect(data.version).toBe('1.0.0');
-            expect(data.checks).toBeDefined();
-            expect(data.checks.database).toBe('ok');
-            expect(typeof data.checks.uptime).toBe('number');
-        });
-
-        it('should return degraded status when database has errors', async () => {
-            createServerClientMock.mockReturnValue({
-                from: vi.fn(() => ({
-                    select: vi.fn(() => ({
-                        limit: vi.fn(() => Promise.resolve({ error: new Error('DB error') })),
-                    })),
-                })),
-            });
-
-            const response = await GET();
-            const data = await response.json();
-
-            expect(response.status).toBe(503);
-            expect(data.status).toBe('degraded');
-            expect(data.checks.database).toBe('error');
-        });
-
-        it('should return error status on exception', async () => {
-            createServerClientMock.mockReturnValue({
-                from: vi.fn(() => {
-                    throw new Error('Connection failed');
-                }),
-            });
-
-            const response = await GET();
-            const data = await response.json();
-
-            expect(response.status).toBe(500);
-            expect(data.status).toBe('error');
-            expect(loggerMock.error).toHaveBeenCalled();
-        });
-
-        it('should include timestamp in response', async () => {
-            createServerClientMock.mockReturnValue({
-                from: vi.fn(() => ({
-                    select: vi.fn(() => ({
-                        limit: vi.fn(() => Promise.resolve({ error: null })),
-                    })),
-                })),
-            });
-
-            const response = await GET();
-            const data = await response.json();
-
-            expect(data.timestamp).toBeDefined();
-            expect(new Date(data.timestamp).getTime()).not.toBeNaN();
-        });
+      expect(response.status).toBe(503);
+      expect(data.status).toBe('degraded');
+      expect(data.checks.database).toBe('error');
     });
+
+    it('should return error status on exception', async () => {
+      createServerClientMock.mockReturnValue({
+        from: vi.fn(() => {
+          throw new Error('Connection failed');
+        }),
+      });
+
+      const response = await GET(createMockRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.status).toBe('error');
+      expect(loggerMock.error).toHaveBeenCalled();
+    });
+
+    it('should return ok for liveness probe', async () => {
+      const response = await GET(createMockRequest('http://localhost:3000/api/health?probe=live'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('ok');
+      expect(data.checks).toBeUndefined();
+    });
+
+    it('should include redis and ai status in checks', async () => {
+      createServerClientMock.mockReturnValue({
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ error: null })),
+          })),
+        })),
+      });
+
+      const response = await GET(createMockRequest());
+      const data = await response.json();
+
+      expect(data.checks.redis).toBe('not_configured');
+      expect(data.checks.ai).toBeDefined();
+    });
+
+    it('should include timestamp in response', async () => {
+      createServerClientMock.mockReturnValue({
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve({ error: null })),
+          })),
+        })),
+      });
+
+      const response = await GET(createMockRequest());
+      const data = await response.json();
+
+      expect(data.timestamp).toBeDefined();
+      expect(new Date(data.timestamp).getTime()).not.toBeNaN();
+    });
+  });
 });
