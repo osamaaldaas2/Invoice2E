@@ -107,7 +107,13 @@ export class BatchProcessor {
         });
 
         // Process all segments — extra credits settled in bulk at batch level
+        // IMPORTANT: Keep results[index] as 'pending' until ALL segments are done.
+        // Otherwise, replacing it with seg 0's success result makes completedFiles === totalFiles
+        // prematurely when this is the last file, causing the frontend to stop polling early.
         const segments = splitBuffers.map((buf, s) => ({ buf, s }));
+        let firstSegmentResult: BatchResult | null = null;
+        const extraSegmentResults: BatchResult[] = [];
+
         for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
           const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
           await Promise.all(
@@ -126,7 +132,7 @@ export class BatchProcessor {
                   userId,
                   extractionData: extractedData as unknown as Record<string, unknown>,
                   confidenceScore: extractedData.confidence,
-                  status: 'draft',
+                  status: 'completed',
                 });
                 const segmentResult: BatchResult = {
                   filename: segmentName,
@@ -143,9 +149,9 @@ export class BatchProcessor {
                 };
 
                 if (s === 0) {
-                  results[index] = segmentResult;
+                  firstSegmentResult = segmentResult;
                 } else {
-                  results.push(segmentResult);
+                  extraSegmentResults.push(segmentResult);
                 }
               } catch (segError) {
                 const errMsg = segError instanceof Error ? segError.message : 'Unknown error';
@@ -158,26 +164,47 @@ export class BatchProcessor {
                   completedAt: new Date().toISOString(),
                 };
                 if (s === 0) {
-                  results[index] = segmentResult;
+                  firstSegmentResult = segmentResult;
                 } else {
-                  results.push(segmentResult);
+                  extraSegmentResults.push(segmentResult);
                 }
               }
             })
           );
 
-          // Live progress update after each segment chunk
-          const segSuccessCount = results.filter((r) => r.status === 'success').length;
-          const segFailCount = results.filter((r) => r.status === 'failed').length;
+          // Live progress update after each segment chunk.
+          // results[index] is still 'pending' — count completed segments separately.
+          const segDoneCount = (firstSegmentResult ? 1 : 0) + extraSegmentResults.length;
+          const segTotalCount = segments.length;
+          const firstSeg = firstSegmentResult as BatchResult | null;
+          const segSuccessCount =
+            results.filter((r) => r.status === 'success').length +
+            (firstSeg?.status === 'success' ? 1 : 0) +
+            extraSegmentResults.filter((r) => r.status === 'success').length;
+          const segFailCount =
+            results.filter((r) => r.status === 'failed').length +
+            (firstSeg?.status === 'failed' ? 1 : 0) +
+            extraSegmentResults.filter((r) => r.status === 'failed').length;
+
           await supabase
             .from('batch_jobs')
             .update({
-              total_files: results.length,
+              // total_files accounts for the expansion (original slot + extra segments)
+              total_files:
+                results.length + extraSegmentResults.length + (segTotalCount - segDoneCount),
               completed_files: segSuccessCount,
               failed_files: segFailCount,
-              results: results,
+              // Don't write results to DB mid-processing — the pending slot would confuse the UI
             })
             .eq('id', jobId);
+        }
+
+        // All segments done — now commit to the results array
+        if (firstSegmentResult) {
+          results[index] = firstSegmentResult;
+        }
+        for (const extra of extraSegmentResults) {
+          results.push(extra);
         }
 
         // Safety guard: if no segments were processed, mark as failed
@@ -204,7 +231,7 @@ export class BatchProcessor {
           userId,
           extractionData: extractedData as unknown as Record<string, unknown>,
           confidenceScore: extractedData.confidence,
-          status: 'draft',
+          status: 'completed',
         });
 
         results[index] = {

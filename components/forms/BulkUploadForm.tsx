@@ -232,6 +232,21 @@ export default function BulkUploadForm() {
     }
   };
 
+  // D5: Compute per-invoice readiness from cached extraction data
+  const computeReadiness = (data: any): 'ready' | 'warning' => {
+    const d = data?.extractionData || data;
+    if (!d) return 'warning';
+    const checks = [
+      !!d.sellerName,
+      !!(d.sellerEmail || d.sellerElectronicAddress),
+      !!(d.buyerEmail || d.buyerElectronicAddress),
+      !!d.sellerIban,
+      Array.isArray(d.lineItems) && d.lineItems.length > 0,
+      Number(d.totalAmount) > 0,
+    ];
+    return checks.every(Boolean) ? 'ready' : 'warning';
+  };
+
   const loadExtraction = useCallback(
     async (extractionId: string) => {
       if (extractionCache[extractionId]) return;
@@ -428,6 +443,17 @@ export default function BulkUploadForm() {
                         <span className="text-sm font-medium text-white truncate">
                           {row.filename}
                         </span>
+                        {/* D5: Readiness dot */}
+                        {row.extractionId && extractionCache[row.extractionId] && (
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${computeReadiness(extractionCache[row.extractionId]) === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                            title={
+                              computeReadiness(extractionCache[row.extractionId]) === 'ready'
+                                ? 'Ready'
+                                : 'Missing fields'
+                            }
+                          />
+                        )}
                         {typeof row.confidenceScore === 'number' && (
                           <span className="text-xs text-faded flex-shrink-0">
                             {(row.confidenceScore * 100).toFixed(0)}%

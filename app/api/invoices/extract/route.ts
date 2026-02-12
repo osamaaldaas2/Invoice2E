@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
                 extractionData: extractedData as unknown as Record<string, unknown>,
                 confidenceScore: extractedData.confidence,
                 geminiResponseTimeMs: extractedData.processingTimeMs,
-                status: 'draft',
+                status: 'completed',
               });
 
               // Credits already deducted upfront — no per-segment deduction
@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
       extractionData: extractedData as unknown as Record<string, unknown>,
       confidenceScore: extractedData.confidence,
       geminiResponseTimeMs: responseTime,
-      status: 'draft',
+      status: 'completed',
     });
 
     // Credits already deducted before AI call — no post-extraction deduction needed

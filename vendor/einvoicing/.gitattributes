@@ -1,0 +1,5 @@
+# Vendored e-invoicing artifacts
+*.jar binary
+*.zip binary
+*.xsl linguist-vendored
+*.xsd linguist-vendored

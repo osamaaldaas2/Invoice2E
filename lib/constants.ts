@@ -75,11 +75,11 @@ export const INPUT_LIMITS = {
 export const MAX_CONCURRENT_BATCH_JOBS = 3;
 
 // Multi-invoice parallel extraction concurrency
-export const MULTI_INVOICE_CONCURRENCY = 3;
+export const MULTI_INVOICE_CONCURRENCY = 5;
 
 // Batch AI extraction throttling
 export const BATCH_EXTRACTION = {
-  CONCURRENCY: 3, // Process up to 3 files in parallel
+  CONCURRENCY: 5, // Process up to 5 files in parallel
   MAX_RETRIES: 3, // Max retries on 429/transient errors
   INITIAL_BACKOFF_MS: 5000, // 5s initial backoff
   BACKOFF_MULTIPLIER: 2, // Exponential backoff multiplier

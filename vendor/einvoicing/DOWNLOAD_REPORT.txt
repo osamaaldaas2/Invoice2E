@@ -1,0 +1,155 @@
+================================================================================
+E-INVOICING ARTIFACTS DOWNLOAD REPORT
+================================================================================
+Generated: 2026-02-12T14:19:00Z
+Script: manual download (basis for scripts/vendor-fetch-einvoicing.sh)
+
+================================================================================
+1. EN16931 VALIDATION ARTEFACTS (CEN/TC 434)
+================================================================================
+Repository: ConnectingEurope/eInvoicing-EN16931
+Tag: validation-1.3.15
+Release Date: 2025-10-20
+Release URL: https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/tag/validation-1.3.15
+
+Downloaded Assets:
+  ✓ en16931-cii-1.3.15.zip (222,468 bytes)
+    SHA256: dd7335b711f2f492a2e1d23d81f76fae7979857fd538502465b89681263280f4
+  ✓ en16931-ubl-1.3.15.zip (2,649,312 bytes)
+    SHA256: 974901a9edac022f77f500c337e0804b458d25435dd56a353cfbfb12323f5d3b
+
+Destination: vendor/einvoicing/en16931/validation-1.3.15/
+Extracted Size: 6.5 MB
+License: EUPL v1.2
+
+Contents:
+  - schematron/ (Schematron source rules)
+  - xslt/ (Compiled XSLT transformations)
+  - examples/ (Example invoices)
+
+================================================================================
+2. KOSIT VALIDATOR ENGINE
+================================================================================
+Repository: itplr-kosit/validator
+Tag: v1.6.1
+Release Date: 2026-02-05
+Release URL: https://github.com/itplr-kosit/validator/releases/tag/v1.6.1
+
+Downloaded Assets:
+  ✓ validator-1.6.1-standalone.jar (10,582,815 bytes)
+    SHA256: 6421704675af694a9751f445cfe2fa2ea41dd6eb34939a5da261880133b1f7cd
+
+Destination: vendor/einvoicing/kosit/validator/v1.6.1/
+Total Size: 10.6 MB
+License: Apache 2.0
+Java Requirements: Java 11+ (Recommended: Java 17+)
+
+Usage:
+  java -jar validator-1.6.1-standalone.jar -s scenarios.xml -h invoice.xml
+
+================================================================================
+3. XRECHNUNG VALIDATOR CONFIGURATION
+================================================================================
+Repository: itplr-kosit/validator-configuration-xrechnung
+Tag: v2026-01-31
+Release Date: 2026-02-05
+Release URL: https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/tag/v2026-01-31
+
+Downloaded Assets:
+  ✓ xrechnung-3.0.2-validator-configuration-2026-01-31.zip (487,782 bytes)
+    SHA256: 6a5a5911a421b25fbc423f62f93f894df7b236f5d73ca4f84bb222a945082704
+
+Destination: vendor/einvoicing/kosit/xrechnung-config/v2026-01-31/
+Extracted Size: 5.3 MB
+License: Apache 2.0
+XRechnung Compatibility: 3.0.x (tested with 3.0.2)
+
+Key Files:
+  ✓ scenarios.xml (VERIFIED)
+  ✓ EN16931-CII-validation.xsl (914,777 bytes)
+  ✓ EN16931-UBL-validation.xsl (1,084,309 bytes)
+  ✓ resources/ (XSD, Schematron, codelists)
+
+================================================================================
+4. XRECHNUNG SCHEMATRON RULES
+================================================================================
+Repository: itplr-kosit/xrechnung-schematron
+Tag: v2.5.0
+Release Date: 2026-01-31
+Release URL: https://github.com/itplr-kosit/xrechnung-schematron/releases/tag/v2.5.0
+
+Downloaded Assets:
+  ✓ xrechnung-3.0.2-schematron-2.5.0.zip (64,318 bytes)
+    SHA256: a0f3d82737759bee8591c298ff24983a8f1c667f85e45a34863c75a242bc6f43
+
+Destination: vendor/einvoicing/kosit/xrechnung-schematron/v2.5.0/
+Extracted Size: 549 KB
+License: Apache 2.0
+XRechnung Compatibility: 3.0.x (specifically 3.0.2)
+
+Contents:
+  - schematron/ (BR-DE-* rules, BR-TMP-* rules)
+  - CHANGELOG.md (detailed rule history)
+
+================================================================================
+SUMMARY
+================================================================================
+Total Artifacts: 4 packages
+Total Downloaded: 13,956,383 bytes (13.6 MB compressed)
+Total Extracted: ~23.3 MB
+All Checksums: VERIFIED
+
+Directory Structure:
+vendor/einvoicing/
+├── en16931/validation-1.3.15/
+├── kosit/
+│   ├── validator/v1.6.1/
+│   ├── xrechnung-config/v2026-01-31/
+│   └── xrechnung-schematron/v2.5.0/
+├── .gitattributes
+└── README.md
+
+Documentation:
+  ✓ vendor/einvoicing/README.md (overview)
+  ✓ docs/vendor-artefacts.md (comprehensive guide)
+  ✓ scripts/vendor-fetch-einvoicing.sh (update script)
+
+Each package directory contains:
+  ✓ checksums.sha256 (integrity verification)
+  ✓ SOURCE.md (release metadata)
+
+================================================================================
+INTEGRATION STATUS
+================================================================================
+Internal Validation: READY (TypeScript implementation)
+External Validation: READY (feature-gated, requires env config)
+
+Environment Variables Required (for external validation):
+  ENABLE_EXTERNAL_VALIDATION=true
+  KOSIT_VALIDATOR_JAR=vendor/einvoicing/kosit/validator/v1.6.1/validator-1.6.1-standalone.jar
+  KOSIT_SCENARIOS_XML=vendor/einvoicing/kosit/xrechnung-config/v2026-01-31/scenarios.xml
+
+Code Integration:
+  ✓ services/xrechnung/validator.ts → validateExternal() method
+  ✓ tests/unit/external-validation.test.ts → test suite
+
+================================================================================
+DEVIATIONS / NOTES
+================================================================================
+1. All releases fetched from official GitHub repositories (no mirrors)
+2. Used "latest" endpoint for KoSIT packages (v2026-01-31 resolved)
+3. EN16931 version pinned to validation-1.3.15 (matches XRechnung Config)
+4. All assets verified against GitHub-provided SHA256 digests
+5. scenarios.xml successfully extracted and verified in config package
+6. No source tarballs downloaded (only release assets)
+
+================================================================================
+NEXT STEPS
+================================================================================
+1. Update .env.example with KOSIT_* paths
+2. Add vendor/ to .gitignore exceptions (or commit if policy allows)
+3. Run checksum verification in CI/CD pipeline
+4. Test external validation with sample invoices
+5. Update CHANGELOG.md with artifact versions
+
+================================================================================

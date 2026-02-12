@@ -366,7 +366,7 @@ export class BatchService {
               userId,
               extractionData: extractedData as unknown as Record<string, unknown>,
               confidenceScore: extractedData.confidence,
-              status: 'draft',
+              status: 'completed',
             });
 
             results.push({
@@ -421,7 +421,7 @@ export class BatchService {
     const finalStatus =
       failedFiles === 0 ? 'completed' : completedFiles === 0 ? 'failed' : 'partial_success';
 
-    await supabase
+    const { error: finalUpdateError } = await supabase
       .from('batch_jobs')
       .update({
         status: finalStatus,
@@ -431,6 +431,24 @@ export class BatchService {
         completed_at: new Date().toISOString(),
       })
       .eq('id', jobId);
+
+    if (finalUpdateError) {
+      logger.error('Multi-invoice final status update failed, retrying', {
+        jobId,
+        finalStatus,
+        error: finalUpdateError.message,
+      });
+      // Retry once without results (smaller payload)
+      await supabase
+        .from('batch_jobs')
+        .update({
+          status: finalStatus,
+          completed_files: completedFiles,
+          failed_files: failedFiles,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+    }
 
     logger.info('Multi-invoice job completed', {
       jobId,

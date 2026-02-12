@@ -55,7 +55,10 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const data = extraction.extractionData as Record<string, unknown>;
+        const { _originalExtraction: _snap, ...data } = extraction.extractionData as Record<
+          string,
+          unknown
+        >;
 
         // Map extracted data to XRechnung service format
         const serviceData = {
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
           totalAmount: Number(data.totalAmount) || 0,
         } as Record<string, unknown>;
 
-        const result = xrechnungService.generateXRechnung(
+        const result = await xrechnungService.generateXRechnung(
           serviceData as unknown as XRechnungInvoiceData
         );
         let fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');

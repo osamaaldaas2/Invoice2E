@@ -109,7 +109,10 @@ export async function GET(req: NextRequest) {
           xmlFileName = cachedFileName;
           logger.info('Using cached XML for batch download', { extractionId });
         } else {
-          const data = extraction.extractionData as Record<string, unknown>;
+          const { _originalExtraction: _snap, ...data } = extraction.extractionData as Record<
+            string,
+            unknown
+          >;
           const serviceData = {
             ...data,
             invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
@@ -120,7 +123,7 @@ export async function GET(req: NextRequest) {
             totalAmount: Number(data.totalAmount) || 0,
           } as Record<string, unknown>;
 
-          const xmlResult = xrechnungService.generateXRechnung(
+          const xmlResult = await xrechnungService.generateXRechnung(
             serviceData as unknown as XRechnungInvoiceData
           );
           xmlContent = xmlResult.xmlContent;
