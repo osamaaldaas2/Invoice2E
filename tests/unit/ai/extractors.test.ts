@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { GeminiExtractor } from '@/services/ai/gemini.extractor';
 import { DeepSeekExtractor } from '@/services/ai/deepseek.extractor';
+import { OpenAIExtractor } from '@/services/ai/openai.extractor';
 import { AppError } from '@/lib/errors';
 
 // Mock dependencies
@@ -22,6 +23,7 @@ describe('AI Extractors', () => {
     // Setup default valid keys for tests
     process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
     process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.OPENAI_API_KEY = 'test-openai-key';
   });
 
   afterEach(() => {
@@ -61,6 +63,13 @@ describe('AI Extractors', () => {
       expect(() => ExtractorFactory.create()).toThrow(AppError);
     });
 
+    it('should create OpenAI extractor when specified via env', () => {
+      process.env.AI_PROVIDER = 'openai';
+      const extractor = ExtractorFactory.create();
+      expect(extractor).toBeInstanceOf(OpenAIExtractor);
+      expect(extractor.getProviderName()).toBe('OpenAI');
+    });
+
     it('should support explicit provider argument', () => {
       process.env.AI_PROVIDER = 'deepseek';
       // Even if env is deepseek, requesting gemini should work
@@ -80,6 +89,13 @@ describe('AI Extractors', () => {
     it('Gemini should implement IAIExtractor', () => {
       const extractor = new GeminiExtractor();
       expect(extractor.getProviderName()).toBe('Gemini');
+      expect(typeof extractor.validateConfiguration).toBe('function');
+      expect(typeof extractor.extractFromFile).toBe('function');
+    });
+
+    it('OpenAI should implement IAIExtractor', () => {
+      const extractor = new OpenAIExtractor();
+      expect(extractor.getProviderName()).toBe('OpenAI');
       expect(typeof extractor.validateConfiguration).toBe('function');
       expect(typeof extractor.extractFromFile).toBe('function');
     });

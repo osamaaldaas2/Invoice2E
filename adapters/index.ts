@@ -1,6 +1,7 @@
 export * from './interfaces';
 export * from './gemini.adapter';
 export * from './deepseek.adapter';
+export * from './openai.adapter';
 export * from './stripe.adapter';
 export * from './paypal.adapter';
 export * from './sendgrid.adapter';

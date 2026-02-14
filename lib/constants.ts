@@ -7,6 +7,7 @@ export const APP_VERSION = '1.0.0';
 export const API_TIMEOUTS = {
   GEMINI_EXTRACTION: 60000, // 60 seconds (AI processing)
   DEEPSEEK_EXTRACTION: 60000, // 60 seconds (AI processing)
+  OPENAI_EXTRACTION: 60000, // 60 seconds (AI processing)
   BOUNDARY_DETECTION: 30000, // 30 seconds (lighter AI call)
   STRIPE_API: 30000, // 30 seconds (payment processing)
   PAYPAL_API: 30000, // 30 seconds (payment processing)
@@ -87,6 +88,11 @@ export const BATCH_EXTRACTION = {
 } as const;
 
 // Gemini API rate limiting (token bucket)
+export const OPENAI_RATE_LIMIT = {
+  MAX_TOKENS: 5, // Burst capacity
+  REFILL_PER_SEC: 2, // Tokens refilled per second
+} as const;
+
 export const GEMINI_RATE_LIMIT = {
   MAX_TOKENS: 5, // Burst capacity (5 calls fire instantly, then 2/sec sustained)
   REFILL_PER_SEC: 2, // Tokens refilled per second (~120 RPM, under Gemini's 150 RPM)

@@ -1,4 +1,4 @@
-import { GEMINI_RATE_LIMIT } from '@/lib/constants';
+import { GEMINI_RATE_LIMIT, OPENAI_RATE_LIMIT } from '@/lib/constants';
 
 /**
  * Token-bucket rate limiter for AI API calls.
@@ -73,6 +73,12 @@ export class TokenBucketThrottle {
     return this.tokens;
   }
 }
+
+// OpenAI throttle
+export const openaiThrottle = new TokenBucketThrottle(
+  OPENAI_RATE_LIMIT.MAX_TOKENS,
+  OPENAI_RATE_LIMIT.REFILL_PER_SEC
+);
 
 // Singleton: 2 tokens, refilled at 2/sec (~120 RPM, safely under Gemini's 150 RPM limit)
 export const geminiThrottle = new TokenBucketThrottle(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 
@@ -16,7 +16,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
-        const supabase = createServerClient();
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const supabase = await createUserScopedClient(user.id);
 
         const { data, error, count } = await supabase
             .from('credit_transactions')

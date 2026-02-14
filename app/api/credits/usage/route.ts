@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const supabase = createServerClient();
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const supabase = await createUserScopedClient(user.id);
         const now = new Date();
         const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 

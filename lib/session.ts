@@ -221,8 +221,12 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
                     maxAge: SESSION_MAX_AGE,
                     path: '/',
                 });
-            } catch {
+            } catch (renewalError) {
                 // Non-critical: if cookie renewal fails, session still valid
+                logger.warn('Session renewal failed, continuing with current session', {
+                    userId: session.userId,
+                    error: renewalError instanceof Error ? renewalError.message : String(renewalError),
+                });
             }
         }
 

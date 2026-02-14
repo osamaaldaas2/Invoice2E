@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import { logger } from '@/lib/logger';
 import { XRechnungGenerationResult, XRechnungInvoiceData } from './types';
-import { xrechnungValidator } from './validator';
+import { xrechnungValidator, validateXmlStructure } from './validator';
 import { xrechnungBuilder } from './builder';
 
 export class XRechnungService {
@@ -25,19 +25,34 @@ export class XRechnungService {
       // Build XML
       const xmlContent = this.builder.buildXml(invoiceData);
 
+      // Post-generation: lightweight XML structure validation
+      const xmlStructure = validateXmlStructure(xmlContent);
+      if (!xmlStructure.valid) {
+        logger.warn('XML structure validation found issues', {
+          invoiceNumber: invoiceData.invoiceNumber,
+          errors: xmlStructure.errors,
+        });
+      }
+
       logger.info('XRechnung generated successfully', {
         invoiceNumber: invoiceData.invoiceNumber,
         xmlSize: xmlContent.length,
         warnings: validationResult.warnings.length,
       });
 
+      // Combine pipeline warnings with XML structure errors
+      const allWarnings = validationResult.warnings.map((w) => `[${w.ruleId}] ${w.message}`);
+      if (!xmlStructure.valid) {
+        allWarnings.push(...xmlStructure.errors.map((e) => `[XML-STRUCT] ${e}`));
+      }
+
       const result: XRechnungGenerationResult = {
         xmlContent,
         fileName: `${invoiceData.invoiceNumber || 'invoice'}_xrechnung.xml`,
         fileSize: Buffer.byteLength(xmlContent, 'utf8'),
-        validationStatus: validationResult.warnings.length > 0 ? 'warnings' : 'valid',
+        validationStatus: allWarnings.length > 0 ? 'warnings' : 'valid',
         validationErrors: [],
-        validationWarnings: validationResult.warnings.map((w) => `[${w.ruleId}] ${w.message}`),
+        validationWarnings: allWarnings,
         structuredErrors: validationResult.warnings,
       };
 

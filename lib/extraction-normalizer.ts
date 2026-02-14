@@ -7,8 +7,43 @@
  * field defaults, and line item mapping.
  */
 
-import type { ExtractedInvoiceData, TaxCategoryCode } from '@/types';
+import type { ExtractedInvoiceData, TaxCategoryCode, AllowanceCharge } from '@/types';
 import { logger } from '@/lib/logger';
+
+/**
+ * Try to parse city and postal code from a combined address string.
+ * Handles common German/European formats:
+ *   "Musterstraße 1, 12345 Berlin" → { postalCode: "12345", city: "Berlin" }
+ *   "12345 Berlin" → { postalCode: "12345", city: "Berlin" }
+ *   "D-12345 Berlin" → { postalCode: "12345", city: "Berlin" }
+ */
+function parseAddressComponents(address: string | null | undefined): {
+  street: string | null;
+  postalCode: string | null;
+  city: string | null;
+} {
+  if (!address || !address.trim()) return { street: null, postalCode: null, city: null };
+
+  const trimmed = address.trim();
+
+  // Try to find a postal code (4-5 digits, optionally prefixed with country code like D-)
+  // Pattern: optional "XX-" prefix, then 4-5 digits, then city name
+  const postalCityMatch = trimmed.match(/(?:^|[,\n])\s*(?:[A-Z]{1,2}[- ]?)?(\d{4,5})\s+(.+?)$/m);
+  if (postalCityMatch) {
+    const postalCode = postalCityMatch[1]!;
+    const city = postalCityMatch[2]!.replace(/[,.\s]+$/, '').trim();
+    // Everything before the postal code match is the street
+    const matchIndex = trimmed.indexOf(postalCityMatch[0]!);
+    const beforePostal = matchIndex > 0 ? trimmed.slice(0, matchIndex).replace(/[,\s]+$/, '').trim() : '';
+    return {
+      street: beforePostal || null,
+      postalCode,
+      city: city || null,
+    };
+  }
+
+  return { street: trimmed, postalCode: null, city: null };
+}
 
 /**
  * Parse a monetary/numeric string that may use European locale formatting.
@@ -189,32 +224,84 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
   return {
     invoiceNumber: (data.invoiceNumber as string) || null,
     invoiceDate: (data.invoiceDate as string) || null,
+    // Fallback: parse address components from combined address string if city/postalCode missing
+    ...(() => {
+      let buyerAddr = (data.buyerAddress as string) || (data.buyerStreet as string) || null;
+      let buyerCityVal = (data.buyerCity as string) || null;
+      let buyerPostal = data.buyerPostalCode != null ? String(data.buyerPostalCode) : null;
+      if ((!buyerCityVal || !buyerPostal) && buyerAddr) {
+        const parsed = parseAddressComponents(buyerAddr);
+        if (!buyerCityVal && parsed.city) buyerCityVal = parsed.city;
+        if (!buyerPostal && parsed.postalCode) buyerPostal = parsed.postalCode;
+        if (parsed.street && parsed.street !== buyerAddr) buyerAddr = parsed.street;
+      }
+      let sellerAddr = (data.sellerAddress as string) || (data.sellerStreet as string) || null;
+      let sellerCityVal = (data.sellerCity as string) || null;
+      let sellerPostal = data.sellerPostalCode != null ? String(data.sellerPostalCode) : null;
+      if ((!sellerCityVal || !sellerPostal) && sellerAddr) {
+        const parsed = parseAddressComponents(sellerAddr);
+        if (!sellerCityVal && parsed.city) sellerCityVal = parsed.city;
+        if (!sellerPostal && parsed.postalCode) sellerPostal = parsed.postalCode;
+        if (parsed.street && parsed.street !== sellerAddr) sellerAddr = parsed.street;
+      }
+      return {
+        buyerAddress: buyerAddr,
+        buyerCity: buyerCityVal,
+        buyerPostalCode: buyerPostal,
+        sellerAddress: sellerAddr,
+        sellerCity: sellerCityVal,
+        sellerPostalCode: sellerPostal,
+      };
+    })(),
     buyerName: (data.buyerName as string) || null,
     buyerEmail: (data.buyerEmail as string) || null,
-    buyerAddress: (data.buyerAddress as string) || null,
-    buyerCity: (data.buyerCity as string) || null,
-    buyerPostalCode: data.buyerPostalCode != null ? String(data.buyerPostalCode) : null,
     buyerCountryCode: (data.buyerCountryCode as string) || null,
     buyerTaxId: (data.buyerTaxId as string) || null,
     buyerPhone: (data.buyerPhone as string) || null,
     sellerName: (data.sellerName as string) || null,
     sellerEmail: (data.sellerEmail as string) || null,
-    sellerAddress: (data.sellerAddress as string) || null,
-    sellerCity: (data.sellerCity as string) || null,
-    sellerPostalCode: data.sellerPostalCode != null ? String(data.sellerPostalCode) : null,
     sellerCountryCode: (data.sellerCountryCode as string) || null,
     sellerTaxId: (data.sellerTaxId as string) || null,
     sellerIban: normalizeIban(data.sellerIban),
     sellerBic: (data.sellerBic as string) || null,
     sellerPhone: (data.sellerPhone as string) || null,
     bankName: (data.bankName as string) || null,
-    lineItems: rawItems.map((item: Record<string, unknown>) => {
+    lineItems: rawItems.map((item: Record<string, unknown>, index: number) => {
       // T3: Use only the per-item rate from AI; do NOT fallback to invoice-level rate
       const itemTaxRate = normalizeTaxRate(item?.taxRate);
       const resolvedRate = !isNaN(itemTaxRate) ? itemTaxRate : undefined;
       const qty = safeNumberStrict(item?.quantity);
       const up = safeNumberStrict(item?.unitPrice);
       const tp = safeNumberStrict(item?.totalPrice);
+
+      // F2: Semantic guard - detect GROSS-probable cases
+      if (!isNaN(qty) && !isNaN(up) && !isNaN(tp) && qty > 0 && up > 0) {
+        const expectedNet = qty * up;
+        const deviation = Math.abs(tp - expectedNet);
+        const deviationPercent = expectedNet > 0 ? deviation / expectedNet : 0;
+
+        // Check if totalPrice significantly differs from qty × unitPrice
+        if (deviation > 0.05 && deviationPercent > 0.01) {
+          // Check if it matches GROSS (net + tax)
+          if (resolvedRate !== undefined && resolvedRate > 0) {
+            const possibleGross = expectedNet * (1 + resolvedRate / 100);
+            const deviationFromGross = Math.abs(tp - possibleGross);
+
+            if (deviationFromGross < 0.02) {
+              // Very likely GROSS instead of NET
+              logger.warn('Line item totalPrice appears to be GROSS (includes VAT)', {
+                lineIndex: index,
+                totalPrice: tp,
+                expectedNet: Math.round(expectedNet * 100) / 100,
+                taxRate: resolvedRate,
+                possibleGross: Math.round(possibleGross * 100) / 100,
+                note: 'EN 16931 requires NET line totals. Check extraction prompt.',
+              });
+            }
+          }
+        }
+      }
+
       return {
         description: (item?.description as string) || '',
         quantity: isNaN(qty) ? 1 : qty,
@@ -237,6 +324,11 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
     ...normalizeElectronicAddresses(data),
     documentTypeCode: normalizeDocumentTypeCode(data.documentTypeCode),
     buyerReference: (data.buyerReference as string) || null,
+    // v2 prompt fields
+    sellerContactName: (data.sellerContactName as string) || null,
+    dueDate: (data.dueDate as string) || null,
+    // Document-level allowances and charges (BG-20 / BG-21)
+    allowanceCharges: normalizeAllowanceCharges(data.allowanceCharges),
   };
 }
 
@@ -287,6 +379,38 @@ function normalizeElectronicAddresses(data: Record<string, unknown>) {
       ? (data.sellerElectronicAddressScheme as string) || 'EM'
       : null,
   };
+}
+
+/**
+ * Normalize document-level allowances and charges from AI output.
+ * Returns empty array if none found (backward-compatible).
+ */
+function normalizeAllowanceCharges(raw: unknown): AllowanceCharge[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  return raw
+    .map((item: Record<string, unknown>) => {
+      if (!item || typeof item !== 'object') return null;
+
+      const amount = safeNumberStrict(item.amount);
+      if (isNaN(amount) || amount <= 0) return null;
+
+      const percentage = safeNumberStrict(item.percentage);
+      const baseAmount = safeNumberStrict(item.baseAmount);
+      const taxRate = normalizeTaxRate(item.taxRate);
+
+      return {
+        chargeIndicator: item.chargeIndicator === true,
+        amount,
+        baseAmount: isNaN(baseAmount) ? null : baseAmount,
+        percentage: isNaN(percentage) ? null : percentage,
+        reason: (item.reason as string) || null,
+        reasonCode: (item.reasonCode as string) || null,
+        taxRate: isNaN(taxRate) ? null : taxRate,
+        taxCategoryCode: normalizeTaxCategoryCode(item.taxCategoryCode, isNaN(taxRate) ? undefined : taxRate) ?? null,
+      } as AllowanceCharge;
+    })
+    .filter((item): item is AllowanceCharge => item !== null);
 }
 
 /**

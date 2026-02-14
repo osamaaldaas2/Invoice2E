@@ -1,7 +1,7 @@
 export interface BatchJob {
     id: string;
     userId: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'partial_success';
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'failed_refunded';
     totalFiles: number;
     completedFiles: number;
     failedFiles: number;

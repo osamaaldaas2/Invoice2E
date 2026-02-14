@@ -11,6 +11,7 @@ import { FILE_LIMITS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 const BACKGROUND_THRESHOLD = 3;
 
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = user.id; // SECURE: From authenticated session only
+
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(userId);
 
     // SECURITY: Rate limit upload requests per user
     const rateLimitId = getRequestIdentifier(request) + ':extract:' + userId;
@@ -220,7 +224,7 @@ export async function POST(request: NextRequest) {
                 confidenceScore: extractedData.confidence,
                 geminiResponseTimeMs: extractedData.processingTimeMs,
                 status: 'completed',
-              });
+              }, userClient);
 
               // Credits already deducted upfront — no per-segment deduction
 
@@ -328,14 +332,14 @@ export async function POST(request: NextRequest) {
 
     const responseTime = Date.now() - startTime;
 
-    // Save extraction to database
+    // Save extraction to database (RLS enforced)
     const extraction = await invoiceDbService.createExtraction({
       userId,
       extractionData: extractedData as unknown as Record<string, unknown>,
       confidenceScore: extractedData.confidence,
       geminiResponseTimeMs: responseTime,
       status: 'completed',
-    });
+    }, userClient);
 
     // Credits already deducted before AI call — no post-extraction deduction needed
 

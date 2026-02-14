@@ -12,14 +12,16 @@ export class GeminiAdapter implements IGeminiAdapter {
   private readonly configApiKey?: string;
   private readonly timeout: number;
   private readonly modelName: string;
+  private readonly enableThinking: boolean;
   private genAI: GoogleGenerativeAI | null = null;
   private model: GenerativeModel | null = null;
   private lastApiKey: string | null = null;
 
-  constructor(config?: { apiKey?: string; timeout?: number; model?: string }) {
+  constructor(config?: { apiKey?: string; timeout?: number; model?: string; enableThinking?: boolean }) {
     this.configApiKey = config?.apiKey;
     this.timeout = config?.timeout ?? API_TIMEOUTS.GEMINI_EXTRACTION;
     this.modelName = config?.model ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+    this.enableThinking = config?.enableThinking ?? (process.env.GEMINI_ENABLE_THINKING !== 'false');
   }
 
   private get apiKey(): string {
@@ -35,7 +37,15 @@ export class GeminiAdapter implements IGeminiAdapter {
     if (!this.genAI || this.lastApiKey !== key) {
       this.lastApiKey = key;
       this.genAI = new GoogleGenerativeAI(key);
-      this.model = this.genAI.getGenerativeModel({ model: this.modelName });
+      this.model = this.genAI.getGenerativeModel({
+        model: this.modelName,
+        generationConfig: {
+          // @ts-ignore – thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
+          thinkingConfig: this.enableThinking
+            ? { thinkingBudget: 4096 }
+            : { thinkingBudget: 0 },
+        },
+      });
     }
 
     return this.model!;
@@ -82,26 +92,27 @@ export class GeminiAdapter implements IGeminiAdapter {
 
       clearTimeout(timeoutId);
 
-      const responseTime = Date.now() - startTime;
       // @ts-ignore
       const textContent = result.response.text();
       const extractedData = this.parseResponse(textContent);
 
+      const totalTime = Date.now() - startTime;
+
       const finalResult: ExtractedInvoiceData = {
         ...extractedData,
-        processingTimeMs: responseTime,
+        processingTimeMs: totalTime,
         confidence: extractedData.confidence || this.calculateConfidenceScore(extractedData),
       };
 
       logger.info('Gemini extraction successful', {
-        processingTimeMs: responseTime,
+        processingTimeMs: totalTime,
         confidence: finalResult.confidence,
       });
 
       return {
         data: finalResult,
         confidence: finalResult.confidence ?? 0.8,
-        processingTimeMs: responseTime,
+        processingTimeMs: totalTime,
         // @ts-ignore
         rawResponse: result.response,
       };

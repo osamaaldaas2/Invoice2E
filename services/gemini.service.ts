@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use adapters/gemini.adapter.ts (GeminiAdapter implementing IAIExtractor) instead.
+ * This file is kept for backward compatibility but is NOT used in production.
+ * The adapter pattern in adapters/ is the canonical implementation.
+ */
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -18,9 +23,22 @@ const ExtractedInvoiceItemSchema = z.object({
   taxRate: z.coerce.number().optional(),
 });
 
+const AllowanceChargeSchema = z.object({
+  chargeIndicator: z.boolean().default(false),
+  amount: z.coerce.number().default(0),
+  baseAmount: z.union([z.coerce.number(), z.null()]).optional().default(null),
+  percentage: z.union([z.coerce.number(), z.null()]).optional().default(null),
+  reason: z.union([z.string(), z.null()]).optional().default(null),
+  reasonCode: z.union([z.string(), z.null()]).optional().default(null),
+  taxRate: z.union([z.coerce.number(), z.null()]).optional().default(null),
+  taxCategoryCode: z.union([z.string(), z.null()]).optional().default(null),
+});
+
 const ExtractedInvoiceDataSchema = z.object({
   invoiceNumber: z.union([z.string(), z.null()]).default(null),
   invoiceDate: z.union([z.string(), z.null()]).default(null),
+  dueDate: z.union([z.string(), z.null()]).optional().default(null),
+  documentTypeCode: z.coerce.number().optional(),
   buyerName: z.union([z.string(), z.null()]).default(null),
   buyerEmail: z.union([z.string(), z.null()]).default(null),
   buyerAddress: z.union([z.string(), z.null()]).default(null),
@@ -28,7 +46,11 @@ const ExtractedInvoiceDataSchema = z.object({
   buyerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
   buyerCountryCode: z.union([z.string(), z.null()]).optional().default(null),
   buyerTaxId: z.union([z.string(), z.null()]).default(null),
+  buyerVatId: z.union([z.string(), z.null()]).optional().default(null),
   buyerPhone: z.union([z.string(), z.null()]).default(null),
+  buyerReference: z.union([z.string(), z.null()]).optional().default(null),
+  buyerElectronicAddress: z.union([z.string(), z.null()]).optional().default(null),
+  buyerElectronicAddressScheme: z.union([z.string(), z.null()]).optional().default(null),
   sellerName: z.union([z.string(), z.null()]).default(null),
   sellerEmail: z.union([z.string(), z.null()]).default(null),
   sellerAddress: z.union([z.string(), z.null()]).default(null),
@@ -36,14 +58,22 @@ const ExtractedInvoiceDataSchema = z.object({
   sellerPostalCode: z.union([z.coerce.string(), z.null()]).default(null),
   sellerCountryCode: z.union([z.string(), z.null()]).optional().default(null),
   sellerTaxId: z.union([z.string(), z.null()]).default(null),
+  sellerVatId: z.union([z.string(), z.null()]).optional().default(null),
+  sellerTaxNumber: z.union([z.string(), z.null()]).optional().default(null),
   sellerIban: z.union([z.string(), z.null()]).optional().default(null),
   sellerBic: z.union([z.string(), z.null()]).optional().default(null),
   sellerPhone: z.union([z.string(), z.null()]).default(null),
+  sellerContactName: z.union([z.string(), z.null()]).optional().default(null),
+  sellerElectronicAddress: z.union([z.string(), z.null()]).optional().default(null),
+  sellerElectronicAddressScheme: z.union([z.string(), z.null()]).optional().default(null),
   bankName: z.union([z.string(), z.null()]).optional().default(null),
   lineItems: z.array(ExtractedInvoiceItemSchema).default([]),
-  subtotal: z.coerce.number().default(0),
-  taxRate: z.coerce.number().default(0),
-  taxAmount: z.coerce.number().default(0),
+  allowanceCharges: z.array(AllowanceChargeSchema).optional().default([]),
+  // IMPORTANT: subtotal/taxAmount use .optional() so null from AI stays null
+  // (not coerced to 0). The normalizer handles null → computed fallback.
+  subtotal: z.union([z.coerce.number(), z.null()]).optional().default(null),
+  taxRate: z.union([z.coerce.number(), z.null()]).optional().default(null),
+  taxAmount: z.union([z.coerce.number(), z.null()]).optional().default(null),
   totalAmount: z.coerce.number().default(0),
   currency: z.string().default('EUR'),
   paymentTerms: z.union([z.string(), z.null()]).default(null),
@@ -76,7 +106,13 @@ export class GeminiService {
   private getModel(): GenerativeModel {
     if (!this.model) {
       const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-      this.model = this.getClient().getGenerativeModel({ model: modelName });
+      this.model = this.getClient().getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          // @ts-ignore – thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      });
     }
     return this.model;
   }
@@ -298,6 +334,7 @@ export class GeminiService {
       // FIX-014: Robust JSON extraction (direct parse, code blocks, balanced braces)
       const rawData = parseJsonFromAiResponse(textContent) as Record<string, unknown>;
 
+      // FORENSIC_STAGE_1: Log parsed JSON types BEFORE Zod coercion
       // FIX-015: Validate AI response with Zod schema
       const parseResult = ExtractedInvoiceDataSchema.safeParse(rawData);
       if (!parseResult.success) {

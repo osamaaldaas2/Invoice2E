@@ -279,6 +279,7 @@ describe('B: Credit Notes (documentTypeCode 381)', () => {
       data: makeBase({
         invoiceNumber: 'TEST-CN-001',
         documentTypeCode: 381,
+        precedingInvoiceReference: 'INV-2025-001',
         lineItems: [
           {
             description: 'Refund IT Service',
@@ -300,6 +301,7 @@ describe('B: Credit Notes (documentTypeCode 381)', () => {
       data: makeBase({
         invoiceNumber: 'TEST-CN-002',
         documentTypeCode: 381,
+        precedingInvoiceReference: 'INV-2025-002',
         lineItems: [
           {
             description: 'Refund Software',
@@ -329,6 +331,7 @@ describe('B: Credit Notes (documentTypeCode 381)', () => {
       data: makeBase({
         invoiceNumber: 'TEST-CN-003',
         documentTypeCode: 381,
+        precedingInvoiceReference: 'INV-2025-003',
         lineItems: [
           {
             description: 'Partial Refund Consulting',

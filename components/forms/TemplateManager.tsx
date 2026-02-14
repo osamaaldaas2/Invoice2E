@@ -46,7 +46,7 @@ export default function TemplateManager({ onApplyTemplate }: Props) {
             setLoading(true);
             const response = await fetch('/api/invoices/templates');
             const data = await response.json();
-            setTemplates(data.templates || []);
+            setTemplates(data.data?.templates || data.templates || []);
         } catch {
             toast({ title: 'Failed to load templates', variant: 'error' });
         } finally {

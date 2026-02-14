@@ -109,13 +109,24 @@ export const SellerInfoSection: React.FC<SellerInfoSectionProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">{t('taxId')}</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1">
+            {t('vatId')} <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             {...register('sellerTaxId')}
-            className="w-full p-2 rounded-xl bg-slate-950/60 border border-white/10 text-white"
+            className={`w-full p-2 rounded-xl bg-slate-950/60 border ${
+              errors.sellerTaxId ? 'border-rose-400/60' : 'border-white/10'
+            } text-white`}
+            placeholder="DE123456789 / 12/345/67890"
           />
+          {errors.sellerTaxId && (
+            <p className="mt-1 text-sm text-red-500">{errors.sellerTaxId.message as string}</p>
+          )}
+          <p className="mt-1 text-xs text-slate-400">{t('vatIdHint')}</p>
         </div>
+
+        {/* IBAN and BIC moved to Payment Information section */}
       </div>
     </div>
   );

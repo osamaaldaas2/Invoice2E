@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { paymentProcessor } from '@/services/payment-processor';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { PaginationSchema } from '@/lib/validators';
@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const supabase = createServerClient();
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const supabase = await createUserScopedClient(user.id);
 
         // Parse query parameters
         const { searchParams } = new URL(req.url);

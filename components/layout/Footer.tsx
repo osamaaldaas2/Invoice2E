@@ -12,13 +12,13 @@ export default function Footer(): React.ReactElement {
                         {t('copyright').replace('Invoice2E', APP_NAME).replace(/20\d{2}/, String(new Date().getFullYear()))}
                     </p>
                     <div className="flex items-center gap-4 text-sm">
-                        <a href="#" className="text-faded hover:text-white transition-colors">
+                        <a href="/privacy" className="text-faded hover:text-white transition-colors">
                             {t('privacy')}
                         </a>
-                        <a href="#" className="text-faded hover:text-white transition-colors">
+                        <a href="/terms" className="text-faded hover:text-white transition-colors">
                             {t('terms')}
                         </a>
-                        <a href="#" className="text-faded hover:text-white transition-colors">
+                        <a href="mailto:support@invoice2e.com" className="text-faded hover:text-white transition-colors">
                             {t('contact')}
                         </a>
                     </div>

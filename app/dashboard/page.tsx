@@ -42,6 +42,7 @@ export default function DashboardPage() {
     const pathname = usePathname();
     const { user, loading: userLoading } = useUser();
     const t = useTranslations('dashboard');
+    const tHistory = useTranslations('history');
 
     const navItems = [
         { href: '/dashboard', label: t('navDashboard'), icon: '🏠' },
@@ -248,9 +249,10 @@ export default function DashboardPage() {
                                     ) : (
                                         <div className="space-y-3">
                                             {conversions.map((conversion) => (
-                                                <div
+                                                <Link
                                                     key={conversion.id}
-                                                    className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                                                    href={conversion.extraction_id ? `/review/${conversion.extraction_id}` : '/dashboard/history'}
+                                                    className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition-colors cursor-pointer"
                                                 >
                                                     <div>
                                                         <p className="text-white font-medium">
@@ -264,10 +266,24 @@ export default function DashboardPage() {
                                                             })}
                                                         </p>
                                                     </div>
-                                                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/30">
-                                                        {conversion.status || t('completedStatus')}
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                                        conversion.status === 'failed' || conversion.status === 'failed_refunded'
+                                                            ? 'bg-rose-500/15 text-rose-200 border border-rose-400/30'
+                                                            : conversion.status === 'draft'
+                                                                ? 'bg-amber-500/15 text-amber-200 border border-amber-400/30'
+                                                                : conversion.status === 'processing' || conversion.status === 'pending'
+                                                                    ? 'bg-sky-500/15 text-sky-200 border border-sky-400/30'
+                                                                    : 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30'
+                                                    }`}>
+                                                        {conversion.status === 'completed' ? t('completedStatus')
+                                                            : conversion.status === 'draft' ? t('draftStatus')
+                                                            : conversion.status === 'failed' ? tHistory('statusFailed')
+                                                            : conversion.status === 'failed_refunded' ? tHistory('statusFailedRefunded')
+                                                            : conversion.status === 'processing' ? tHistory('statusProcessing')
+                                                            : conversion.status === 'pending' ? tHistory('statusPending')
+                                                            : t('completedStatus')}
                                                     </span>
-                                                </div>
+                                                </Link>
                                             ))}
                                         </div>
                                     )}
@@ -333,12 +349,12 @@ export default function DashboardPage() {
 
                         {/* Quick Stats */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mt-8">
-                            <div className="glass-card p-4 md:p-6">
+                            <Link href="/dashboard/history" className="glass-card p-4 md:p-6 hover:border-sky-400/40 transition-colors">
                                 <h3 className="text-faded font-medium text-sm md:text-base">{t('totalConversions')}</h3>
                                 <p className="text-2xl md:text-3xl font-bold text-sky-200 mt-2">
                                     {statsLoading ? '--' : (stats?.totalConversions || 0)}
                                 </p>
-                            </div>
+                            </Link>
                             <Link href="/pricing" className="glass-card p-4 md:p-6 hover:border-emerald-400/40 transition-colors">
                                 <h3 className="text-faded font-medium text-sm md:text-base">{t('creditsRemaining')}</h3>
                                 <p className="text-2xl md:text-3xl font-bold text-emerald-200 mt-2">

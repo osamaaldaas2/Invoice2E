@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { creditsDbService } from '@/services/credits.db.service';
@@ -79,7 +79,7 @@ export class BatchProcessor {
     userId: string,
     jobId: string,
     results: BatchResult[],
-    supabase: ReturnType<typeof createServerClient>
+    supabase: ReturnType<typeof createAdminClient>
   ): Promise<void> {
     const startedAt = new Date().toISOString();
     results[index] = {
@@ -128,12 +128,13 @@ export class BatchProcessor {
                   segmentName,
                   jobId
                 );
+                const adminClient = createAdminClient();
                 const extraction = await invoiceDbService.createExtraction({
                   userId,
                   extractionData: extractedData as unknown as Record<string, unknown>,
                   confidenceScore: extractedData.confidence,
                   status: 'completed',
-                });
+                }, adminClient);
                 const segmentResult: BatchResult = {
                   filename: segmentName,
                   status: 'success' as const,
@@ -227,12 +228,13 @@ export class BatchProcessor {
           jobId
         );
 
+        const adminClient = createAdminClient();
         const extraction = await invoiceDbService.createExtraction({
           userId,
           extractionData: extractedData as unknown as Record<string, unknown>,
           confidenceScore: extractedData.confidence,
           status: 'completed',
-        });
+        }, adminClient);
 
         results[index] = {
           filename: file.name,
@@ -290,7 +292,7 @@ export class BatchProcessor {
     const concurrency = BATCH_EXTRACTION.CONCURRENCY;
     logger.info('Processing batch', { jobId, fileCount: files.length, format, concurrency });
 
-    const supabase = createServerClient();
+    const supabase = createAdminClient();
     const results: BatchResult[] = new Array(files.length);
     const extractor = ExtractorFactory.create();
 
@@ -428,9 +430,11 @@ export class BatchProcessor {
       }
 
       // Refund credits for failed results
+      let refundSucceeded = false;
       if (failCount > 0) {
         try {
           await creditsDbService.addCredits(userId, failCount, 'batch_refund', jobId);
+          refundSucceeded = true;
           logger.info('Refunded credits for failed batch files', { jobId, userId, failCount });
         } catch (refundErr) {
           logger.error('Failed to refund credits for failed batch files', {
@@ -447,10 +451,12 @@ export class BatchProcessor {
       let finalStatus: string;
       if (failCount === 0) {
         finalStatus = 'completed';
+      } else if (successCount === 0 && refundSucceeded) {
+        finalStatus = 'failed_refunded';
       } else if (successCount === 0) {
         finalStatus = 'failed';
       } else {
-        finalStatus = 'partial_success';
+        finalStatus = 'completed'; // partial success — some completed
       }
 
       const finalPayload = {

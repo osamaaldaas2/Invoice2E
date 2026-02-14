@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { batchService } from '@/services/batch.service';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createSignedDownloadToken } from '@/lib/session';
@@ -16,10 +17,10 @@ import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
 const resolveActiveUserId = async (
-  supabase: ReturnType<typeof createServerClient>,
+  client: SupabaseClient,
   user: { id: string; email?: string }
 ): Promise<string | null> => {
-  const { data: byId } = await supabase.from('users').select('id').eq('id', user.id).maybeSingle();
+  const { data: byId } = await client.from('users').select('id').eq('id', user.id).maybeSingle();
 
   if (byId?.id) {
     return byId.id as string;
@@ -29,7 +30,7 @@ const resolveActiveUserId = async (
     return null;
   }
 
-  const { data: byEmail } = await supabase
+  const { data: byEmail } = await client
     .from('users')
     .select('id')
     .eq('email', user.email.toLowerCase())
@@ -114,9 +115,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check user credits BEFORE creating job
-    const supabase = createServerClient();
-    const activeUserId = await resolveActiveUserId(supabase, user);
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+    const activeUserId = await resolveActiveUserId(userClient, user);
     if (!activeUserId) {
       return NextResponse.json(
         { error: 'User account not found. Please login again.' },
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: credits } = await supabase
+    const { data: credits } = await userClient
       .from('user_credits')
       .select('available_credits')
       .eq('user_id', activeUserId)
@@ -184,8 +185,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createServerClient();
-    const activeUserId = await resolveActiveUserId(supabase, user);
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+    const activeUserId = await resolveActiveUserId(userClient, user);
     if (!activeUserId) {
       return NextResponse.json(
         { error: 'User account not found. Please login again.' },
@@ -290,8 +292,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createServerClient();
-    const activeUserId = await resolveActiveUserId(supabase, user);
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+    const activeUserId = await resolveActiveUserId(userClient, user);
     if (!activeUserId) {
       return NextResponse.json(
         { error: 'User account not found. Please login again.' },

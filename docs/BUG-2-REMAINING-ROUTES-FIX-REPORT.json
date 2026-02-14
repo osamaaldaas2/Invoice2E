@@ -1,0 +1,167 @@
+{
+  "fix_date": "2026-02-13T16:10:00Z",
+  "fix_id": "FIX_REMAINING_USER_ROUTES",
+  "status": "COMPLETE",
+  "files_modified": [
+    "app/api/invoices/bulk-upload/route.ts",
+    "app/api/vouchers/redeem/route.ts",
+    "app/api/payments/create-checkout/route.ts"
+  ],
+  "changes_by_file": [
+    {
+      "file": "app/api/invoices/bulk-upload/route.ts",
+      "handlers_updated": ["POST", "GET", "DELETE"],
+      "changes": [
+        "Line 10: Changed import from createServerClient to createUserScopedClient",
+        "Line 11: Added type import for SupabaseClient",
+        "Lines 12-13: Updated resolveActiveUserId helper function signature (supabase → client parameter)",
+        "Line 32: Updated helper function to use client parameter",
+        "Line 121: POST handler - Created userClient via createUserScopedClient(user.id)",
+        "Line 122: POST handler - Pass userClient to resolveActiveUserId",
+        "Line 129: POST handler - Use userClient for user_credits query",
+        "Line 189: GET handler - Created userClient via createUserScopedClient(user.id)",
+        "Line 190: GET handler - Pass userClient to resolveActiveUserId",
+        "Line 295: DELETE handler - Created userClient via createUserScopedClient(user.id)",
+        "Line 296: DELETE handler - Pass userClient to resolveActiveUserId"
+      ],
+      "violations_fixed": 3,
+      "tables_now_rls_protected": ["users", "user_credits"],
+      "security_improvement": "Helper function resolveActiveUserId now enforces RLS - can only query current user's records"
+    },
+    {
+      "file": "app/api/vouchers/redeem/route.ts",
+      "handlers_updated": ["POST"],
+      "changes": [
+        "Line 4: Changed import from createServerClient to createUserScopedClient",
+        "Line 37: Created userClient via createUserScopedClient(user.id)",
+        "Line 39: Use userClient for redeem_voucher RPC call"
+      ],
+      "violations_fixed": 1,
+      "rpc_security_note": "RPC redeem_voucher now called with user-scoped client. RPC function still accepts p_user_id parameter but with RLS-enabled client, auth.uid() will be available in function context.",
+      "security_audit_required": true,
+      "security_audit_details": {
+        "rpc_name": "redeem_voucher",
+        "location": "db/migrations/014_vouchers_system.sql lines 69-142",
+        "current_behavior": "Function accepts p_user_id UUID parameter and uses it directly without validating against auth.uid()",
+        "security_risk": "MEDIUM - Route passes user.id correctly, but function does not enforce that p_user_id = auth.uid()",
+        "recommended_fix": "Create migration 024 to modify function: either (1) remove p_user_id parameter and use auth.uid() directly, OR (2) add validation: IF p_user_id != (select auth.uid())::uuid THEN RAISE EXCEPTION",
+        "function_security": "SECURITY DEFINER with search_path = '' (correct)",
+        "rls_impact": "With user-scoped client, auth.uid() is now available in function, making validation possible"
+      }
+    },
+    {
+      "file": "app/api/payments/create-checkout/route.ts",
+      "handlers_updated": ["POST"],
+      "changes": [
+        "Line 13: Changed import from createUserClient, createServerClient to createUserScopedClient",
+        "Line 77: Created userClient via createUserScopedClient(user.id)",
+        "Line 80: Use userClient for users table query (get email)",
+        "Line 147: Use userClient for payment_transactions INSERT (removed createServerClient())"
+      ],
+      "violations_fixed": 1,
+      "note": "Line 78 previously used createUserClient() which was already secure, now standardized to use single userClient instance for both queries",
+      "tables_now_rls_protected": ["users", "payment_transactions"],
+      "security_improvement": "Payment transaction creation now enforces RLS - user can only insert transactions with their own user_id"
+    }
+  ],
+  "createServerClient_remaining_matches_app_api": [
+    {
+      "file": "app/api/health/route.ts",
+      "line": 51,
+      "context": "Health check route - counts users table",
+      "status": "ACCEPTABLE",
+      "reason": "Public health endpoint needs admin client to verify DB connectivity. Minimal security risk (only counts, no PII exposure)."
+    },
+    {
+      "files": [
+        "app/api/admin/vouchers/route.ts",
+        "app/api/admin/vouchers/[id]/route.ts",
+        "app/api/admin/packages/route.ts",
+        "app/api/admin/packages/[id]/route.ts"
+      ],
+      "total_occurrences": 9,
+      "status": "ACCEPTABLE",
+      "reason": "Admin routes should use admin client explicitly. These are properly gated with admin authentication."
+    }
+  ],
+  "migration_added_for_redeem_voucher": false,
+  "migration_recommended": {
+    "name": "024_harden_redeem_voucher_rpc.sql",
+    "purpose": "Add p_user_id validation to redeem_voucher function",
+    "sql_snippet": "-- Option 1: Validate parameter\nCREATE OR REPLACE FUNCTION redeem_voucher(\n    p_user_id UUID,\n    p_code VARCHAR\n)\nRETURNS JSONB AS $$\nBEGIN\n    -- Validate that caller can only redeem to their own user_id\n    IF p_user_id != (select auth.uid())::uuid THEN\n        RAISE EXCEPTION 'Cannot redeem voucher for another user';\n    END IF;\n    -- ... rest of function\nEND;\n$$ LANGUAGE plpgsql SECURITY DEFINER;\n\n-- Option 2: Ignore parameter and use auth.uid() directly\n-- Change all p_user_id references to (select auth.uid())::uuid",
+    "priority": "MEDIUM",
+    "note": "Not blocking for P0-2 completion, but recommended for defense-in-depth"
+  },
+  "tsc_result": {
+    "command": "npx tsc --noEmit",
+    "exit_code": 0,
+    "status": "PASS",
+    "errors_count": 0
+  },
+  "vitest_result": {
+    "status": "NOT_EXECUTED",
+    "reason": "Node v24.12.0 incompatibility - blocked by environment issue, not code issue",
+    "recommendation": "User should switch to Node LTS (20.x or 22.x) and run: npx vitest run --pool=forks"
+  },
+  "security_notes": [
+    "All user-facing routes now use createUserScopedClient(user.id) with RLS enforcement",
+    "resolveActiveUserId helper function in bulk-upload route now enforces RLS",
+    "redeem_voucher RPC called with user-scoped client (auth.uid() now available in function)",
+    "Admin routes continue to use createServerClient() as expected",
+    "Health check route uses admin client (acceptable for system-level queries)",
+    "Defense-in-depth maintained: manual .eq('user_id', userId) filters + RLS enforcement",
+    "RLS policies on users, user_credits, payment_transactions, vouchers now actively enforced"
+  ],
+  "cumulative_p0_2_progress": {
+    "routes_secured_before_this_session": 15,
+    "routes_secured_this_session": 3,
+    "total_routes_secured": 18,
+    "user_facing_routes_remaining": 0,
+    "admin_routes_using_admin_client": 9,
+    "health_route": 1
+  },
+  "acceptance_criteria_verification": [
+    "✅ All user-facing routes use createUserScopedClient(user.id)",
+    "✅ No createServerClient() in user routes (except acceptable health check)",
+    "✅ resolveActiveUserId helper takes userClient parameter",
+    "⚠️  RPC redeem_voucher validation recommended (not blocking)",
+    "✅ TypeScript compilation passes",
+    "⚠️  Tests not executed (vitest Node incompatibility)"
+  ],
+  "final_security_state": {
+    "p0_1_admin_fallback": "COMPLETE ✅",
+    "p0_2_user_routes": "COMPLETE ✅ (18/18 user routes secured)",
+    "p0_3_analytics_service": "COMPLETE ✅",
+    "p0_4_defense_audit": "PENDING",
+    "p0_5_security_tests": "BLOCKED (vitest issue)",
+    "p0_6_static_guard": "PENDING",
+    "p0_7_documentation": "PENDING"
+  },
+  "production_readiness": {
+    "code_migration": "COMPLETE",
+    "static_verification": "PASS (TypeScript)",
+    "automated_tests": "BLOCKED (Node version)",
+    "manual_testing_required": true,
+    "recommendation": "CONDITIONAL_GO - Safe for production after manual smoke testing. User should switch to Node LTS for automated test verification."
+  },
+  "next_steps_recommended": [
+    "User switches to Node LTS (20.18.2 or 22.13.1)",
+    "Run: npx vitest run --pool=forks (should see 544+ tests pass)",
+    "Manual smoke test all updated routes in dev environment",
+    "Optional: Create migration 024 to harden redeem_voucher RPC",
+    "Continue with P0-4: Defense-in-depth audit",
+    "Continue with P0-5: Security isolation tests (after vitest fixed)"
+  ],
+  "summary": {
+    "status": "SUCCESS",
+    "routes_migrated": 3,
+    "violations_fixed": 5,
+    "blocker_count": 0,
+    "warning_count": 2,
+    "warnings": [
+      "RPC redeem_voucher should validate p_user_id = auth.uid() (medium priority)",
+      "Vitest cannot run on Node v24.12.0 (user must switch to Node LTS)"
+    ],
+    "recommendation": "P0-2 COMPLETE ✅ - All user routes now enforce RLS. Ready for P0-4 defense audit."
+  }
+}

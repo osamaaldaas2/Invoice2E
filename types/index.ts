@@ -152,6 +152,26 @@ export type TaxCategoryCode = 'S' | 'Z' | 'E' | 'AE' | 'K' | 'G' | 'O' | 'L';
 /** EN 16931 document type codes (BT-3) */
 export type DocumentTypeCode = 380 | 381 | 384 | 389;
 
+/** Document-level allowance (BG-20) or charge (BG-21) per EN 16931 */
+export interface AllowanceCharge {
+  /** false = allowance/discount, true = charge/surcharge */
+  chargeIndicator: boolean;
+  /** Allowance/charge amount (BT-92 / BT-99) — always positive */
+  amount: number;
+  /** Base amount for percentage calculation (BT-93 / BT-100) */
+  baseAmount?: number | null;
+  /** Percentage if applicable (BT-94 / BT-101) — e.g. 10 for 10% */
+  percentage?: number | null;
+  /** Reason text (BT-97 / BT-104) — e.g. "Rabatt", "Frachtkosten" */
+  reason?: string | null;
+  /** UNCL5189 reason code (BT-98 / BT-105) — e.g. 95=discount, 100=special agreement */
+  reasonCode?: string | null;
+  /** Tax rate for this allowance/charge */
+  taxRate?: number | null;
+  /** Tax category code (BT-95 / BT-102) */
+  taxCategoryCode?: TaxCategoryCode | null;
+}
+
 export interface ExtractedInvoiceData {
   invoiceNumber: string | null;
   invoiceDate: string | null;
@@ -210,4 +230,18 @@ export interface ExtractedInvoiceData {
   documentTypeCode?: DocumentTypeCode;
   /** Buyer reference / Leitweg-ID (BT-10) */
   buyerReference?: string | null;
+  /** Seller contact person name (BR-DE-2) */
+  sellerContactName?: string | null;
+  /** Payment due date (BT-9) in YYYY-MM-DD format */
+  dueDate?: string | null;
+  /** Document-level allowances and charges (BG-20 / BG-21) */
+  allowanceCharges?: AllowanceCharge[];
+  /** Preceding invoice reference (BT-25) — required for credit notes (TypeCode 381) */
+  precedingInvoiceReference?: string | null;
+  /** Prepaid amount (BT-113) — deducted from grand total to compute amount due */
+  prepaidAmount?: number | null;
+  /** Billing period start date (BT-73) — YYYY-MM-DD format */
+  billingPeriodStart?: string | null;
+  /** Billing period end date (BT-74) — YYYY-MM-DD format */
+  billingPeriodEnd?: string | null;
 }

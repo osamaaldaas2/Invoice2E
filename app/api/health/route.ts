@@ -14,6 +14,7 @@ interface HealthCheckResponse {
     ai: {
       deepseek: 'configured' | 'not_configured';
       gemini: 'configured' | 'not_configured';
+      openai: 'configured' | 'not_configured';
     };
     uptime: number;
   };
@@ -41,6 +42,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         | 'configured'
         | 'not_configured',
       gemini: (process.env.GEMINI_API_KEY ? 'configured' : 'not_configured') as
+        | 'configured'
+        | 'not_configured',
+      openai: (process.env.OPENAI_API_KEY ? 'configured' : 'not_configured') as
         | 'configured'
         | 'not_configured',
     },

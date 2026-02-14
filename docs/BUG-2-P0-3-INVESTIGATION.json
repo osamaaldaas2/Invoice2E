@@ -1,0 +1,426 @@
+{
+  "investigation_date": "2026-02-13",
+  "task": "P0-3: Analytics Service Refactor Readiness Assessment",
+  "analytics_summary": {
+    "file_path": "services/analytics.service.ts",
+    "total_lines": 604,
+    "class_name": "AnalyticsService",
+    "export_pattern": "singleton instance as analyticsService",
+    "public_methods": [
+      {
+        "name": "getConversionHistory",
+        "lines": "98-362",
+        "params": "userId: string, page: number, limit: number, filters?: HistoryFilters",
+        "return_type": "Promise<PaginatedHistory>",
+        "tables_accessed": [
+          "invoice_conversions (lines 181-184, filtered by user_id)",
+          "invoice_extractions (lines 220-223, filtered by user_id)",
+          "batch_jobs (lines 266-269, filtered by user_id)"
+        ],
+        "client_creation": "Line 106: createServerClient()",
+        "rls_pattern": "All queries use .eq('user_id', userId)"
+      },
+      {
+        "name": "getStatistics",
+        "lines": "367-454",
+        "params": "userId: string",
+        "return_type": "Promise<UserStatistics>",
+        "tables_accessed": [
+          "user_credits (lines 374-378, filtered by user_id)",
+          "invoice_conversions (lines 401-404, filtered by user_id)"
+        ],
+        "client_creation": "Line 370: createServerClient()",
+        "rls_pattern": "All queries use .eq('user_id', userId)"
+      },
+      {
+        "name": "getChartsData",
+        "lines": "459-560",
+        "params": "userId: string, period: 'week' | 'month' | 'year'",
+        "return_type": "Promise<ChartsData>",
+        "tables_accessed": [
+          "invoice_conversions (lines 484-487, filtered by user_id)"
+        ],
+        "client_creation": "Line 465: createServerClient()",
+        "rls_pattern": "All queries use .eq('user_id', userId)"
+      },
+      {
+        "name": "exportHistoryAsCSV",
+        "lines": "565-599",
+        "params": "userId: string",
+        "return_type": "Promise<string>",
+        "tables_accessed": [],
+        "client_creation": "None (calls getConversionHistory internally)",
+        "rls_pattern": "Delegates to getConversionHistory which filters by user_id"
+      }
+    ],
+    "security_violations": [
+      {
+        "type": "DEPRECATED_CLIENT_USAGE",
+        "severity": "HIGH",
+        "lines": [106, 370, 465],
+        "issue": "Uses deprecated createServerClient() which will fallback to admin client in old code",
+        "impact": "After P0-1, these calls will continue using admin client because service creates its own client instead of accepting one"
+      }
+    ]
+  },
+  "call_sites": [
+    {
+      "file": "app/api/invoices/history/route.ts",
+      "route_path": "/api/invoices/history",
+      "http_method": "GET",
+      "is_admin_route": false,
+      "is_user_facing": true,
+      "authentication": "Line 22: getAuthenticatedUser(req)",
+      "analytics_calls": [
+        {
+          "line": 60,
+          "method": "exportHistoryAsCSV(user.id)",
+          "context": "CSV export query parameter",
+          "params_passed": ["user.id"]
+        },
+        {
+          "line": 77,
+          "method": "getConversionHistory(user.id, page, limit, filters)",
+          "context": "Paginated history retrieval",
+          "params_passed": ["user.id", "page", "limit", "filters"]
+        }
+      ],
+      "current_client_usage": "NONE - route does not create client, analytics service creates its own",
+      "blocking_status": "BLOCKED - After P0-1, analytics methods will throw MISSING_CLIENT if refactored to require client parameter"
+    },
+    {
+      "file": "app/api/invoices/analytics/route.ts",
+      "route_path": "/api/invoices/analytics",
+      "http_method": "GET",
+      "is_admin_route": false,
+      "is_user_facing": true,
+      "authentication": "Line 24: getAuthenticatedUser(req)",
+      "analytics_calls": [
+        {
+          "line": 43,
+          "method": "getStatistics(user.id)",
+          "context": "Conditional: type !== 'charts'",
+          "params_passed": ["user.id"]
+        },
+        {
+          "line": 48,
+          "method": "getChartsData(user.id, period)",
+          "context": "Conditional: type !== 'stats'",
+          "params_passed": ["user.id", "period"]
+        }
+      ],
+      "current_client_usage": "NONE - route does not create client, analytics service creates its own",
+      "blocking_status": "BLOCKED - After P0-1, analytics methods will throw MISSING_CLIENT if refactored to require client parameter"
+    }
+  ],
+  "history_route_trace": {
+    "route_file": "app/api/invoices/history/route.ts",
+    "full_path": "app/api/invoices/history/route.ts",
+    "lines_total": 88,
+    "authentication": {
+      "line": 22,
+      "method": "getAuthenticatedUser(req)",
+      "user_extraction": "user.id"
+    },
+    "analytics_usage": {
+      "csv_export": {
+        "line": 60,
+        "call": "analyticsService.exportHistoryAsCSV(user.id)",
+        "triggers_internal_call": "exportHistoryAsCSV -> getConversionHistory (line 568)"
+      },
+      "paginated_history": {
+        "line": 77,
+        "call": "analyticsService.getConversionHistory(user.id, page, limit, filters)",
+        "creates_client_at": "analytics.service.ts:106 (createServerClient)"
+      }
+    },
+    "current_failure_mode": "NO FAILURE YET - analytics service still uses deprecated createServerClient() which returns admin client",
+    "post_p01_failure_mode": "WILL FAIL - If analytics service is refactored to require client parameter (like invoice.db.service), route will crash with MISSING_CLIENT error",
+    "rls_enforcement_status": "BYPASSED - All analytics queries use admin client, RLS policies do not apply",
+    "user_data_exposure_risk": "LOW - All analytics methods explicitly filter by userId parameter, so even with admin client, cross-user access is prevented by application logic"
+  },
+  "rls_risk_assessment": {
+    "classification": "USER_SCOPED",
+    "justification": [
+      "All analytics methods accept userId parameter",
+      "All database queries filter by .eq('user_id', userId)",
+      "No global/cross-user aggregations",
+      "No admin-only statistics or metrics",
+      "Data returned is specific to the authenticated user"
+    ],
+    "current_rls_state": "BYPASSED_SAFELY",
+    "explanation": "Analytics service uses admin client (createServerClient) which bypasses RLS, BUT all queries manually filter by user_id. This is defense-in-depth: even if RLS is bypassed, application logic enforces isolation.",
+    "rls_policies_that_would_apply": [
+      {
+        "table": "invoice_conversions",
+        "policy": "conversions_select",
+        "rule": "user_id::text = (select auth.uid())::text OR is_admin((select auth.uid())::uuid)",
+        "migration_file": "db/migrations/022_fix_rls_performance.sql:80-84"
+      },
+      {
+        "table": "invoice_extractions",
+        "policy": "extractions_select",
+        "rule": "user_id::text = (select auth.uid())::text",
+        "migration_file": "db/migrations/022_fix_rls_performance.sql:67-68"
+      },
+      {
+        "table": "batch_jobs",
+        "policy": "batch_jobs_select",
+        "rule": "user_id::text = (select auth.uid())::text",
+        "migration_file": "db/migrations/022_fix_rls_performance.sql:130-131"
+      },
+      {
+        "table": "user_credits",
+        "policy": "user_credits_select",
+        "rule": "user_id::text = (select auth.uid())::text OR is_admin((select auth.uid())::uuid)",
+        "migration_file": "db/migrations/022_fix_rls_performance.sql:44-48"
+      }
+    ],
+    "with_user_scoped_client": {
+      "auth_uid_resolution": "Will resolve to userId passed to createUserScopedClient",
+      "rls_enforcement": "Queries will be automatically filtered by RLS policies",
+      "redundant_filtering": "Application-level .eq('user_id', userId) will be redundant but harmless (defense-in-depth)",
+      "performance_impact": "Negligible - same query execution plan"
+    },
+    "security_improvement": "HIGH - Migrating to user-scoped client adds RLS as safety net. If future developer removes .eq('user_id', userId), RLS will prevent data leak."
+  },
+  "refactor_recommendation": {
+    "chosen_option": "OPTION_A_CLIENT_INJECTION",
+    "rationale": [
+      "Analytics is user-specific data, must use user-scoped client",
+      "Client injection pattern already established in invoice.db.service (P0-1)",
+      "Minimal changes to call sites (2 routes)",
+      "No need to split services - all methods are user-scoped",
+      "Maintains singleton pattern while enabling RLS"
+    ],
+    "signature_changes_required": [
+      {
+        "method": "getConversionHistory",
+        "current_signature": "async getConversionHistory(userId: string, page: number = 1, limit: number = 20, filters?: HistoryFilters): Promise<PaginatedHistory>",
+        "new_signature": "async getConversionHistory(userId: string, page: number = 1, limit: number = 20, filters?: HistoryFilters, client?: SupabaseClient): Promise<PaginatedHistory>",
+        "changes": [
+          "Add optional client parameter at end",
+          "Add assertClientProvided(client, 'getConversionHistory') at method start",
+          "Replace 'const supabase = createServerClient()' with 'const supabase = client!' (line 106)"
+        ]
+      },
+      {
+        "method": "getStatistics",
+        "current_signature": "async getStatistics(userId: string): Promise<UserStatistics>",
+        "new_signature": "async getStatistics(userId: string, client?: SupabaseClient): Promise<UserStatistics>",
+        "changes": [
+          "Add optional client parameter",
+          "Add assertClientProvided(client, 'getStatistics') at method start",
+          "Replace 'const supabase = createServerClient()' with 'const supabase = client!' (line 370)"
+        ]
+      },
+      {
+        "method": "getChartsData",
+        "current_signature": "async getChartsData(userId: string, period: 'week' | 'month' | 'year' = 'month'): Promise<ChartsData>",
+        "new_signature": "async getChartsData(userId: string, period: 'week' | 'month' | 'year' = 'month', client?: SupabaseClient): Promise<ChartsData>",
+        "changes": [
+          "Add optional client parameter at end",
+          "Add assertClientProvided(client, 'getChartsData') at method start",
+          "Replace 'const supabase = createServerClient()' with 'const supabase = client!' (line 465)"
+        ]
+      },
+      {
+        "method": "exportHistoryAsCSV",
+        "current_signature": "async exportHistoryAsCSV(userId: string): Promise<string>",
+        "new_signature": "async exportHistoryAsCSV(userId: string, client?: SupabaseClient): Promise<string>",
+        "changes": [
+          "Add optional client parameter",
+          "Add assertClientProvided(client, 'exportHistoryAsCSV') at method start",
+          "Pass client to getConversionHistory call (line 568): 'await this.getConversionHistory(userId, 1, 10000, undefined, client)'"
+        ]
+      }
+    ],
+    "helper_method_needed": {
+      "name": "assertClientProvided",
+      "signature": "private assertClientProvided(client: SupabaseClient | undefined, methodName: string): asserts client is SupabaseClient",
+      "location": "Add to AnalyticsService class (copy from InvoiceDatabaseService)",
+      "purpose": "Fail-fast if client not provided (P0-1 pattern)"
+    }
+  },
+  "files_to_change": [
+    {
+      "file": "services/analytics.service.ts",
+      "changes_required": [
+        "Import SupabaseClient type from '@supabase/supabase-js'",
+        "Import AppError from '@/lib/errors' (already imported)",
+        "Add assertClientProvided helper method (lines ~77-85, before queryWithTimeout)",
+        "Update getConversionHistory: add client param, assert, replace line 106",
+        "Update getStatistics: add client param, assert, replace line 370",
+        "Update getChartsData: add client param, assert, replace line 465",
+        "Update exportHistoryAsCSV: add client param, assert, pass to getConversionHistory"
+      ],
+      "lines_modified_estimate": "4 method signatures + 3 createServerClient replacements + 1 helper = ~15 lines",
+      "breaking_change": "YES - All call sites must pass client parameter"
+    },
+    {
+      "file": "app/api/invoices/history/route.ts",
+      "changes_required": [
+        "Import createUserScopedClient from '@/lib/supabase.server'",
+        "After authentication (line ~22), create: 'const userClient = await createUserScopedClient(user.id)'",
+        "Update line 60: 'await analyticsService.exportHistoryAsCSV(user.id, userClient)'",
+        "Update line 77: 'await analyticsService.getConversionHistory(user.id, page, limit, filters, userClient)'"
+      ],
+      "lines_modified_estimate": "1 import + 1 client creation + 2 call updates = ~4 lines",
+      "blocking_removed": "YES - Route will be unblocked after this change"
+    },
+    {
+      "file": "app/api/invoices/analytics/route.ts",
+      "changes_required": [
+        "Import createUserScopedClient from '@/lib/supabase.server'",
+        "After authentication (line ~24), create: 'const userClient = await createUserScopedClient(user.id)'",
+        "Update line 43: 'await analyticsService.getStatistics(user.id, userClient)'",
+        "Update line 48: 'await analyticsService.getChartsData(user.id, period, userClient)'"
+      ],
+      "lines_modified_estimate": "1 import + 1 client creation + 2 call updates = ~4 lines",
+      "blocking_removed": "YES - Route will be unblocked after this change"
+    }
+  ],
+  "tests_impacted_or_needed": {
+    "existing_tests_likely_to_fail": [
+      {
+        "test_pattern": "analytics.service.test.ts or analytics.test.ts",
+        "failure_reason": "If tests exist, they call analytics methods without client parameter",
+        "fix_required": "Mock SupabaseClient and pass to all analytics method calls",
+        "search_command": "rg -n \"analyticsService\\.|AnalyticsService\" tests --type ts"
+      }
+    ],
+    "new_tests_needed": [
+      {
+        "test_file": "tests/security/analytics-rls-isolation.test.ts",
+        "test_cases": [
+          "User A cannot see User B history via analytics.getConversionHistory",
+          "User A cannot see User B credits via analytics.getStatistics",
+          "User A cannot see User B charts via analytics.getChartsData"
+        ],
+        "pattern": "Create user-scoped clients for two different users, verify each only sees their own data"
+      }
+    ],
+    "integration_test_scenarios": [
+      "GET /api/invoices/history with valid user token returns only that user's data",
+      "GET /api/invoices/history with user A token cannot access user B data even if userId param is manipulated",
+      "GET /api/invoices/analytics?type=stats with valid user token returns only that user's statistics",
+      "CSV export via /api/invoices/history?export=csv contains only authenticated user's invoices"
+    ]
+  },
+  "risk_checklist": {
+    "breaking_changes": {
+      "severity": "MEDIUM",
+      "description": "All call sites must update to pass client parameter",
+      "mitigation": "Only 2 routes affected, both identified and will be updated in same PR"
+    },
+    "performance_impact": {
+      "severity": "LOW",
+      "description": "JWT signing adds ~1-5ms overhead per request",
+      "mitigation": "Negligible compared to database query time (50-500ms)"
+    },
+    "data_integrity": {
+      "severity": "NONE",
+      "description": "No data changes, only client usage pattern change",
+      "verification": "Existing .eq('user_id', userId) filters remain in place"
+    },
+    "pagination_changes": {
+      "severity": "NONE",
+      "description": "Pagination logic unchanged, still in-memory after fetching",
+      "note": "Future optimization: push pagination to database to reduce memory usage"
+    },
+    "csv_export": {
+      "severity": "LOW",
+      "description": "CSV export delegates to getConversionHistory which will use user-scoped client",
+      "verification": "Test CSV export returns only authenticated user's data"
+    },
+    "hidden_couplings": {
+      "found": false,
+      "checked": "analytics.service.ts does not import or call other services that might use admin client",
+      "note": "queryWithTimeout is internal helper, no external service calls"
+    }
+  },
+  "verification_commands_executed": [
+    {
+      "command": "rg -n \"analyticsService\\.|from.*analytics\\.service\" --type ts",
+      "purpose": "Find all call sites",
+      "result": "2 routes found: history, analytics"
+    },
+    {
+      "command": "rg -n \"createServerClient\\(\" services app lib",
+      "purpose": "Find all deprecated client usages",
+      "result": "analytics.service.ts lines 106, 370, 465 + others (not in analytics)"
+    }
+  ],
+  "implementation_checklist": [
+    {
+      "step": 1,
+      "action": "Update services/analytics.service.ts",
+      "substeps": [
+        "Import SupabaseClient type",
+        "Add assertClientProvided helper",
+        "Update 4 method signatures (add client parameter)",
+        "Replace 3 createServerClient() calls with client!",
+        "Update exportHistoryAsCSV to pass client to getConversionHistory"
+      ],
+      "verification": "npx tsc --noEmit"
+    },
+    {
+      "step": 2,
+      "action": "Update app/api/invoices/history/route.ts",
+      "substeps": [
+        "Import createUserScopedClient",
+        "Create userClient after authentication",
+        "Pass userClient to exportHistoryAsCSV call",
+        "Pass userClient to getConversionHistory call"
+      ],
+      "verification": "npx tsc --noEmit"
+    },
+    {
+      "step": 3,
+      "action": "Update app/api/invoices/analytics/route.ts",
+      "substeps": [
+        "Import createUserScopedClient",
+        "Create userClient after authentication",
+        "Pass userClient to getStatistics call",
+        "Pass userClient to getChartsData call"
+      ],
+      "verification": "npx tsc --noEmit"
+    },
+    {
+      "step": 4,
+      "action": "Run type check and tests",
+      "substeps": [
+        "npx tsc --noEmit (must pass)",
+        "npx vitest run --pool=forks (check for failures)",
+        "Fix any broken unit tests by adding client parameter"
+      ],
+      "verification": "All tests passing"
+    },
+    {
+      "step": 5,
+      "action": "Manual testing",
+      "substeps": [
+        "Test GET /api/invoices/history (paginated)",
+        "Test GET /api/invoices/history?export=csv",
+        "Test GET /api/invoices/analytics?type=stats",
+        "Test GET /api/invoices/analytics?type=charts",
+        "Verify no cross-user data leakage"
+      ],
+      "verification": "Manual QA pass"
+    }
+  ],
+  "estimated_effort": {
+    "service_refactor": "30-45 minutes",
+    "route_updates": "15-20 minutes",
+    "testing": "30-45 minutes",
+    "total": "75-110 minutes (1.25-1.8 hours)"
+  },
+  "success_criteria_met": [
+    "✅ Report clearly states analytics must be USER_SCOPED (all methods filter by userId)",
+    "✅ Report lists every file that must change (3 files: analytics.service.ts, 2 routes)",
+    "✅ Report highlights no hidden coupling (analytics service is self-contained)",
+    "✅ Report provides exact signature changes (4 methods)",
+    "✅ Report identifies RLS policies that will apply (4 tables)",
+    "✅ Report shows fail-fast pattern will prevent accidental admin client usage"
+  ]
+}

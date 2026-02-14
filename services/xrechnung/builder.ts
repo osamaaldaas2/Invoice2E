@@ -1,8 +1,9 @@
 import { DEFAULT_VAT_RATE, REDUCED_VAT_RATE } from '@/lib/constants';
 import { logger } from '@/lib/logger';
-import { roundMoney, computeTax } from '@/lib/monetary';
+import { roundMoney, sumMoney, computeTax } from '@/lib/monetary';
 import { isEuVatId } from '@/lib/extraction-normalizer';
 import { XRechnungInvoiceData, XRechnungLineItem } from './types';
+import type { AllowanceCharge } from '@/types';
 
 export class XRechnungBuilder {
   private readonly xmlns = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
@@ -56,15 +57,139 @@ export class XRechnungBuilder {
   }
 
   private buildSupplyChainTradeTransaction(data: XRechnungInvoiceData): string {
-    const items = data.lineItems || [];
+    // FIX: Detect gross-priced invoices and convert all amounts to net.
+    // XRechnung/EN16931 requires net (VAT-exclusive) amounts throughout.
+    const processedData = this.preprocessForNetPricing(data);
+    const items = processedData.lineItems || [];
 
     return `
     <rsm:SupplyChainTradeTransaction>
         ${this.buildLineItems(items)}
-        ${this.buildTradeAgreement(data)}
-        ${this.buildTradeDelivery(data)}
-        ${this.buildTradeSettlement(data)}
+        ${this.buildTradeAgreement(processedData)}
+        ${this.buildTradeDelivery(processedData)}
+        ${this.buildTradeSettlement(processedData)}
     </rsm:SupplyChainTradeTransaction>`;
+  }
+
+  /**
+   * FIX-GROSS: Detect gross-priced (VAT-inclusive) invoices and convert all amounts to net.
+   *
+   * German invoices often show Bruttopreise (gross/VAT-inclusive prices). For example:
+   *   Line items sum: 3,159.25 (gross)  →  Discounts: -319.25  →  Netto: 2,386.55  →  19% USt: 453.45  →  Brutto: 2,840.00
+   *
+   * XRechnung requires all amounts to be NET (VAT-exclusive). When gross pricing is detected:
+   * 1. Convert each line item's unitPrice and totalPrice to net (÷ 1.19)
+   * 2. Convert each allowance/charge amount to net (÷ 1.19)
+   * 3. Keep data.subtotal/taxAmount/totalAmount as-is (they're already correct NET values from AI extraction)
+   *
+   * This ensures BR-CO-13 is satisfied: TaxBasisTotalAmount = LineTotalAmount - AllowanceTotalAmount
+   */
+  private preprocessForNetPricing(data: XRechnungInvoiceData): XRechnungInvoiceData {
+    const items = data.lineItems || [];
+    const allowanceCharges = data.allowanceCharges ?? [];
+
+    // Only relevant when there are allowances/charges
+    const grossAllowances = sumMoney(
+      allowanceCharges.filter((ac) => !ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const grossCharges = sumMoney(
+      allowanceCharges.filter((ac) => ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const hasAllowancesOrCharges = grossAllowances > 0 || grossCharges > 0;
+    if (!hasAllowancesOrCharges) return data;
+
+    // Compute gross line total
+    const grossLineTotal = sumMoney(
+      items.map((item) => {
+        const tp = this.safeNumberOrUndefined(item.totalPrice ?? item.lineTotal);
+        const up = this.safeNumber(item.unitPrice);
+        const qty = this.safeNumber(item.quantity) || 1;
+        return tp ?? up * qty;
+      })
+    );
+
+    const grossAfterAdjustments = roundMoney(grossLineTotal - grossAllowances + grossCharges);
+    const providedSubtotal = this.safeNumber(data.subtotal);
+
+    // If computed tax basis already matches provided subtotal, it's net pricing — no conversion needed
+    if (Math.abs(grossAfterAdjustments - providedSubtotal) <= 0.05) return data;
+
+    // Try common VAT rates to detect gross pricing
+    const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05];
+    let detectedRate: number | null = null;
+    for (const rate of commonRates) {
+      if (Math.abs(roundMoney(grossAfterAdjustments / (1 + rate)) - providedSubtotal) < 0.05) {
+        detectedRate = rate;
+        break;
+      }
+    }
+
+    if (detectedRate === null) return data; // Can't detect gross pricing — use as-is
+
+    logger.info('XRechnung: Gross-priced invoice detected, converting amounts to net', {
+      detectedRate: `${(detectedRate * 100).toFixed(0)}%`,
+      grossLineTotal,
+      grossAllowances,
+      providedSubtotal,
+    });
+
+    // Convert each line item to net amounts
+    const netItems = items.map((item) => {
+      const taxRate =
+        this.safeNumberOrUndefined(item.taxRate ?? item.vatRate) ?? detectedRate! * 100;
+      const divisor = 1 + taxRate / 100;
+      const grossTotal =
+        this.safeNumberOrUndefined(item.totalPrice ?? item.lineTotal) ??
+        this.safeNumber(item.unitPrice) * (this.safeNumber(item.quantity) || 1);
+      const grossUnit = this.safeNumber(item.unitPrice);
+
+      return {
+        ...item,
+        unitPrice: roundMoney(grossUnit / divisor),
+        totalPrice: roundMoney(grossTotal / divisor),
+      };
+    });
+
+    // Convert allowance/charge amounts to net
+    const netAllowanceCharges = allowanceCharges.map((ac) => {
+      const taxRate = ac.taxRate != null ? Number(ac.taxRate) : detectedRate! * 100;
+      const divisor = 1 + taxRate / 100;
+      return {
+        ...ac,
+        amount: roundMoney((Number(ac.amount) || 0) / divisor),
+      };
+    });
+
+    // Adjust for rounding: ensure sum(netLines) - sum(netAllowances) = data.subtotal exactly
+    const netLineTotal = sumMoney(netItems.map((it) => this.safeNumber(it.totalPrice)));
+    const netAllowanceTotal = sumMoney(
+      netAllowanceCharges.filter((ac) => !ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const netChargeTotal = sumMoney(
+      netAllowanceCharges.filter((ac) => ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const netTaxBasis = roundMoney(netLineTotal - netAllowanceTotal + netChargeTotal);
+    const roundingDiff = roundMoney(providedSubtotal - netTaxBasis);
+
+    if (Math.abs(roundingDiff) > 0 && Math.abs(roundingDiff) <= 0.05 && netItems.length > 0) {
+      // Adjust the largest line item to absorb rounding difference
+      const largestIdx = netItems.reduce(
+        (maxIdx, item, idx) =>
+          this.safeNumber(item.totalPrice) > this.safeNumber(netItems[maxIdx]!.totalPrice)
+            ? idx
+            : maxIdx,
+        0
+      );
+      netItems[largestIdx]!.totalPrice = roundMoney(
+        this.safeNumber(netItems[largestIdx]!.totalPrice) + roundingDiff
+      );
+    }
+
+    return {
+      ...data,
+      lineItems: netItems,
+      allowanceCharges: netAllowanceCharges,
+    };
   }
 
   /**
@@ -129,11 +254,16 @@ export class XRechnungBuilder {
     // BR-DE-15: BuyerReference (BT-10) is MANDATORY - use invoice number as fallback
     const buyerRef = data.buyerReference || data.invoiceNumber || 'LEITWEG-ID';
 
+    // BG-3: Build preceding invoice reference for credit notes (TypeCode 381)
+    const billingRefXml = data.precedingInvoiceReference?.trim()
+      ? `\n        <ram:InvoiceReferencedDocument>\n            <ram:IssuerAssignedID>${this.escapeXml(data.precedingInvoiceReference.trim())}</ram:IssuerAssignedID>\n        </ram:InvoiceReferencedDocument>`
+      : '';
+
     return `
     <ram:ApplicableHeaderTradeAgreement>
         <ram:BuyerReference>${this.escapeXml(buyerRef)}</ram:BuyerReference>
         ${this.buildSellerTradeParty(data)}
-        ${this.buildBuyerTradeParty(data)}
+        ${this.buildBuyerTradeParty(data)}${billingRefXml}
     </ram:ApplicableHeaderTradeAgreement>`;
   }
 
@@ -242,6 +372,7 @@ export class XRechnungBuilder {
     return `
         <ram:SellerTradeParty>
             <ram:Name>${this.escapeXml(data.sellerName)}</ram:Name>
+            ${this.buildSellerLegalOrganization(data)}
             ${this.buildSellerContact(data)}
             ${this.buildPostalAddress(
               data.sellerPostalCode || '',
@@ -252,6 +383,35 @@ export class XRechnungBuilder {
             ${this.buildURICommunication(sellerEAddr, sellerScheme)}
             ${this.buildSellerTaxRegistrations(data)}
         </ram:SellerTradeParty>`;
+  }
+
+  /**
+   * BR-CO-26: At least one of BT-29 (Seller identifier), BT-30 (Seller legal registration),
+   * or BT-31 (Seller VAT identifier) MUST be present.
+   * When no EU VAT ID (BT-31) is available, output BT-30 using the tax number or company name
+   * as the legal registration identifier to satisfy this rule.
+   */
+  private buildSellerLegalOrganization(data: XRechnungInvoiceData): string {
+    const vatId = data.sellerVatId;
+    // If we have a VAT ID (BT-31), BR-CO-26 is satisfied without BT-30
+    if (vatId) return '';
+
+    // Use tax number or tax ID as legal registration identifier (BT-30)
+    const legalId = data.sellerTaxNumber || data.sellerTaxId || '';
+    if (legalId) {
+      return `<ram:SpecifiedLegalOrganization>
+                <ram:ID schemeID="0204">${this.escapeXml(legalId)}</ram:ID>
+            </ram:SpecifiedLegalOrganization>`;
+    }
+
+    // Last resort: use seller name as trading name in legal org to emit the element
+    if (!data.sellerName?.trim()) {
+      // No identifier available at all — cannot satisfy BR-CO-26
+      return '';
+    }
+    return `<ram:SpecifiedLegalOrganization>
+                <ram:TradingBusinessName>${this.escapeXml(data.sellerName)}</ram:TradingBusinessName>
+            </ram:SpecifiedLegalOrganization>`;
   }
 
   /**
@@ -326,6 +486,26 @@ export class XRechnungBuilder {
   }
 
   /**
+   * BG-14: Invoice period (BT-73 start, BT-74 end).
+   * Output BillingSpecifiedPeriod inside ApplicableHeaderTradeSettlement.
+   */
+  private buildBillingPeriod(data: XRechnungInvoiceData): string {
+    const start = data.billingPeriodStart?.trim();
+    const end = data.billingPeriodEnd?.trim();
+    if (!start && !end) return '';
+
+    let xml = '\n            <ram:BillingSpecifiedPeriod>';
+    if (start) {
+      xml += `\n                <ram:StartDateTime>\n                    <udt:DateTimeString format="102">${this.formatDate(start)}</udt:DateTimeString>\n                </ram:StartDateTime>`;
+    }
+    if (end) {
+      xml += `\n                <ram:EndDateTime>\n                    <udt:DateTimeString format="102">${this.formatDate(end)}</udt:DateTimeString>\n                </ram:EndDateTime>`;
+    }
+    xml += '\n            </ram:BillingSpecifiedPeriod>';
+    return xml;
+  }
+
+  /**
    * BR-DE-23-a: When payment type is 30 (bank transfer), CREDIT TRANSFER (BG-17) is MANDATORY
    * Must include PayeePartyCreditorFinancialAccount with IBAN
    *
@@ -341,10 +521,12 @@ export class XRechnungBuilder {
       logger.warn('XRechnung: Missing seller IBAN (BR-DE-23-a requires this for bank transfers)', {
         seller: data.sellerName,
       });
-      // Return empty payment means - validation should catch this
+      // BR-DE-13/19: TypeCode 1 is NOT in the XRechnung allowed set.
+      // Use TypeCode 30 (credit transfer) as the safest fallback.
+      // Allowed codes: 10, 30, 48, 49, 57, 58, 59, 97
       return `
             <ram:SpecifiedTradeSettlementPaymentMeans>
-                <ram:TypeCode>1</ram:TypeCode>
+                <ram:TypeCode>30</ram:TypeCode>
             </ram:SpecifiedTradeSettlementPaymentMeans>`;
     }
 
@@ -377,26 +559,132 @@ export class XRechnungBuilder {
    * Each rate group gets its own ApplicableTradeTax block with correct
    * BasisAmount (sum of line totals at that rate) and CalculatedAmount (tax).
    */
+  /**
+   * Build document-level AllowanceCharge XML elements (BG-20 / BG-21).
+   * Placed inside ApplicableHeaderTradeSettlement, before ApplicableTradeTax.
+   */
+  private buildAllowanceChargeXml(allowanceCharges: AllowanceCharge[]): string {
+    if (!allowanceCharges || allowanceCharges.length === 0) return '';
+
+    return allowanceCharges
+      .map((ac) => {
+        const indicator = ac.chargeIndicator ? 'true' : 'false';
+        const amount = (Number(ac.amount) || 0).toFixed(2);
+        const taxRate = ac.taxRate != null ? Number(ac.taxRate) : DEFAULT_VAT_RATE;
+        const categoryCode = ac.taxCategoryCode || this.getVatCategoryCode(taxRate);
+
+        // FIX PEPPOL-EN16931-R041: BasisAmount MUST be provided when CalculationPercent is present
+        const percentage = ac.percentage != null ? Number(ac.percentage) : null;
+        let baseAmount = ac.baseAmount != null ? Number(ac.baseAmount) : null;
+        if (percentage != null && percentage > 0 && baseAmount == null) {
+          // Derive base amount from actual amount and percentage
+          baseAmount = roundMoney((Number(ac.amount) || 0) * 100 / percentage);
+        }
+        const baseAmountXml =
+          baseAmount != null
+            ? `\n                <ram:BasisAmount>${baseAmount.toFixed(2)}</ram:BasisAmount>`
+            : '';
+        const percentageXml =
+          percentage != null
+            ? `\n                <ram:CalculationPercent>${percentage.toFixed(2)}</ram:CalculationPercent>`
+            : '';
+        const reasonXml = ac.reason
+          ? `\n                <ram:Reason>${this.escapeXml(ac.reason)}</ram:Reason>`
+          : '';
+        const reasonCodeXml = ac.reasonCode
+          ? `\n                <ram:ReasonCode>${this.escapeXml(ac.reasonCode)}</ram:ReasonCode>`
+          : '';
+
+        return `
+            <ram:SpecifiedTradeAllowanceCharge>
+                <ram:ChargeIndicator><udt:Indicator>${indicator}</udt:Indicator></ram:ChargeIndicator>${percentageXml}${baseAmountXml}
+                <ram:ActualAmount>${amount}</ram:ActualAmount>${reasonCodeXml}${reasonXml}
+                <ram:CategoryTradeTax>
+                    <ram:TypeCode>VAT</ram:TypeCode>
+                    <ram:CategoryCode>${categoryCode}</ram:CategoryCode>
+                    <ram:RateApplicablePercent>${taxRate.toFixed(2)}</ram:RateApplicablePercent>
+                </ram:CategoryTradeTax>
+            </ram:SpecifiedTradeAllowanceCharge>`;
+      })
+      .join('');
+  }
+
   private buildTradeSettlement(data: XRechnungInvoiceData): string {
     const currency = this.normalizeCurrency(data.currency);
     const items = data.lineItems || [];
+    const allowanceCharges = data.allowanceCharges ?? [];
 
-    // Group line items by tax rate to build per-rate tax breakdowns
-    const taxGroups = this.buildTaxGroups(items);
+    // Calculate line total (sum of line items BEFORE allowances/charges)
+    const lineTotal = sumMoney(
+      items.map((item) => {
+        const tp = this.safeNumberOrUndefined(item.totalPrice ?? item.lineTotal);
+        const up = this.safeNumber(item.unitPrice);
+        const qty = this.safeNumber(item.quantity) || 1;
+        return tp ?? up * qty;
+      })
+    );
 
-    // Calculate totals from groups (more accurate than header-level fields for mixed-rate invoices)
-    let computedSubtotal = 0;
-    let computedTaxAmount = 0;
+    // Calculate allowances/charges totals
+    const totalAllowances = sumMoney(
+      allowanceCharges.filter((ac) => !ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const totalCharges = sumMoney(
+      allowanceCharges.filter((ac) => ac.chargeIndicator).map((ac) => Number(ac.amount) || 0)
+    );
+    const hasAllowancesOrCharges = totalAllowances > 0 || totalCharges > 0;
+
+    // Tax basis = line total - allowances + charges (BR-CO-13 for net pricing)
+    const computedTaxBasis = roundMoney(lineTotal - totalAllowances + totalCharges);
+
+    // Detect gross pricing: if the provided subtotal doesn't match computed tax basis
+    // and subtotal ≈ computedTaxBasis / (1 + rate), then line items are gross-priced.
+    // In that case, use the provided subtotal/taxAmount/totalAmount as authoritative.
+    let isGrossPriced = false;
+    const providedSubtotal = this.safeNumber(data.subtotal);
+    if (hasAllowancesOrCharges && Math.abs(computedTaxBasis - providedSubtotal) > 0.05) {
+      const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05];
+      for (const rate of commonRates) {
+        const netFromGross = roundMoney(computedTaxBasis / (1 + rate));
+        if (Math.abs(netFromGross - providedSubtotal) < 0.05) {
+          isGrossPriced = true;
+          break;
+        }
+      }
+    }
+
+    // For gross-priced invoices: use the invoice's own subtotal/tax/total
+    // For net-priced invoices: compute from line items + tax groups
+    const taxBasis = isGrossPriced ? providedSubtotal : computedTaxBasis;
+
+    // Build tax breakdowns
     const taxBreakdownXml: string[] = [];
 
-    for (const group of taxGroups) {
-      const taxForGroup = computeTax(group.basisAmount, group.rate);
-      computedSubtotal = roundMoney(computedSubtotal + group.basisAmount);
-      computedTaxAmount = roundMoney(computedTaxAmount + taxForGroup);
-
-      const exemptionXml = this.buildExemptionReason(group.categoryCode);
+    if (isGrossPriced) {
+      // Gross pricing: use provided values, compute tax rate from subtotal/taxAmount
+      const providedTaxAmount = this.safeNumber(data.taxAmount);
+      const inferredRate = providedSubtotal > 0
+        ? roundMoney((providedTaxAmount / providedSubtotal) * 100)
+        : DEFAULT_VAT_RATE;
+      const categoryCode = this.getVatCategoryCode(inferredRate);
+      const exemptionXml = this.buildExemptionReason(categoryCode);
 
       taxBreakdownXml.push(`
+            <ram:ApplicableTradeTax>
+                <ram:CalculatedAmount>${providedTaxAmount.toFixed(2)}</ram:CalculatedAmount>
+                <ram:TypeCode>VAT</ram:TypeCode>${exemptionXml}
+                <ram:BasisAmount>${providedSubtotal.toFixed(2)}</ram:BasisAmount>
+                <ram:CategoryCode>${categoryCode}</ram:CategoryCode>
+                <ram:RateApplicablePercent>${inferredRate.toFixed(2)}</ram:RateApplicablePercent>
+            </ram:ApplicableTradeTax>`);
+    } else {
+      // Net pricing: compute tax groups from line items + allowances
+      const taxGroups = this.buildTaxGroups(items, allowanceCharges);
+
+      for (const group of taxGroups) {
+        const taxForGroup = computeTax(group.basisAmount, group.rate);
+        const exemptionXml = this.buildExemptionReason(group.categoryCode);
+
+        taxBreakdownXml.push(`
             <ram:ApplicableTradeTax>
                 <ram:CalculatedAmount>${taxForGroup.toFixed(2)}</ram:CalculatedAmount>
                 <ram:TypeCode>VAT</ram:TypeCode>${exemptionXml}
@@ -404,21 +692,35 @@ export class XRechnungBuilder {
                 <ram:CategoryCode>${group.categoryCode}</ram:CategoryCode>
                 <ram:RateApplicablePercent>${group.rate.toFixed(2)}</ram:RateApplicablePercent>
             </ram:ApplicableTradeTax>`);
+      }
     }
 
-    // Use header subtotal/tax if no line items (fallback)
-    const subtotal =
-      computedSubtotal > 0 ? roundMoney(computedSubtotal) : this.safeNumber(data.subtotal);
-    const taxAmount =
-      computedSubtotal > 0 ? roundMoney(computedTaxAmount) : this.safeNumber(data.taxAmount);
-    // F1 fix: Derive grand total from recomputed subtotal + tax (not raw input)
-    const total = roundMoney(subtotal + taxAmount);
+    // Determine final tax and total amounts
+    let taxAmount: number;
+    let total: number;
+
+    if (isGrossPriced) {
+      taxAmount = this.safeNumber(data.taxAmount);
+      total = this.safeNumber(data.totalAmount);
+    } else {
+      // Compute from tax breakdowns
+      const taxGroups = this.buildTaxGroups(items, allowanceCharges);
+      let computedTaxAmount = 0;
+      for (const group of taxGroups) {
+        computedTaxAmount = roundMoney(computedTaxAmount + computeTax(group.basisAmount, group.rate));
+      }
+      taxAmount = taxBreakdownXml.length > 0 ? computedTaxAmount : this.safeNumber(data.taxAmount);
+      // NOTE: Do NOT override taxAmount with data.taxAmount here — the CalculatedAmount
+      // in each ApplicableTradeTax block was computed from basisAmount × rate.
+      // BR-CO-14 requires TaxTotalAmount = Σ CalculatedAmount, so they must stay in sync.
+      total = roundMoney(taxBasis + taxAmount);
+    }
 
     // If no groups were built (no line items), create a single fallback group
     if (taxBreakdownXml.length === 0) {
       const fallbackRate =
         this.safeNumberOrUndefined(data.taxRate ?? data.vatRate) ??
-        this.calculateTaxRate(subtotal, taxAmount);
+        this.calculateTaxRate(taxBasis, taxAmount);
       const fallbackCategory = this.getVatCategoryCode(fallbackRate);
       taxBreakdownXml.push(`
             <ram:ApplicableTradeTax>
@@ -429,27 +731,38 @@ export class XRechnungBuilder {
                 <ram:ExemptionReason>Exempt from VAT</ram:ExemptionReason>`
                     : ''
                 }
-                <ram:BasisAmount>${subtotal.toFixed(2)}</ram:BasisAmount>
+                <ram:BasisAmount>${taxBasis.toFixed(2)}</ram:BasisAmount>
                 <ram:CategoryCode>${fallbackCategory}</ram:CategoryCode>
                 <ram:RateApplicablePercent>${fallbackRate.toFixed(2)}</ram:RateApplicablePercent>
             </ram:ApplicableTradeTax>`);
     }
 
+    // Build allowance/charge XML elements (BG-20 / BG-21)
+    const allowanceChargeXml = this.buildAllowanceChargeXml(allowanceCharges);
+
+    // Monetary summation XML
+    const allowanceTotalXml = totalAllowances > 0
+      ? `\n                <ram:AllowanceTotalAmount>${totalAllowances.toFixed(2)}</ram:AllowanceTotalAmount>`
+      : '';
+    const chargeTotalXml = totalCharges > 0
+      ? `\n                <ram:ChargeTotalAmount>${totalCharges.toFixed(2)}</ram:ChargeTotalAmount>`
+      : '';
+
     return `
         <ram:ApplicableHeaderTradeSettlement>
             <ram:InvoiceCurrencyCode>${currency}</ram:InvoiceCurrencyCode>
-
+${this.buildBillingPeriod(data)}
             ${this.buildPaymentMeans(data)}
-
+${allowanceChargeXml}
             ${taxBreakdownXml.join('')}
             ${this.buildPaymentTerms(data)}
 
             <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-                <ram:LineTotalAmount>${subtotal.toFixed(2)}</ram:LineTotalAmount>
-                <ram:TaxBasisTotalAmount>${subtotal.toFixed(2)}</ram:TaxBasisTotalAmount>
+                <ram:LineTotalAmount>${roundMoney(lineTotal).toFixed(2)}</ram:LineTotalAmount>${allowanceTotalXml}${chargeTotalXml}
+                <ram:TaxBasisTotalAmount>${taxBasis.toFixed(2)}</ram:TaxBasisTotalAmount>
                 <ram:TaxTotalAmount currencyID="${currency}">${taxAmount.toFixed(2)}</ram:TaxTotalAmount>
-                <ram:GrandTotalAmount>${total.toFixed(2)}</ram:GrandTotalAmount>
-                <ram:DuePayableAmount>${total.toFixed(2)}</ram:DuePayableAmount>
+                <ram:GrandTotalAmount>${total.toFixed(2)}</ram:GrandTotalAmount>${data.prepaidAmount && Number(data.prepaidAmount) > 0 ? `\n                <ram:TotalPrepaidAmount>${roundMoney(Number(data.prepaidAmount)).toFixed(2)}</ram:TotalPrepaidAmount>` : ''}
+                <ram:DuePayableAmount>${roundMoney(total - (Number(data.prepaidAmount) || 0)).toFixed(2)}</ram:DuePayableAmount>
             </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         </ram:ApplicableHeaderTradeSettlement>`;
   }
@@ -460,7 +773,8 @@ export class XRechnungBuilder {
    * Uses decimal-safe arithmetic (roundMoney) for summation.
    */
   private buildTaxGroups(
-    items: XRechnungLineItem[]
+    items: XRechnungLineItem[],
+    allowanceCharges?: AllowanceCharge[]
   ): { rate: number; categoryCode: string; basisAmount: number }[] {
     const groups = new Map<string, { rate: number; categoryCode: string; basisAmount: number }>();
 
@@ -479,6 +793,23 @@ export class XRechnungBuilder {
         existing.basisAmount = roundMoney(existing.basisAmount + totalPrice);
       } else {
         groups.set(key, { rate: taxRate, categoryCode, basisAmount: roundMoney(totalPrice) });
+      }
+    }
+
+    // Include document-level allowances/charges in their tax groups
+    if (allowanceCharges && allowanceCharges.length > 0) {
+      for (const ac of allowanceCharges) {
+        const taxRate = ac.taxRate != null ? Number(ac.taxRate) : DEFAULT_VAT_RATE;
+        const categoryCode = ac.taxCategoryCode || this.getVatCategoryCode(taxRate);
+        const adjustment = ac.chargeIndicator ? (Number(ac.amount) || 0) : -(Number(ac.amount) || 0);
+
+        const key = `${taxRate}:${categoryCode}`;
+        const existing = groups.get(key);
+        if (existing) {
+          existing.basisAmount = roundMoney(existing.basisAmount + adjustment);
+        } else {
+          groups.set(key, { rate: taxRate, categoryCode, basisAmount: roundMoney(adjustment) });
+        }
       }
     }
 

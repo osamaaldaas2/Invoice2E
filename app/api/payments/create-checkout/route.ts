@@ -10,10 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { packageService } from '@/services/package.service';
 import { stripeAdapter } from '@/adapters/stripe.adapter';
 import { paypalAdapter } from '@/adapters/paypal.adapter';
-import { createUserClient, createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { CreditPackage } from '@/types/credit-package';
 import { handleApiError } from '@/lib/api-helpers';
+import { requireCsrfToken } from '@/lib/csrf';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 type PaymentMethod = 'stripe' | 'paypal';
@@ -30,6 +31,10 @@ import { getAuthenticatedUser } from '@/lib/auth';
  */
 export async function POST(req: NextRequest) {
     try {
+        // CSRF protection
+        const csrfError = await requireCsrfToken(req);
+        if (csrfError) return csrfError as NextResponse;
+
         // Auth: try Supabase first, then fallback to session cookie
         const user = await getAuthenticatedUser(req);
 
@@ -74,8 +79,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Invalid payment method' }, { status: 400 });
         }
 
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const userClient = await createUserScopedClient(user.id);
+
         // Get user email
-        const { data: userData } = await createUserClient()
+        const { data: userData } = await userClient
             .from('users')
             .select('email')
             .eq('id', user.id)
@@ -142,8 +150,7 @@ export async function POST(req: NextRequest) {
 
         // 2. Insert DB record ONLY if session creation succeeded
         // FIX: Store session ID in stripe_session_id, leave stripe_payment_id for webhook to set (payment_intent)
-        const supabase = createServerClient();
-        const { data: transaction, error: insertError } = await supabase
+        const { data: transaction, error: insertError} = await userClient
             .from('payment_transactions')
             .insert({
                 user_id: user.id,

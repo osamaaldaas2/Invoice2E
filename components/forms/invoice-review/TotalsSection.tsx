@@ -17,15 +17,33 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({
 }) => {
   const t = useTranslations('invoiceReview');
   const items = useMemo(() => watch('items') || [], [watch]);
+  const allowanceCharges = useMemo(() => watch('allowanceCharges') || [], [watch]);
   const subtotal = watch('subtotal');
   const taxAmount = watch('taxAmount');
   const totalAmount = watch('totalAmount');
 
   // FIX-028: Use integer cents to avoid floating point errors
+  // FIX-029: When allowances/charges exist, we cannot reliably auto-calculate
+  // totals because we don't know if line item prices are net (VAT-exclusive)
+  // or gross (VAT-inclusive). Use AI-extracted values for invoices with
+  // allowances; only auto-calculate for simple invoices without them.
   useEffect(() => {
+    const hasAllowances = allowanceCharges.some(
+      (ac: { amount?: number }) => Math.round((Number(ac.amount) || 0) * 100) > 0
+    );
+
+    if (hasAllowances) {
+      // When allowances/charges exist, the AI-extracted totals are more reliable
+      // because the AI can read the actual Netto/MwSt/Brutto from the invoice.
+      // Don't override — let the user edit manually if needed.
+      return;
+    }
+
+    // Simple case: no allowances/charges — auto-calculate from line items (net pricing)
     const calculatedSubtotalCents = items.reduce((sum: number, item: { totalPrice?: number }) => {
       return sum + Math.round((Number(item.totalPrice) || 0) * 100);
     }, 0);
+
     const calculatedTaxCents = items.reduce(
       (sum: number, item: { totalPrice?: number; taxRate?: number | string }) => {
         const amountCents = Math.round((Number(item.totalPrice) || 0) * 100);
@@ -38,7 +56,7 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({
     setValue('subtotal', calculatedSubtotalCents / 100);
     setValue('taxAmount', calculatedTaxCents / 100);
     setValue('totalAmount', (calculatedSubtotalCents + calculatedTaxCents) / 100);
-  }, [items, setValue]);
+  }, [items, allowanceCharges, setValue]);
 
   const showDiff = (current: number, extracted: number | undefined) => {
     if (extracted === undefined || extracted === null) return null;

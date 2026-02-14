@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { APP_NAME } from '@/lib/constants';
+import { getTranslations } from 'next-intl/server';
 
-export default function NotFound(): React.ReactElement {
+export default async function NotFound() {
+    const t = await getTranslations('errorPages.notFound');
+
     return (
         <div className="flex-1 flex items-center justify-center px-4 py-24">
             <div className="text-center max-w-[min(400px,calc(100vw-2rem))]">
@@ -9,16 +11,16 @@ export default function NotFound(): React.ReactElement {
                     404
                 </h1>
                 <h2 className="text-lg sm:text-xl font-semibold mb-2 text-white">
-                    Page Not Found
+                    {t('title')}
                 </h2>
                 <p className="text-sm text-faded mb-6">
-                    The page you&apos;re looking for doesn&apos;t exist.
+                    {t('description')}
                 </p>
                 <Link
                     href="/"
                     className="inline-block px-6 py-3 bg-gradient-to-br from-sky-400 to-indigo-500 text-white rounded-full font-semibold text-sm no-underline hover:opacity-90 transition-opacity"
                 >
-                    Return to {APP_NAME}
+                    {t('backHome')}
                 </Link>
             </div>
         </div>

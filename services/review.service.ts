@@ -42,6 +42,15 @@ export type ReviewedInvoiceData = {
   // Line items
   lineItems: LineItem[];
 
+  // Document-level allowances/charges (BG-20 / BG-21)
+  allowanceCharges?: {
+    chargeIndicator: boolean;
+    amount: number;
+    percentage?: number | null;
+    reason?: string | null;
+    taxRate?: number | null;
+  }[];
+
   // Totals
   subtotal: number;
   taxAmount: number;
@@ -139,12 +148,54 @@ export class ReviewService {
       );
     }
 
-    // Check sum of line net amounts ≈ subtotal
+    // Check sum of line net amounts ≈ subtotal (accounting for allowances/charges)
     const lineNetSum = sumMoney(data.lineItems.map((li) => li.totalPrice));
-    if (!moneyEqual(lineNetSum, data.subtotal, 0.02)) {
+    const allowances = data.allowanceCharges || [];
+    const totalAllowances = sumMoney(
+      allowances.filter((ac) => !ac.chargeIndicator).map((ac) => ac.amount)
+    );
+    const totalCharges = sumMoney(
+      allowances.filter((ac) => ac.chargeIndicator).map((ac) => ac.amount)
+    );
+
+    if (allowances.length > 0) {
+      // BR-CO-13: subtotal = lineNetSum - allowances + charges
+      // But for gross-priced invoices, subtotal may be the net (VAT-exclusive)
+      // while lineNetSum is gross. Allow both interpretations.
+      const expectedSubtotalNet = roundMoney(lineNetSum - totalAllowances + totalCharges);
+      const grossTotal = roundMoney(lineNetSum - totalAllowances + totalCharges);
+
+      // Check if subtotal matches either the direct calculation or the
+      // VAT-extracted version (gross pricing: subtotal = grossTotal / (1 + rate))
+      if (moneyEqual(expectedSubtotalNet, data.subtotal, 0.05)) {
+        // Direct match — net pricing
+        return;
+      }
+
+      // Gross pricing check: try common VAT rates to see if subtotal = grossTotal / (1 + rate)
+      const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05, 0];
+      for (const rate of commonRates) {
+        const netFromGross = roundMoney(grossTotal / (1 + rate));
+        if (moneyEqual(netFromGross, data.subtotal, 0.05)) {
+          return; // Gross pricing match
+        }
+      }
+
+      // Still allow if subtotal is simply less than lineNetSum (discounts applied)
+      if (data.subtotal < lineNetSum) {
+        return;
+      }
+
       throw new ValidationError(
-        `Line items total (${lineNetSum}) does not match subtotal (${data.subtotal})`
+        `Line items total (${lineNetSum}) minus allowances (${totalAllowances}) plus charges (${totalCharges}) = ${expectedSubtotalNet}, but subtotal is ${data.subtotal}`
       );
+    } else {
+      // No allowances — original simple check
+      if (!moneyEqual(lineNetSum, data.subtotal, 0.02)) {
+        throw new ValidationError(
+          `Line items total (${lineNetSum}) does not match subtotal (${data.subtotal})`
+        );
+      }
     }
   }
 

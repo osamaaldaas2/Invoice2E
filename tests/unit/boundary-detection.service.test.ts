@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BoundaryDetectionService } from '@/services/boundary-detection.service';
 
+// Mock sendPrompt function shared by the GeminiAdapter mock instance
+const mockSendPrompt = vi.hoisted(() => vi.fn());
+
 // Mock dependencies
 vi.mock('@/services/pdf-splitter.service', () => ({
   pdfSplitterService: {
@@ -8,11 +11,16 @@ vi.mock('@/services/pdf-splitter.service', () => ({
   },
 }));
 
-vi.mock('@/adapters/gemini.adapter', () => ({
-  geminiAdapter: {
-    sendPrompt: vi.fn(),
-  },
-}));
+vi.mock('@/adapters/gemini.adapter', () => {
+  return {
+    GeminiAdapter: class {
+      sendPrompt = mockSendPrompt;
+    },
+    geminiAdapter: {
+      sendPrompt: mockSendPrompt,
+    },
+  };
+});
 
 vi.mock('@/adapters/deepseek.adapter', () => ({
   deepseekAdapter: {
@@ -20,8 +28,33 @@ vi.mock('@/adapters/deepseek.adapter', () => ({
   },
 }));
 
+const mockOpenAISendPrompt = vi.hoisted(() => vi.fn());
+
+vi.mock('@/adapters/openai.adapter', () => ({
+  openaiAdapter: {
+    sendPrompt: mockOpenAISendPrompt,
+  },
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('@/lib/boundary-detection-prompt', () => ({
+  BOUNDARY_DETECTION_PROMPT: 'test prompt',
+}));
+
+vi.mock('@/lib/constants', () => ({
+  MAX_PAGES_FOR_BOUNDARY_DETECTION: 50,
+}));
+
+vi.mock('@/lib/errors', () => ({
+  ExtractionError: class ExtractionError extends Error {
+    constructor(message: string) { super(message); this.name = 'ExtractionError'; }
+  },
+}));
+
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
-import { geminiAdapter } from '@/adapters/gemini.adapter';
 
 describe('BoundaryDetectionService', () => {
   let service: BoundaryDetectionService;
@@ -74,7 +107,7 @@ describe('BoundaryDetectionService', () => {
       confidence: 0.95,
     });
 
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue(aiResponse);
+    mockSendPrompt.mockResolvedValue(aiResponse);
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -101,7 +134,7 @@ describe('BoundaryDetectionService', () => {
       }) +
       '\n```';
 
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue(aiResponse);
+    mockSendPrompt.mockResolvedValue(aiResponse);
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -123,7 +156,7 @@ describe('BoundaryDetectionService', () => {
       confidence: 0.3,
     });
 
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue(aiResponse);
+    mockSendPrompt.mockResolvedValue(aiResponse);
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -133,7 +166,7 @@ describe('BoundaryDetectionService', () => {
 
   it('should fallback to single invoice when AI returns invalid JSON', async () => {
     vi.mocked(pdfSplitterService.getPageCount).mockResolvedValue(3);
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue('I cannot process this document');
+    mockSendPrompt.mockResolvedValue('I cannot process this document');
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -154,7 +187,7 @@ describe('BoundaryDetectionService', () => {
       confidence: 0.9,
     });
 
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue(aiResponse);
+    mockSendPrompt.mockResolvedValue(aiResponse);
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -175,7 +208,7 @@ describe('BoundaryDetectionService', () => {
       confidence: 0.9,
     });
 
-    vi.mocked(geminiAdapter.sendPrompt).mockResolvedValue(aiResponse);
+    mockSendPrompt.mockResolvedValue(aiResponse);
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 
@@ -193,9 +226,34 @@ describe('BoundaryDetectionService', () => {
     expect(result.provider).toBe('page-count-error');
   });
 
+  it('should use openai adapter when AI_PROVIDER is openai', async () => {
+    vi.stubEnv('AI_PROVIDER', 'openai');
+    service = new BoundaryDetectionService();
+
+    vi.mocked(pdfSplitterService.getPageCount).mockResolvedValue(4);
+
+    const aiResponse = JSON.stringify({
+      totalInvoices: 2,
+      totalPages: 4,
+      invoices: [
+        { invoiceIndex: 1, pages: [1, 2], label: 'INV-001' },
+        { invoiceIndex: 2, pages: [3, 4], label: 'INV-002' },
+      ],
+      confidence: 0.95,
+    });
+
+    mockOpenAISendPrompt.mockResolvedValue(aiResponse);
+
+    const result = await service.detect(Buffer.from('test'), 'application/pdf');
+
+    expect(result.totalInvoices).toBe(2);
+    expect(result.provider).toBe('openai');
+    expect(mockOpenAISendPrompt).toHaveBeenCalled();
+  });
+
   it('should fallback when AI adapter throws', async () => {
     vi.mocked(pdfSplitterService.getPageCount).mockResolvedValue(3);
-    vi.mocked(geminiAdapter.sendPrompt).mockRejectedValue(new Error('API error'));
+    mockSendPrompt.mockRejectedValue(new Error('API error'));
 
     const result = await service.detect(Buffer.from('test'), 'application/pdf');
 

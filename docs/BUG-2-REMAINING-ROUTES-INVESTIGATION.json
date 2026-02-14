@@ -1,0 +1,222 @@
+{
+  "investigation_date": "2026-02-13T14:52:00Z",
+  "investigation_id": "CHECK_REMAINING_USER_ROUTES_FOR_ADMIN_CLIENT",
+  "status": "VIOLATIONS_FOUND",
+  "summary": {
+    "total_createServerClient_usages": 15,
+    "admin_routes": 11,
+    "user_routes": 4,
+    "health_route": 1
+  },
+  "remaining_user_routes": [
+    {
+      "file": "app/api/invoices/bulk-upload/route.ts",
+      "severity": "HIGH",
+      "violations": [
+        {
+          "line": 118,
+          "context": "POST handler - credit check before batch job creation",
+          "code": "const supabase = createServerClient();",
+          "tables_accessed": ["users", "user_credits"],
+          "operations": ["SELECT user by email", "SELECT available_credits"],
+          "rls_bypass": true,
+          "security_impact": "Can read any user's credits, can resolve userId by email across all users"
+        },
+        {
+          "line": 187,
+          "context": "GET handler - batch status listing",
+          "code": "const supabase = createServerClient();",
+          "tables_accessed": ["users"],
+          "operations": ["SELECT user by id/email"],
+          "rls_bypass": true,
+          "security_impact": "Can resolve userId for any email"
+        },
+        {
+          "line": 293,
+          "context": "GET handler - download URL generation (line 293+)",
+          "code": "const supabase = createServerClient();",
+          "tables_accessed": ["users"],
+          "operations": ["SELECT user by id/email"],
+          "rls_bypass": true,
+          "security_impact": "Can resolve userId for any email"
+        }
+      ],
+      "helper_function_analysis": {
+        "function": "resolveActiveUserId",
+        "lines": "18-39",
+        "takes_supabase_parameter": true,
+        "queries": [
+          "SELECT id FROM users WHERE id = ?",
+          "SELECT id FROM users WHERE email = ?"
+        ],
+        "security_note": "Helper function performs cross-user email lookup. If supabase is admin client, can query any user."
+      },
+      "auth_method": "getAuthenticatedUser(req)",
+      "user_scoped_client_needed": true,
+      "recommendation": "Create userClient after authentication, pass to resolveActiveUserId and all queries. RLS policies on users + user_credits tables will enforce isolation."
+    },
+    {
+      "file": "app/api/vouchers/redeem/route.ts",
+      "severity": "HIGH",
+      "violations": [
+        {
+          "line": 36,
+          "context": "POST handler - voucher redemption",
+          "code": "const supabase = createServerClient();",
+          "rpc_calls": ["redeem_voucher(p_user_id, p_code)"],
+          "security_impact": "Calls RPC with user.id parameter. RPC may not enforce RLS if called with admin client. Potential cross-user redemption if RPC doesn't validate p_user_id matches auth.uid()."
+        }
+      ],
+      "auth_method": "getAuthenticatedUser(request)",
+      "user_scoped_client_needed": true,
+      "recommendation": "Use user-scoped client so RPC can rely on auth.uid() from JWT. Verify RPC 'redeem_voucher' validates p_user_id = auth.uid().",
+      "rpc_security_audit_required": true
+    },
+    {
+      "file": "app/api/payments/create-checkout/route.ts",
+      "severity": "HIGH",
+      "violations": [
+        {
+          "line": 78,
+          "context": "POST handler - get user email before checkout",
+          "code": "const { data: userData } = await createUserClient().from('users').select('email').eq('id', user.id).single();",
+          "note": "Uses createUserClient() (NOT createServerClient), so this one is SECURE",
+          "security_impact": "NONE - already using user-scoped client"
+        },
+        {
+          "line": 145,
+          "context": "POST handler - insert payment transaction",
+          "code": "const supabase = createServerClient();",
+          "tables_accessed": ["payment_transactions"],
+          "operations": ["INSERT payment_transactions"],
+          "rls_bypass": true,
+          "security_impact": "Can insert payment transactions for any user_id (though user.id is used, admin client bypasses RLS enforcement)"
+        }
+      ],
+      "auth_method": "getAuthenticatedUser(req)",
+      "user_scoped_client_needed": true,
+      "recommendation": "Replace line 145 createServerClient() with user-scoped client. RLS policies on payment_transactions will enforce user can only create their own transactions.",
+      "note": "Line 78 already secure (uses createUserClient)"
+    },
+    {
+      "file": "app/api/health/route.ts",
+      "severity": "LOW",
+      "violations": [
+        {
+          "line": 51,
+          "context": "GET handler - database health check",
+          "code": "const supabase = createServerClient();",
+          "tables_accessed": ["users (count query)"],
+          "operations": ["SELECT count(*) FROM users"],
+          "rls_bypass": true,
+          "security_impact": "MINIMAL - only counts users, doesn't read PII. Health check needs admin access to verify DB connectivity."
+        }
+      ],
+      "auth_method": "none (public health check)",
+      "user_scoped_client_needed": false,
+      "recommendation": "ACCEPTABLE - health checks often need admin client for system-level queries. Consider moving to /api/internal/health if concerned."
+    }
+  ],
+  "admin_routes_using_admin_client": [
+    {
+      "file": "app/api/admin/vouchers/route.ts",
+      "lines": [98, 150],
+      "status": "ACCEPTABLE",
+      "note": "Admin routes should use admin client explicitly"
+    },
+    {
+      "file": "app/api/admin/vouchers/[id]/route.ts",
+      "lines": [87, 175],
+      "status": "ACCEPTABLE",
+      "note": "Admin routes should use admin client explicitly"
+    },
+    {
+      "file": "app/api/admin/packages/route.ts",
+      "lines": [41, 103],
+      "status": "ACCEPTABLE",
+      "note": "Admin routes should use admin client explicitly"
+    },
+    {
+      "file": "app/api/admin/packages/[id]/route.ts",
+      "lines": [47, 112, 229],
+      "status": "ACCEPTABLE",
+      "note": "Admin routes should use admin client explicitly"
+    }
+  ],
+  "no_createAdminClient_usages": {
+    "searched": "app/api/**/*.ts",
+    "matches": 0,
+    "note": "No routes are explicitly using createAdminClient() function"
+  },
+  "no_service_role_key_usages": {
+    "searched": "app/api/**/*.ts",
+    "matches": 0,
+    "note": "No routes directly access SUPABASE_SERVICE_ROLE_KEY env var"
+  },
+  "invoiceDbService_call_sites": {
+    "searched": "app/api/**/*.ts",
+    "method_pattern": "invoiceDbService\\.(get|create|update|delete|list|search)",
+    "status": "ALL_ROUTES_ALREADY_MIGRATED",
+    "note": "P0-2 initial + continuation secured all invoiceDbService call sites. No violations found."
+  },
+  "priority_order_to_fix": [
+    {
+      "rank": 1,
+      "file": "app/api/invoices/bulk-upload/route.ts",
+      "reason": "HIGH PRIORITY - 3 violations, reads user_credits (financial data), performs cross-user email lookups",
+      "security_risk": "CRITICAL - Can read any user's credit balance, resolve userIds across entire user base",
+      "estimated_effort": "30-45 minutes (3 handlers + helper function refactor)",
+      "recommendation": "Create userClient after auth, pass to resolveActiveUserId and all DB queries. Update helper function signature."
+    },
+    {
+      "rank": 2,
+      "file": "app/api/vouchers/redeem/route.ts",
+      "reason": "HIGH PRIORITY - Calls RPC that modifies user_credits and voucher_redemptions",
+      "security_risk": "HIGH - RPC may not validate p_user_id = auth.uid() if called with admin client",
+      "estimated_effort": "15 minutes (single handler, verify RPC logic)",
+      "recommendation": "Use user-scoped client. Audit RPC 'redeem_voucher' to ensure it validates p_user_id = (select auth.uid())::text.",
+      "additional_task": "Check migration files for redeem_voucher RPC definition, verify security"
+    },
+    {
+      "rank": 3,
+      "file": "app/api/payments/create-checkout/route.ts",
+      "reason": "HIGH PRIORITY - Writes payment_transactions (financial data)",
+      "security_risk": "MEDIUM - Uses user.id correctly, but admin client bypasses RLS enforcement",
+      "estimated_effort": "10 minutes (single line change + verification)",
+      "recommendation": "Replace createServerClient() with user-scoped client at line 145",
+      "note": "Line 78 already secure (uses createUserClient)"
+    },
+    {
+      "rank": 4,
+      "file": "app/api/health/route.ts",
+      "reason": "LOW PRIORITY - Health check, no PII exposure",
+      "security_risk": "MINIMAL - Only counts users, public endpoint",
+      "estimated_effort": "5 minutes (optional - consider acceptable for health checks)",
+      "recommendation": "OPTIONAL - Move to /api/internal/health or document as acceptable admin client usage"
+    }
+  ],
+  "blockers_identified": 0,
+  "warnings": [
+    "RPC 'redeem_voucher' security needs verification - does it validate p_user_id = auth.uid()?",
+    "resolveActiveUserId helper performs cross-user email lookup with admin client - potential for misuse"
+  ],
+  "total_violations": 3,
+  "total_user_routes_needing_fix": 3,
+  "estimated_total_effort": "55-70 minutes for all 3 high-priority routes",
+  "acceptance_criteria": [
+    "All user-facing routes use createUserScopedClient(user.id)",
+    "No createServerClient() in user routes except health checks",
+    "resolveActiveUserId helper takes userClient parameter",
+    "RPC redeem_voucher validates p_user_id = auth.uid()",
+    "TypeScript compilation passes",
+    "Tests pass (after vitest infra fix)"
+  ],
+  "next_step_recommendation": "Fix vitest infrastructure first (BLOCKER), then migrate 3 remaining user routes in priority order",
+  "notes": [
+    "Admin routes using createServerClient() are acceptable - they should use explicit admin client",
+    "P0-2 continuation successfully secured 15 routes, only 3 user routes remain",
+    "Health check route is edge case - acceptable to use admin client for system queries",
+    "No direct SUPABASE_SERVICE_ROLE_KEY usage found (good)",
+    "All invoiceDbService calls already migrated (good)"
+  ]
+}

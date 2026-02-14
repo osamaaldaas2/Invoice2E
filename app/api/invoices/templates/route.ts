@@ -27,11 +27,20 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        const rateLimitId = `${getRequestIdentifier(req)}:invoices-templates-list:${user.id}`;
+        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+                { status: 429, headers: { 'Retry-After': String(rateLimit.resetInSeconds) } }
+            );
+        }
+
         const templates = await templateDBService.listTemplates(user.id);
 
         return NextResponse.json({
             success: true,
-            templates,
+            data: { templates },
         });
     } catch (error) {
         return handleApiError(error, 'Failed to list templates', {
@@ -108,7 +117,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            template,
+            data: { template },
         }, { status: 201 });
     } catch (error) {
         return handleApiError(error, 'Failed to create template', {

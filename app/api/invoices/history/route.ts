@@ -12,6 +12,7 @@ import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
 import { getAuthenticatedUser } from '@/lib/auth';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 /**
  * GET /api/invoices/history
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest) {
                 { status: 401 }
             );
         }
+
+        // P0-3: Create user-scoped client for RLS-based data isolation
+        const userClient = await createUserScopedClient(user.id);
 
         // Parse query parameters
         const { searchParams } = new URL(req.url);
@@ -55,9 +59,9 @@ export async function GET(req: NextRequest) {
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate'); const exportType = searchParams.get('export');
 
-        // Handle CSV export
+        // Handle CSV export (RLS enforced)
         if (exportType === 'csv') {
-            const csv = await analyticsService.exportHistoryAsCSV(user.id);
+            const csv = await analyticsService.exportHistoryAsCSV(user.id, userClient);
             return new NextResponse(csv, {
                 headers: {
                     'Content-Type': 'text/csv',
@@ -66,7 +70,7 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // Get paginated history
+        // Get paginated history (RLS enforced)
         const filters = {
             ...(format && { format }),
             ...(status && { status }),
@@ -74,7 +78,7 @@ export async function GET(req: NextRequest) {
             ...(endDate && { endDate }),
         };
 
-        const history = await analyticsService.getConversionHistory(user.id, page, limit, filters);
+        const history = await analyticsService.getConversionHistory(user.id, page, limit, filters, userClient);
 
         return NextResponse.json({
             success: true,

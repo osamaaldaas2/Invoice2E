@@ -14,6 +14,7 @@ import { handleApiError } from '@/lib/api-helpers';
  * Get user statistics and charts data
  */
 import { getAuthenticatedUser } from '@/lib/auth';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 /**
  * GET /api/invoices/analytics
@@ -30,6 +31,9 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        // P0-3: Create user-scoped client for RLS-based data isolation
+        const userClient = await createUserScopedClient(user.id);
+
         const { searchParams } = new URL(req.url);
         const periodParam = searchParams.get('period') || 'month';
         const validPeriods: readonly string[] = ['week', 'month', 'year'];
@@ -38,14 +42,14 @@ export async function GET(req: NextRequest) {
             : 'month';
         const type = searchParams.get('type'); // 'stats', 'charts', or both
 
-        // Get statistics
+        // Get statistics (RLS enforced)
         const statistics = type !== 'charts'
-            ? await analyticsService.getStatistics(user.id)
+            ? await analyticsService.getStatistics(user.id, userClient)
             : null;
 
-        // Get charts data
+        // Get charts data (RLS enforced)
         const chartsData = type !== 'stats'
-            ? await analyticsService.getChartsData(user.id, period)
+            ? await analyticsService.getChartsData(user.id, period, userClient)
             : null;
 
         return NextResponse.json({

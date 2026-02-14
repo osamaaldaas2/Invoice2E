@@ -1,8 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError } from '@/lib/errors';
 import type { InvoiceExtraction, InvoiceConversion } from '@/types';
 import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
+import { createAdminClient } from '@/lib/supabase.server';
 
 export type CreateExtractionData = {
     userId: string;
@@ -39,28 +40,28 @@ export type UpdateConversionData = {
 };
 
 export class InvoiceDatabaseService {
-    private getAdminClient() {
-        // Direct admin client using Service Role Key to bypass RLS completely
-        // This is necessary because createUserClient() might lack session in some contexts
-        // and createServerClient() with SSR helpers can be finicky with Service Key
-        return createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
+    /**
+     * P0-1: Fail-fast pattern - NO ADMIN FALLBACK.
+     * User-facing operations MUST provide a SupabaseClient.
+     * If client is missing, throws an error instead of silently bypassing RLS.
+     * Admin operations should use explicit *Admin() methods.
+     */
+    private assertClientProvided(client: SupabaseClient | undefined, methodName: string): asserts client is SupabaseClient {
+        if (!client) {
+            throw new AppError(
+                'MISSING_CLIENT',
+                `${methodName} requires a Supabase client for RLS enforcement. Pass createUserScopedClient(userId) or use *Admin() method variant.`,
+                500
+            );
+        }
     }
 
-    async createExtraction(data: CreateExtractionData): Promise<InvoiceExtraction> {
-        // Use admin client to ensure reliable inserts from server-side routes
-        const supabase = this.getAdminClient();
+    async createExtraction(data: CreateExtractionData, client?: SupabaseClient): Promise<InvoiceExtraction> {
+        // P0-1: Client required - fail fast if missing
+        this.assertClientProvided(client, 'createExtraction');
         const snakeData = camelToSnakeKeys(data);
 
-        const { data: extraction, error } = await supabase
+        const { data: extraction, error } = await client!
             .from('invoice_extractions')
             .insert([snakeData])
             .select()
@@ -74,11 +75,11 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(extraction) as InvoiceExtraction;
     }
 
-    async getExtractionById(extractionId: string): Promise<InvoiceExtraction> {
-        // Use admin client to bypass RLS for server-side reads
-        const supabase = this.getAdminClient();
+    async getExtractionById(extractionId: string, client?: SupabaseClient): Promise<InvoiceExtraction> {
+        // P0-1: Client required - fail fast if missing
+        this.assertClientProvided(client, 'getExtractionById');
 
-        const { data, error } = await supabase
+        const { data, error } = await client!
             .from('invoice_extractions')
             .select('*')
             .eq('id', extractionId)
@@ -92,11 +93,11 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(data) as InvoiceExtraction;
     }
 
-    async getUserExtractions(userId: string, limit: number = 10): Promise<InvoiceExtraction[]> {
-        // Use admin client for server-side reads
-        const supabase = this.getAdminClient();
+    async getUserExtractions(userId: string, limit: number = 10, client?: SupabaseClient): Promise<InvoiceExtraction[]> {
+        // P0-1: Client required - fail fast if missing
+        this.assertClientProvided(client, 'getUserExtractions');
 
-        const { data, error } = await supabase
+        const { data, error } = await client!
             .from('invoice_extractions')
             .select('*')
             .eq('user_id', userId)
@@ -113,12 +114,13 @@ export class InvoiceDatabaseService {
 
     async updateExtraction(
         extractionId: string,
-        data: { status?: string; extractionData?: Record<string, unknown> }
+        data: { status?: string; extractionData?: Record<string, unknown> },
+        client?: SupabaseClient
     ): Promise<InvoiceExtraction> {
-        const supabase = this.getAdminClient();
+        this.assertClientProvided(client, 'updateExtraction');
         const snakeData = camelToSnakeKeys(data);
 
-        const { data: extraction, error } = await supabase
+        const { data: extraction, error } = await client!
             .from('invoice_extractions')
             .update(snakeData)
             .eq('id', extractionId)
@@ -126,17 +128,17 @@ export class InvoiceDatabaseService {
             .single();
 
         if (error) {
-            logger.error('Failed to update extraction', { extractionId, error: error.message });
+            logger.error('Failed to update extraction', { extractionId, error: error.message, code: error.code, details: error.details, hint: error.hint });
             throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
         }
 
         return snakeToCamelKeys(extraction) as InvoiceExtraction;
     }
 
-    async deleteExtraction(extractionId: string): Promise<void> {
-        const supabase = this.getAdminClient();
+    async deleteExtraction(extractionId: string, client?: SupabaseClient): Promise<void> {
+        this.assertClientProvided(client, 'deleteExtraction');
 
-        const { error } = await supabase
+        const { error } = await client!
             .from('invoice_extractions')
             .delete()
             .eq('id', extractionId);
@@ -147,12 +149,11 @@ export class InvoiceDatabaseService {
         }
     }
 
-    async createConversion(data: CreateConversionData): Promise<InvoiceConversion> {
-        // Use admin client for server-side inserts
-        const supabase = this.getAdminClient();
+    async createConversion(data: CreateConversionData, client?: SupabaseClient): Promise<InvoiceConversion> {
+        this.assertClientProvided(client, 'createConversion');
         const snakeData = camelToSnakeKeys(data);
 
-        const { data: conversion, error } = await supabase
+        const { data: conversion, error } = await client!
             .from('invoice_conversions')
             .insert([snakeData])
             .select()
@@ -166,12 +167,11 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(conversion) as InvoiceConversion;
     }
 
-    async updateConversion(conversionId: string, data: UpdateConversionData): Promise<InvoiceConversion> {
-        // Use admin client to ensure we can update regardless of RLS (critical for status updates)
-        const supabase = this.getAdminClient();
+    async updateConversion(conversionId: string, data: UpdateConversionData, client?: SupabaseClient): Promise<InvoiceConversion> {
+        this.assertClientProvided(client, 'updateConversion');
         const snakeData = camelToSnakeKeys(data);
 
-        const { data: conversion, error } = await supabase
+        const { data: conversion, error } = await client!
             .from('invoice_conversions')
             .update(snakeData)
             .eq('id', conversionId)
@@ -198,11 +198,10 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(conversion) as InvoiceConversion;
     }
 
-    async getConversionById(conversionId: string): Promise<InvoiceConversion> {
-        // Use admin client for server-side reads
-        const supabase = this.getAdminClient();
+    async getConversionById(conversionId: string, client?: SupabaseClient): Promise<InvoiceConversion> {
+        this.assertClientProvided(client, 'getConversionById');
 
-        const { data, error } = await supabase
+        const { data, error } = await client!
             .from('invoice_conversions')
             .select('*')
             .eq('id', conversionId)
@@ -218,11 +217,10 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(data) as InvoiceConversion;
     }
 
-    async getUserConversions(userId: string, limit: number = 10): Promise<InvoiceConversion[]> {
-        // Use admin client for server-side reads
-        const supabase = this.getAdminClient();
+    async getUserConversions(userId: string, limit: number = 10, client?: SupabaseClient): Promise<InvoiceConversion[]> {
+        this.assertClientProvided(client, 'getUserConversions');
 
-        const { data, error } = await supabase
+        const { data, error } = await client!
             .from('invoice_conversions')
             .select('*')
             .eq('user_id', userId)
@@ -237,11 +235,10 @@ export class InvoiceDatabaseService {
         return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceConversion);
     }
 
-    async getConversionByExtractionId(extractionId: string): Promise<InvoiceConversion | null> {
-        // Use admin client for server-side reads
-        const supabase = this.getAdminClient();
+    async getConversionByExtractionId(extractionId: string, client?: SupabaseClient): Promise<InvoiceConversion | null> {
+        this.assertClientProvided(client, 'getConversionByExtractionId');
 
-        const { data, error } = await supabase
+        const { data, error } = await client!
             .from('invoice_conversions')
             .select('*')
             .eq('extraction_id', extractionId)
@@ -259,11 +256,10 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(data) as InvoiceConversion;
     }
 
-    async processConversionTransaction(userId: string, conversionId: string): Promise<{ success: boolean; remainingCredits?: number; error?: string }> {
-        // Use admin client for RPC calls to ensure proper permissions
-        const supabase = this.getAdminClient();
+    async processConversionTransaction(userId: string, conversionId: string, client?: SupabaseClient): Promise<{ success: boolean; remainingCredits?: number; error?: string }> {
+        this.assertClientProvided(client, 'processConversionTransaction');
 
-        const { data, error } = await supabase.rpc('convert_invoice_with_credit_deduction', {
+        const { data, error } = await client!.rpc('convert_invoice_with_credit_deduction', {
             p_user_id: userId,
             p_conversion_id: conversionId,
             p_credits_cost: 1
@@ -282,6 +278,57 @@ export class InvoiceDatabaseService {
         }
 
         return { success: true, remainingCredits: result.remaining_credits };
+    }
+
+    // ============================================================
+    // ADMIN METHODS - Use ONLY in admin routes or background jobs
+    // These methods bypass RLS by design
+    // ============================================================
+
+    /**
+     * Admin-only: Get any extraction by ID (bypasses RLS).
+     * Use ONLY in admin routes or background jobs.
+     */
+    async getExtractionByIdAdmin(extractionId: string): Promise<InvoiceExtraction> {
+        const adminClient = createAdminClient();
+        const { data, error } = await adminClient
+            .from('invoice_extractions')
+            .select('*')
+            .eq('id', extractionId)
+            .single();
+
+        if (error) {
+            logger.error('Failed to get extraction (admin)', { extractionId, error: error.message });
+            throw new NotFoundError('Extraction not found');
+        }
+
+        return snakeToCamelKeys(data) as InvoiceExtraction;
+    }
+
+    /**
+     * Admin-only: Update any extraction (bypasses RLS).
+     * Use ONLY in admin routes or background jobs.
+     */
+    async updateExtractionAdmin(
+        extractionId: string,
+        data: { status?: string; extractionData?: Record<string, unknown> }
+    ): Promise<InvoiceExtraction> {
+        const adminClient = createAdminClient();
+        const snakeData = camelToSnakeKeys(data);
+
+        const { data: extraction, error } = await adminClient
+            .from('invoice_extractions')
+            .update(snakeData)
+            .eq('id', extractionId)
+            .select()
+            .single();
+
+        if (error) {
+            logger.error('Failed to update extraction (admin)', { extractionId, error: error.message });
+            throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
+        }
+
+        return snakeToCamelKeys(extraction) as InvoiceExtraction;
     }
 }
 

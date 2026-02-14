@@ -16,6 +16,7 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { verifySignedDownloadToken } from '@/lib/session';
 import { handleApiError } from '@/lib/api-helpers';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 /**
  * GET /api/invoices/bulk-upload/download
@@ -76,6 +77,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No successful conversions to download' }, { status: 404 });
     }
 
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+
     // Generate XML on-the-fly from extraction data (same approach as batch-download route)
     const zip = new JSZip();
     const errors: { extractionId: string; error: string }[] = [];
@@ -85,7 +89,7 @@ export async function GET(req: NextRequest) {
     for (const result of successfulResults) {
       const extractionId = result.extractionId!;
       try {
-        const extraction = await invoiceDbService.getExtractionById(extractionId);
+        const extraction = await invoiceDbService.getExtractionById(extractionId, userClient);
 
         if (extraction.userId !== user.id) {
           errors.push({ extractionId, error: 'Access denied' });
@@ -93,7 +97,7 @@ export async function GET(req: NextRequest) {
         }
 
         // PERF-2: Check for cached XML first
-        const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+        const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
         const cachedXml = (existingConversion as Record<string, unknown> | null)?.xml_content as
           | string
           | undefined;
@@ -135,7 +139,7 @@ export async function GET(req: NextRequest) {
             await invoiceDbService.updateConversion(existingConversion.id, {
               xmlContent,
               xmlFileName,
-            });
+            }, userClient);
           }
         }
 
@@ -156,9 +160,9 @@ export async function GET(req: NextRequest) {
           await invoiceDbService.updateConversion(existingConversion.id, {
             conversionStatus: 'completed',
             ...(validationStatus ? { validationStatus } : {}),
-          });
+          }, userClient);
         }
-        await invoiceDbService.updateExtraction(extractionId, { status: 'completed' });
+        await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Generation failed';
         errors.push({ extractionId, error: msg });

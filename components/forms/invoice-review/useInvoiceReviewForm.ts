@@ -50,6 +50,13 @@ export interface InvoiceReviewFormValues {
     taxRate: number | string;
     taxCategoryCode: string;
   }[];
+  allowanceCharges: {
+    chargeIndicator: boolean;
+    amount: number;
+    percentage: number | string;
+    reason: string;
+    taxRate: number | string;
+  }[];
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -137,6 +144,18 @@ export const useInvoiceReviewForm = ({
           },
         ];
 
+  // Parse allowances/charges from AI extraction
+  const sourceAllowanceCharges = Array.isArray(initialData?.allowanceCharges)
+    ? initialData.allowanceCharges
+    : [];
+  const defaultAllowanceCharges = sourceAllowanceCharges.map((ac: any) => ({
+    chargeIndicator: ac?.chargeIndicator === true,
+    amount: Number(ac?.amount) || 0,
+    percentage: ac?.percentage != null ? Number(ac.percentage) : ('' as number | string),
+    reason: ac?.reason || '',
+    taxRate: ac?.taxRate != null ? Number(ac.taxRate) : ('' as number | string),
+  }));
+
   const normalizeIban = (value: unknown) => {
     if (value === null || value === undefined) return '';
     return String(value).replace(/\s+/g, '').toUpperCase();
@@ -182,6 +201,7 @@ export const useInvoiceReviewForm = ({
       paymentInstructions: initialData?.paymentInstructions || '',
 
       items: defaultItems,
+      allowanceCharges: defaultAllowanceCharges,
 
       subtotal: rawSubtotal || 0,
       taxAmount: resolvedTaxAmount || 0,
@@ -274,6 +294,22 @@ export const useInvoiceReviewForm = ({
               ? item.taxCategoryCode
               : undefined,
         })),
+        // Document-level allowances/charges (BG-20 / BG-21)
+        allowanceCharges: (data.allowanceCharges || [])
+          .filter((ac) => Number(ac.amount) > 0)
+          .map((ac) => ({
+            chargeIndicator: ac.chargeIndicator,
+            amount: Number(ac.amount),
+            percentage:
+              ac.percentage !== '' && ac.percentage != null
+                ? Number(ac.percentage)
+                : null,
+            reason: ac.reason || null,
+            taxRate:
+              ac.taxRate !== '' && ac.taxRate != null
+                ? Number(ac.taxRate)
+                : null,
+          })),
       };
 
       const response = await fetch('/api/invoices/review', {
@@ -312,7 +348,12 @@ export const useInvoiceReviewForm = ({
         }, 2000);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Review failed';
+      let message: string;
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        message = 'Connection failed, please try again';
+      } else {
+        message = err instanceof Error ? err.message : 'Review failed';
+      }
       setSubmitError(message);
       logger.error('Review error', err);
     }

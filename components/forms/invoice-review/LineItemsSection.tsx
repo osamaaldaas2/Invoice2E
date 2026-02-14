@@ -138,8 +138,12 @@ export const LineItemsSection: React.FC<LineItemsSectionProps> = ({
 
             <button
               type="button"
-              onClick={() => remove(index)}
-              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => {
+                if (window.confirm(t('confirmDeleteItem'))) {
+                  remove(index);
+                }
+              }}
+              className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             >
               <Trash2 className="w-4 h-4" />
             </button>

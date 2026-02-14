@@ -1,4 +1,4 @@
-import type { TaxCategoryCode, DocumentTypeCode } from '@/types';
+import type { TaxCategoryCode, DocumentTypeCode, AllowanceCharge } from '@/types';
 import type { ValidationError as VPError } from '@/validation/validation-result';
 import type { ExternalValidationResult } from './validator';
 
@@ -80,4 +80,14 @@ export interface XRechnungInvoiceData {
   dueDate?: string | null;
   /** EN 16931 document type code (BT-3) */
   documentTypeCode?: DocumentTypeCode;
+  /** Document-level allowances and charges (BG-20 / BG-21) */
+  allowanceCharges?: AllowanceCharge[];
+  /** Preceding invoice reference (BT-25) — required for credit notes (TypeCode 381) */
+  precedingInvoiceReference?: string | null;
+  /** Prepaid amount (BT-113) — deducted from grand total to compute amount due */
+  prepaidAmount?: number | null;
+  /** Billing period start date (BT-73) — YYYY-MM-DD format */
+  billingPeriodStart?: string | null;
+  /** Billing period end date (BT-74) — YYYY-MM-DD format */
+  billingPeriodEnd?: string | null;
 }

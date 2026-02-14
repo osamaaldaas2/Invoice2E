@@ -73,6 +73,12 @@ const isRedisConfigured = !!(
 let redis: Redis | null = null;
 let redisRateLimiters: Record<string, Ratelimit> | null = null;
 
+// SECURITY: Warn about missing Redis in production (in-memory fallback is per-instance only)
+if (!isRedisConfigured && process.env.NODE_ENV === 'production') {
+    const msg = 'WARNING: Redis (Upstash) is not configured for rate limiting. In-memory fallback is per-instance only and will not work correctly with multiple serverless function instances. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for production use.';
+    logger.warn(msg);
+}
+
 if (isRedisConfigured) {
     try {
         redis = new Redis({
@@ -115,7 +121,7 @@ if (isRedisConfigured) {
         redisRateLimiters = null;
     }
 } else {
-    logger.info('Redis not configured, using in-memory rate limiter');
+    logger.info('Redis not configured, using in-memory rate limiter (development only)');
 }
 
 // ============================================
@@ -131,7 +137,8 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Clean up old entries periodically (every 5 minutes)
-setInterval(() => {
+// Use unref() to prevent the interval from keeping the process alive
+const cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of rateLimitStore.entries()) {
         if (now - entry.firstAttempt > 60 * 60 * 1000) {
@@ -139,6 +146,11 @@ setInterval(() => {
         }
     }
 }, 5 * 60 * 1000);
+
+// Prevent this interval from blocking Node.js process shutdown
+if (cleanupInterval && typeof cleanupInterval.unref === 'function') {
+    cleanupInterval.unref();
+}
 
 // ============================================
 // Main Rate Limit Functions

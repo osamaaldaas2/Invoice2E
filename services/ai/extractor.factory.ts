@@ -3,8 +3,9 @@ import { AppError } from '@/lib/errors';
 import { IAIExtractor } from './IAIExtractor';
 import { GeminiExtractor } from './gemini.extractor';
 import { DeepSeekExtractor } from './deepseek.extractor';
+import { OpenAIExtractor } from './openai.extractor';
 
-export type AIProvider = 'gemini' | 'deepseek' | 'aws';
+export type AIProvider = 'gemini' | 'deepseek' | 'openai' | 'aws';
 
 export class ExtractorFactory {
   private static instances: Map<AIProvider, IAIExtractor> = new Map();
@@ -30,6 +31,10 @@ export class ExtractorFactory {
 
       case 'deepseek':
         extractor = new DeepSeekExtractor();
+        break;
+
+      case 'openai':
+        extractor = new OpenAIExtractor();
         break;
 
       case 'aws':
@@ -64,7 +69,7 @@ export class ExtractorFactory {
   }
 
   static getAvailableProviders(): AIProvider[] {
-    return ['gemini', 'deepseek'];
+    return ['gemini', 'deepseek', 'openai'];
   }
 
   static clear(): void {

@@ -3,8 +3,16 @@ import { BOUNDARY_DETECTION_PROMPT } from '@/lib/boundary-detection-prompt';
 import { MAX_PAGES_FOR_BOUNDARY_DETECTION } from '@/lib/constants';
 import { ExtractionError } from '@/lib/errors';
 import { pdfSplitterService } from './pdf-splitter.service';
-import { geminiAdapter } from '@/adapters/gemini.adapter';
+import { GeminiAdapter } from '@/adapters/gemini.adapter';
 import { deepseekAdapter } from '@/adapters/deepseek.adapter';
+import { openaiAdapter } from '@/adapters/openai.adapter';
+
+// Dedicated adapter for boundary detection — uses GEMINI_BOUNDARY_MODEL (defaults to gemini-2.5-flash)
+// so boundary detection stays accurate even when extraction uses a cheaper/faster model.
+const boundaryGeminiAdapter = new GeminiAdapter({
+  model: process.env.GEMINI_BOUNDARY_MODEL ?? 'gemini-2.5-flash',
+  enableThinking: true,
+});
 
 export interface InvoiceBoundary {
   invoiceIndex: number;
@@ -61,7 +69,14 @@ export class BoundaryDetectionService {
 
     // Pick the adapter (same as extraction)
     const aiProvider = process.env.AI_PROVIDER || 'gemini';
-    const adapter = aiProvider === 'gemini' ? geminiAdapter : deepseekAdapter;
+    let adapter;
+    if (aiProvider === 'openai') {
+      adapter = openaiAdapter;
+    } else if (aiProvider === 'gemini') {
+      adapter = boundaryGeminiAdapter;
+    } else {
+      adapter = deepseekAdapter;
+    }
 
     try {
       logger.info('Starting boundary detection', { pageCount, provider: aiProvider });

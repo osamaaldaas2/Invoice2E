@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripeAdapter } from '@/adapters/stripe.adapter';
 import { paypalAdapter } from '@/adapters/paypal.adapter';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { getSessionFromCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const supabase = createServerClient();
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const supabase = await createUserScopedClient(user.id);
         let verified = false;
         let credits = 0;
         let paymentId = '';
@@ -73,8 +74,16 @@ export async function POST(req: NextRequest) {
                 });
 
                 if (session.payment_status === 'paid' && session.metadata?.credits) {
+                    const parsedCredits = parseInt(session.metadata.credits, 10);
+                    if (!Number.isFinite(parsedCredits) || parsedCredits <= 0) {
+                        logger.error('Invalid credits value in Stripe session metadata', {
+                            sessionId,
+                            rawCredits: session.metadata.credits,
+                        });
+                        throw new ValidationError('Invalid credits value in payment session');
+                    }
                     verified = true;
-                    credits = parseInt(session.metadata.credits, 10);
+                    credits = parsedCredits;
                     // Use paymentIntentId if available, otherwise fallback to session ID
                     // But for lookup, we MUST use what we stored.
                     // create-checkout stores session.id as stripe_session_id

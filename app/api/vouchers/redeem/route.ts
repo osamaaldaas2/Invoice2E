@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 const RedeemSchema = z.object({
-    code: z.string().min(3),
+    code: z.string().min(3).max(100),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -33,9 +33,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const validated = RedeemSchema.parse(body);
         const normalizedCode = validated.code.trim().toUpperCase();
 
-        const supabase = createServerClient();
+        // P0-2: Create user-scoped client for RLS-based data isolation
+        const userClient = await createUserScopedClient(user.id);
 
-        const { data, error } = await supabase.rpc('redeem_voucher', {
+        const { data, error } = await userClient.rpc('redeem_voucher', {
             p_user_id: user.id,
             p_code: normalizedCode,
         });

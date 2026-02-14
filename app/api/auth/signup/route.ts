@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-helpers';
 import { logger } from '@/lib/logger';
 import { LOCALE_COOKIE_NAME, DEFAULT_LOCALE } from '@/lib/constants';
 import { setSessionCookie } from '@/lib/session';
+import { setCsrfCookie } from '@/lib/csrf';
 import { SignupSchema } from '@/lib/validators';
 import { authService } from '@/services/auth.service';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
@@ -37,6 +38,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Set session cookie so backend recognizes the new user as logged in
         await setSessionCookie(user);
+
+        // Set CSRF token cookie for double-submit pattern
+        await setCsrfCookie();
 
         // Set locale cookie to English for new signups
         const cookieStore = await cookies();

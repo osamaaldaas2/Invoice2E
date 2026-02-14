@@ -17,6 +17,109 @@ import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
 import { Button } from '@/components/ui/button';
 import InvoiceReviewForm from './invoice-review/InvoiceReviewForm';
 
+const APPLYABLE_FIELDS = [
+  { key: 'sellerName', label: 'Seller Name' },
+  { key: 'sellerEmail', label: 'Seller Email (BT-34)' },
+  { key: 'sellerPhone', label: 'Seller Phone' },
+  { key: 'sellerStreet', label: 'Seller Street' },
+  { key: 'sellerCity', label: 'Seller City' },
+  { key: 'sellerPostalCode', label: 'Seller Postal Code' },
+  { key: 'sellerCountryCode', label: 'Seller Country Code' },
+  { key: 'sellerTaxId', label: 'Seller Tax ID' },
+  { key: 'sellerVatId', label: 'Seller VAT ID' },
+  { key: 'sellerIban', label: 'Seller IBAN' },
+  { key: 'sellerBic', label: 'Seller BIC' },
+  { key: 'buyerName', label: 'Buyer Name' },
+  { key: 'buyerEmail', label: 'Buyer Email (BT-49)' },
+  { key: 'buyerStreet', label: 'Buyer Street' },
+  { key: 'buyerCity', label: 'Buyer City' },
+  { key: 'buyerPostalCode', label: 'Buyer Postal Code' },
+  { key: 'buyerCountryCode', label: 'Buyer Country Code' },
+  { key: 'buyerTaxId', label: 'Buyer Tax ID' },
+  { key: 'buyerReference', label: 'Buyer Reference (BR-DE-15)' },
+  { key: 'paymentTerms', label: 'Payment Terms' },
+  { key: 'currency', label: 'Currency' },
+];
+
+function DashboardApplyToAll({ extractionIds, onApplied, onClose }: {
+  extractionIds: string[];
+  onApplied: () => void;
+  onClose: () => void;
+}) {
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const isApplyingRef = useRef(false);
+
+  const handleApply = async () => {
+    if (isApplyingRef.current) return;
+    const filledFields = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v.trim())
+    );
+    if (Object.keys(filledFields).length === 0) return;
+
+    isApplyingRef.current = true;
+    setApplying(true);
+    try {
+      const res = await fetch('/api/invoices/batch-apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extractionIds, fields: filledFields }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setResult(`Error: ${errorData.error || res.statusText}`);
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        setResult(`✅ Updated ${data.data.updated} invoices (${data.data.skipped} already had values)`);
+        setTimeout(() => { onApplied(); }, 1500);
+      } else {
+        setResult(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      setResult(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setApplying(false);
+      isApplyingRef.current = false;
+    }
+  };
+
+  return (
+    <div className="p-4 glass-panel border border-sky-400/20 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-sky-200">Apply to All Invoices (only fills missing fields)</h4>
+        <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">Close</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {APPLYABLE_FIELDS.map(({ key, label }) => (
+          <div key={key} className="flex flex-col gap-0.5">
+            <label className="text-[11px] text-slate-400">{label}</label>
+            <input
+              type="text"
+              value={fields[key] || ''}
+              onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))}
+              placeholder={`Enter ${label.toLowerCase()}`}
+              className="px-2 py-1 text-xs bg-white/5 border border-white/10 rounded text-white placeholder:text-slate-600 focus:border-sky-400/50 focus:outline-none"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleApply}
+          disabled={applying || Object.values(fields).every((v) => !v.trim())}
+          className="px-4 py-1.5 text-xs font-medium rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-100 hover:bg-sky-500/30 disabled:opacity-40"
+        >
+          {applying ? 'Applying...' : 'Apply to All'}
+        </button>
+        {result && <span className="text-xs text-sky-300">{result}</span>}
+      </div>
+    </div>
+  );
+}
+
 type UploadState =
   | 'idle'
   | 'uploading'
@@ -39,6 +142,7 @@ type MultiInvoiceResult = {
     label: string;
     confidence: number;
     status?: 'success' | 'failed' | 'pending';
+    errorMessage?: string;
   }[];
 };
 
@@ -73,6 +177,8 @@ export default function FileUploadForm({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [extractionCache, setExtractionCache] = useState<Record<string, any>>({});
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [validationResults, setValidationResults] = useState<Record<string, { valid: boolean; errors: string[] }>>({});
+  const [showApplyAll, setShowApplyAll] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,12 +232,15 @@ export default function FileUploadForm({
                 extractionId?: string;
                 confidenceScore?: number;
                 status: string;
+                error?: string;
+                errorMessage?: string;
               };
               const extractions = results.map((r: PollResult, idx: number) => ({
                 extractionId: r.extractionId || '',
                 label: r.filename || `Invoice ${idx + 1}`,
                 confidence: r.confidenceScore || 0,
                 status: r.status as 'success' | 'failed' | 'pending',
+                errorMessage: r.errorMessage || r.error || undefined,
               }));
               setMultiResult({
                 totalInvoices: total,
@@ -214,6 +323,33 @@ export default function FileUploadForm({
       sessionStorage.setItem('reviewedExtractionIds', JSON.stringify([...reviewedIds]));
     }
   }, [reviewedIds]);
+
+  // Auto-validate after multi-invoice extraction completes (success or error with results)
+  useEffect(() => {
+    if (!multiResult || (state !== 'success' && state !== 'error')) return;
+    if (Object.keys(validationResults).length > 0) return; // already fetched
+    const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
+    if (extractionIds.length === 0) return;
+
+    fetch('/api/invoices/batch-validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ extractionIds }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const results = data?.data?.results || data?.results;
+        if (results) {
+          const vMap: Record<string, { valid: boolean; errors: string[] }> = {};
+          results.forEach((r: { extractionId: string; valid: boolean; errors?: string[] }) => {
+            vMap[r.extractionId] = { valid: r.valid, errors: r.errors || [] };
+          });
+          setValidationResults(vMap);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, multiResult]);
 
   const loadExtraction = useCallback(
     async (extractionId: string) => {
@@ -405,6 +541,8 @@ export default function FileUploadForm({
     setExpandedId(null);
     setExtractionCache({});
     setReviewedIds(new Set());
+    setValidationResults({});
+    setShowApplyAll(false);
     setProgress(0);
     setBackgroundJobId(null);
     setBackgroundProgress(0);
@@ -423,9 +561,20 @@ export default function FileUploadForm({
 
     if (extractionIds.length === 0) return;
 
-    setState('downloading');
+    // Block download if any invoices have validation errors
+    const hasValidation = Object.keys(validationResults).length > 0;
+    if (hasValidation) {
+      const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
+      if (invalidCount > 0) {
+        setError(t('fixErrorsBeforeDownload', { count: invalidCount }));
+        setState('error');
+        return;
+      }
+    }
+
     setIsDownloading(true);
     try {
+      setState('downloading');
       const response = await fetch('/api/invoices/batch-download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -458,7 +607,7 @@ export default function FileUploadForm({
       setState('error');
       setIsDownloading(false);
     }
-  }, [multiResult, resetForm]);
+  }, [multiResult, resetForm, t, validationResults]);
 
   const getStatusIcon = () => {
     if (!hasCredits) return '🔒';
@@ -553,7 +702,7 @@ export default function FileUploadForm({
                 state === 'downloading'
                   ? t('generatingZip')
                   : backgroundJobId
-                    ? `Processing ${backgroundTotal} invoices... ${backgroundProgress}%`
+                    ? t('processingInvoices', { count: backgroundTotal, progress: backgroundProgress })
                     : state === 'uploading'
                       ? t('uploading')
                       : t('aiExtracting')
@@ -595,11 +744,24 @@ export default function FileUploadForm({
 
       {isProcessing && state !== 'downloading' && (
         <div className="mt-4">
-          <div className="w-full bg-white/10 rounded-full h-2.5">
-            <div
-              className="bg-gradient-to-r from-emerald-400 to-green-500 h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${backgroundJobId ? backgroundProgress : progress}%` }}
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-white/10 rounded-full h-2.5">
+              <div
+                className="bg-gradient-to-r from-emerald-400 to-green-500 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${backgroundJobId ? backgroundProgress : progress}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                stopPolling();
+                abortRef.current?.abort();
+                resetForm();
+              }}
+              className="px-3 py-1 text-xs rounded-full border border-white/15 text-slate-300 hover:bg-white/10 transition-colors"
+            >
+              {tCommon('cancel')}
+            </button>
           </div>
         </div>
       )}
@@ -639,13 +801,18 @@ export default function FileUploadForm({
                       {Math.round(ext.confidence * 100)}%
                     </span>
                   )}
+                  {ext.status === 'failed' && ext.errorMessage && (
+                    <span className="text-xs text-rose-300/70 ml-auto flex-shrink-0 truncate max-w-[150px]" title={ext.errorMessage}>
+                      {ext.errorMessage}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-      {state === 'error' && (
+      {state === 'error' && !multiResult && (
         <div className="mt-4 p-4 glass-panel border border-rose-400/30 rounded-xl">
           <p className="text-rose-200 font-medium">❌ {error}</p>
           <div className="flex gap-3 mt-3">
@@ -660,6 +827,187 @@ export default function FileUploadForm({
             )}
             <Button variant="outline" size="sm" onClick={resetForm}>
               {t('uploadDifferentFile')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Error state WITH multi-result: show error + extraction list with validation status */}
+      {state === 'error' && multiResult && (
+        <div className="mt-4 space-y-3">
+          <div className="p-4 glass-panel border border-rose-400/30 rounded-xl">
+            <p className="text-rose-200 font-medium">❌ {error}</p>
+            <p className="text-sm text-faded mt-1">{t('reviewFixAndRetry')}</p>
+          </div>
+          <div className="p-4 glass-panel border border-white/10 rounded-xl">
+            <p className="text-sm text-faded mb-3">
+              {t('invoicesDetected', { count: multiResult.totalInvoices })}
+            </p>
+            {/* Validation summary + Apply to All for error state */}
+            {Object.keys(validationResults).length > 0 && (() => {
+              const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
+              const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
+              if (invalidCount > 0) {
+                return (
+                  <div className="mb-3 space-y-2">
+                    <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-amber-200">
+                          <strong>{invalidCount}</strong> invoices have errors — fix individually or use Apply to All.
+                        </span>
+                        <button
+                          onClick={() => setShowApplyAll(!showApplyAll)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
+                        >
+                          {showApplyAll ? t('collapse') : t('applyToAll')}
+                        </button>
+                      </div>
+                    </div>
+                    {showApplyAll && (
+                      <DashboardApplyToAll
+                        extractionIds={extractionIds}
+                        onApplied={() => {
+                          setShowApplyAll(false);
+                          setValidationResults({});
+                        }}
+                        onClose={() => setShowApplyAll(false)}
+                      />
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            <div className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}>
+              {multiResult.extractions.map((ext, idx) => {
+                const vr = ext.extractionId ? validationResults[ext.extractionId] : null;
+                return (
+                <div key={ext.extractionId || idx}>
+                  <div className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
+                    ext.status === 'failed' ? 'border border-rose-400/30' :
+                    vr && !vr.valid ? 'border border-amber-400/30' :
+                    vr?.valid ? 'border border-emerald-400/20' : 'border border-white/5'
+                  }`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ext.status === 'failed' ? (
+                        <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
+                      ) : vr && !vr.valid ? (
+                        <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
+                      ) : vr?.valid ? (
+                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                      ) : reviewedIds.has(ext.extractionId) ? (
+                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                      ) : null}
+                      <span className="text-sm font-medium text-white truncate">
+                        {ext.label || `Invoice ${idx + 1}`}
+                      </span>
+                      {ext.confidence > 0 && (
+                        <span className="text-xs text-faded flex-shrink-0">
+                          {Math.round(ext.confidence * 100)}%
+                        </span>
+                      )}
+                      {vr && !vr.valid && (
+                        <span className="text-xs text-amber-300/80 flex-shrink-0">
+                          ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                        </span>
+                      )}
+                      {vr?.valid && (
+                        <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
+                      )}
+                    </div>
+                    {ext.extractionId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (expandedId === ext.extractionId) {
+                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                            setExpandedId(null);
+                          } else {
+                            setExpandedId(ext.extractionId);
+                            loadExtraction(ext.extractionId);
+                          }
+                        }}
+                        className={
+                          vr && !vr.valid
+                            ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                            : reviewedIds.has(ext.extractionId)
+                              ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                              : 'bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+                        }
+                      >
+                        {vr && !vr.valid
+                          ? t('fixErrors')
+                          : reviewedIds.has(ext.extractionId)
+                            ? t('reviewed')
+                            : expandedId === ext.extractionId
+                              ? t('collapse')
+                              : t('reviewAndEdit')}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-rose-300" title={ext.errorMessage}>
+                        {ext.errorMessage || t('extractionFailed')}
+                      </span>
+                    )}
+                  </div>
+                  {/* Show validation errors inline */}
+                  {vr && !vr.valid && expandedId !== ext.extractionId && (
+                    <div className="ml-6 mt-1 space-y-0.5">
+                      {vr.errors.slice(0, 3).map((err, i) => (
+                        <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>{err}</p>
+                      ))}
+                      {vr.errors.length > 3 && (
+                        <p className="text-[11px] text-amber-400/50">+{vr.errors.length - 3} more</p>
+                      )}
+                    </div>
+                  )}
+                  {expandedId === ext.extractionId && (
+                    <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
+                      {extractionCache[ext.extractionId] ? (
+                        <InvoiceReviewForm
+                          extractionId={ext.extractionId}
+                          userId={userId || ''}
+                          initialData={
+                            extractionCache[ext.extractionId].extractionData ||
+                            extractionCache[ext.extractionId]
+                          }
+                          confidence={
+                            extractionCache[ext.extractionId].confidenceScore || ext.confidence || 0
+                          }
+                          compact
+                          onSubmitSuccess={() => {
+                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                            setExpandedId(null);
+                            // Re-validate after fix
+                            setValidationResults({});
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
+                          <span className="ml-3 text-sm text-faded">{t('loading') || 'Loading...'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setValidationResults({}); setState('success'); }}
+              className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors"
+            >
+              {t('retryDownload')}
+            </button>
+            <Button variant="outline" onClick={() => router.push('/dashboard/history')}>
+              {t('viewInHistory')}
+            </Button>
+            <Button variant="outline" onClick={resetForm}>
+              {t('newUpload')}
             </Button>
           </div>
         </div>
@@ -709,17 +1057,75 @@ export default function FileUploadForm({
                 </p>
               );
             })()}
+          {/* Validation summary banner */}
+          {Object.keys(validationResults).length > 0 && (() => {
+            const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
+            const totalValidated = Object.keys(validationResults).length;
+            const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
+            if (invalidCount > 0) {
+              return (
+                <div className="mb-3 space-y-2">
+                  <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400">⚠</span>
+                        <span className="text-sm text-amber-200">
+                          <strong>{invalidCount}</strong> of {totalValidated} invoices have validation errors.
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowApplyAll(!showApplyAll)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
+                      >
+                        {showApplyAll ? t('collapse') : t('applyToAll')}
+                      </button>
+                    </div>
+                  </div>
+                  {showApplyAll && (
+                    <DashboardApplyToAll
+                      extractionIds={extractionIds}
+                      onApplied={() => {
+                        setShowApplyAll(false);
+                        setValidationResults({});
+                      }}
+                      onClose={() => setShowApplyAll(false)}
+                    />
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div className="mb-3 p-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span>
+                  <span className="text-sm text-emerald-200">All {totalValidated} invoices passed validation.</span>
+                </div>
+              </div>
+            );
+          })()}
           <div
             ref={listScrollRef}
             className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}
           >
-            {multiResult.extractions.map((ext, idx) => (
+            {multiResult.extractions.map((ext, idx) => {
+              const vr = ext.extractionId ? validationResults[ext.extractionId] : null;
+              return (
               <div key={ext.extractionId || idx}>
-                <div className="flex items-center justify-between glass-panel p-2.5 rounded-lg">
+                <div className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
+                  ext.status === 'failed' ? 'border border-rose-400/30' :
+                  vr && !vr.valid ? 'border border-amber-400/30' :
+                  vr?.valid ? 'border border-emerald-400/20' : ''
+                }`}>
                   <div className="flex items-center gap-2 min-w-0">
-                    {reviewedIds.has(ext.extractionId) && (
-                      <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
-                    )}
+                    {ext.status === 'failed' ? (
+                      <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
+                    ) : vr && !vr.valid ? (
+                      <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
+                    ) : vr?.valid ? (
+                      <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                    ) : reviewedIds.has(ext.extractionId) ? (
+                      <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                    ) : null}
                     <span className="text-sm font-medium text-white truncate">
                       {ext.label || `Invoice ${idx + 1}`}
                     </span>
@@ -727,6 +1133,14 @@ export default function FileUploadForm({
                       <span className="text-xs text-faded flex-shrink-0">
                         {Math.round(ext.confidence * 100)}%
                       </span>
+                    )}
+                    {vr && !vr.valid && (
+                      <span className="text-xs text-amber-300/80 flex-shrink-0">
+                        ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                      </span>
+                    )}
+                    {vr?.valid && (
+                      <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
                     )}
                   </div>
                   {ext.extractionId ? (
@@ -738,14 +1152,12 @@ export default function FileUploadForm({
                         if (isCollapsing) {
                           setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
                           setExpandedId(null);
-                          // Restore scroll position after collapse renders
                           requestAnimationFrame(() => {
                             if (listScrollRef.current) {
                               listScrollRef.current.scrollTop = savedScrollPos.current;
                             }
                           });
                         } else {
-                          // Save scroll position before expanding
                           if (listScrollRef.current) {
                             savedScrollPos.current = listScrollRef.current.scrollTop;
                           }
@@ -754,23 +1166,40 @@ export default function FileUploadForm({
                         }
                       }}
                       className={
-                        reviewedIds.has(ext.extractionId)
-                          ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
-                          : expandedId === ext.extractionId
-                            ? 'bg-white/10 text-slate-200 hover:bg-white/15'
-                            : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                        vr && !vr.valid
+                          ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                          : reviewedIds.has(ext.extractionId)
+                            ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                            : expandedId === ext.extractionId
+                              ? 'bg-white/10 text-slate-200 hover:bg-white/15'
+                              : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
                       }
                     >
-                      {reviewedIds.has(ext.extractionId)
-                        ? t('reviewed')
-                        : expandedId === ext.extractionId
-                          ? t('collapse')
-                          : t('reviewAndEdit')}
+                      {vr && !vr.valid
+                        ? t('fixErrors')
+                        : reviewedIds.has(ext.extractionId)
+                          ? t('reviewed')
+                          : expandedId === ext.extractionId
+                            ? t('collapse')
+                            : t('reviewAndEdit')}
                     </Button>
                   ) : (
-                    <span className="text-xs text-rose-300">{tCommon('error')}</span>
+                    <span className="text-xs text-rose-300" title={ext.errorMessage}>
+                      {ext.errorMessage || tCommon('error')}
+                    </span>
                   )}
                 </div>
+                {/* Show validation errors inline when not expanded */}
+                {vr && !vr.valid && expandedId !== ext.extractionId && (
+                  <div className="ml-6 mt-1 space-y-0.5">
+                    {vr.errors.slice(0, 3).map((err, i) => (
+                      <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>{err}</p>
+                    ))}
+                    {vr.errors.length > 3 && (
+                      <p className="text-[11px] text-amber-400/50">+{vr.errors.length - 3} more</p>
+                    )}
+                  </div>
+                )}
                 {expandedId === ext.extractionId && (
                   <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
                     {extractionCache[ext.extractionId] ? (
@@ -788,6 +1217,8 @@ export default function FileUploadForm({
                         onSubmitSuccess={() => {
                           setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
                           setExpandedId(null);
+                          // Re-validate after fix
+                          setValidationResults({});
                           requestAnimationFrame(() => {
                             if (listScrollRef.current) {
                               listScrollRef.current.scrollTop = savedScrollPos.current;
@@ -804,18 +1235,45 @@ export default function FileUploadForm({
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
+          {/* Summary of failed extractions */}
+          {(() => {
+            const failedCount = multiResult.extractions.filter((e) => e.status === 'failed').length;
+            const successCount = multiResult.extractions.filter((e) => e.extractionId).length;
+            if (failedCount > 0) {
+              return (
+                <div className="mt-3 p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                  <p className="text-sm text-amber-200">
+                    ⚠️ {failedCount} of {multiResult.totalInvoices} invoices failed extraction.
+                    {successCount > 0 && ` ${successCount} successful invoices can be downloaded.`}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <div className="flex gap-2 mt-4">
-            <button
-              type="button"
-              onClick={handleDownloadZip}
-              disabled={isDownloading}
-              className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors disabled:opacity-50"
-            >
-              {isDownloading ? t('generatingZip') : t('downloadAllZip')}
-            </button>
-            <Button variant="outline" onClick={resetForm}>
+            {(() => {
+              const successCount = multiResult.extractions.filter((e) => e.extractionId).length;
+              return successCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleDownloadZip}
+                  disabled={isDownloading}
+                  className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors disabled:opacity-50"
+                >
+                  {isDownloading ? t('generatingZip') : `${t('downloadAllZip')} (${successCount})`}
+                </button>
+              ) : null;
+            })()}
+            <Button variant="outline" onClick={() => router.push('/dashboard/history')}>
+              {tCommon('viewHistory') || 'View in History'}
+            </Button>
+            <Button variant="outline" onClick={() => {
+              if (window.confirm(t('confirmNewUpload'))) resetForm();
+            }}>
               {t('newUpload')}
             </Button>
           </div>

@@ -70,13 +70,50 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
     );
   }
 
-  // BR-DE-11: Buyer country code is required
+  // BR-DE-6: Buyer address street is required
+  if (!data.buyerAddress?.trim()) {
+    errors.push(
+      createError(
+        'BR-DE-6',
+        'invoice.buyer.address',
+        'Buyer street address is required for XRechnung (BR-DE-6)',
+        { suggestion: 'Provide the buyer street address (e.g. "Musterstraße 1")' }
+      )
+    );
+  }
+
+  // BR-DE-7: Buyer city is required
+  if (!data.buyerCity?.trim()) {
+    errors.push(
+      createError(
+        'BR-DE-7',
+        'invoice.buyer.city',
+        'Buyer city is required for XRechnung (BR-DE-7)',
+        { suggestion: 'Provide the buyer city name (e.g. "Berlin")' }
+      )
+    );
+  }
+
+  // BR-DE-8: Buyer postal code is required
+  if (!data.buyerPostalCode?.trim()) {
+    errors.push(
+      createError(
+        'BR-DE-8',
+        'invoice.buyer.postalCode',
+        'Buyer postal code is required for XRechnung (BR-DE-8)',
+        { suggestion: 'Provide the buyer postal code (e.g. "10115")' }
+      )
+    );
+  }
+
+  // BR-DE-9/11: Buyer country code is required
   if (!data.buyerCountryCode?.trim()) {
     errors.push(
       createError(
         'BR-DE-11',
         'invoice.buyer.countryCode',
-        'Buyer country code is required (BR-DE-11)'
+        'Buyer country code is required (BR-DE-11)',
+        { suggestion: 'Provide a 2-letter country code (e.g. "DE" for Germany)' }
       )
     );
   }
@@ -96,8 +133,46 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
     );
   }
 
-  // BR-DE-17: Payment means type code must be an accepted value
-  // (Validated during XML generation; skip here as we derive from IBAN presence)
+  // BR-CO-26 / BR-S-02 / BR-DE-16: Seller tax identifier is required
+  // When VAT category S/Z/E/AE/K/G/L/M is used, at least one of:
+  //   - Seller VAT Identifier (BT-31)
+  //   - Seller tax registration identifier (BT-32)
+  //   - Seller tax representative VAT identifier (BT-63)
+  // must be present.
+  const hasSellerVatId = !!(data.sellerVatId?.trim());
+  const hasSellerTaxNumber = !!(data.sellerTaxNumber?.trim());
+  const hasSellerTaxId = !!(data.sellerTaxId?.trim());
+  const hasAnySellerTaxIdentifier = hasSellerVatId || hasSellerTaxNumber || hasSellerTaxId;
+
+  if (!hasAnySellerTaxIdentifier) {
+    errors.push(
+      createError(
+        'BR-CO-26',
+        'invoice.seller.taxIdentifier',
+        'At least one seller tax identifier is required: VAT ID (BT-31), tax registration number (BT-32), or tax representative VAT ID (BT-63) (BR-CO-26 / BR-S-02 / BR-DE-16)',
+        {
+          suggestion: 'Provide either the seller USt-IdNr. (e.g. "DE123456789") or Steuernummer (e.g. "12/345/67890")',
+        }
+      )
+    );
+  }
+
+  // BR-DE-18: Invoice currency must be EUR for XRechnung
+  const currency = data.currency?.toString().toUpperCase().trim() || 'EUR';
+  if (currency !== 'EUR') {
+    errors.push(
+      createError(
+        'BR-DE-18',
+        'invoice.currency',
+        `XRechnung requires EUR as the invoice currency (BR-DE-18). Current currency: "${currency}"`,
+        { suggestion: 'Change the invoice currency to EUR (Euro)', expected: 'EUR', actual: currency }
+      )
+    );
+  }
+
+  // BR-DE-13/19: Payment means type code must be from allowed set
+  // Allowed codes: 10, 30, 48, 49, 57, 58, 59, 97
+  // (Further validated during XML generation based on IBAN presence)
 
   // BR-DE-23-a: When payment means is 58 (SEPA CT), IBAN is MANDATORY
   const iban = data.sellerIban?.trim();
@@ -134,6 +209,19 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
         'invoice.seller.electronicAddress',
         'Seller electronic address (BT-34) is required for XRechnung',
         { suggestion: 'Provide seller electronic address (e.g. email)' }
+      )
+    );
+  }
+
+  // BG-3 / BT-25: Preceding invoice reference is MANDATORY for credit notes (TypeCode 381)
+  const docType = data.documentTypeCode ?? 380;
+  if (docType === 381 && !data.precedingInvoiceReference?.trim()) {
+    errors.push(
+      createError(
+        'BR-55',
+        'invoice.precedingInvoiceReference',
+        'Credit notes (TypeCode 381) must include a preceding invoice reference (BT-25)',
+        { suggestion: 'Provide the original invoice number that this credit note relates to' }
       )
     );
   }

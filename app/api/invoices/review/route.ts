@@ -4,10 +4,16 @@ import { reviewService } from '@/services/review.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
+import { requireCsrfToken } from '@/lib/csrf';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // CSRF protection
+    const csrfError = await requireCsrfToken(request);
+    if (csrfError) return csrfError as NextResponse;
+
     // SECURITY FIX (BUG-002): Authenticate user from session, not request body
     const user = await getAuthenticatedUser(request);
     if (!user) {
@@ -34,6 +40,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const userId = user.id; // SECURE: From authenticated session only
 
+    // F3: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(userId);
+
     const body = await request.json();
     const { extractionId, reviewedData } = body;
     // REMOVED: userId from body destructuring - Security vulnerability
@@ -45,8 +54,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Get original extraction
-    const extraction = await invoiceDbService.getExtractionById(extractionId);
+    // Get original extraction with user-scoped client (RLS enforced)
+    const extraction = await invoiceDbService.getExtractionById(extractionId, userClient);
 
     // SECURITY FIX: Verify ownership using authenticated session user ID
     if (extraction.userId !== userId) {
@@ -70,28 +79,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       _originalExtraction: extractionData,
     };
 
-    // Persist reviewed data back to extraction for resume/download flow
+    // Persist reviewed data back to extraction for resume/download flow (RLS enforced)
     await invoiceDbService.updateExtraction(extractionId, {
       extractionData: persistData,
-    });
+    }, userClient);
 
-    // Create or update conversion record
-    const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId);
+    // Create or update conversion record (RLS enforced)
+    const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
     const conversion = existingConversion
       ? await invoiceDbService.updateConversion(existingConversion.id, {
           invoiceNumber: reviewedData.invoiceNumber,
           buyerName: reviewedData.buyerName,
-          conversionFormat: 'xrechnung',
+          conversionFormat: 'XRechnung',
           conversionStatus: 'draft',
-        })
+        }, userClient)
       : await invoiceDbService.createConversion({
           userId,
           extractionId,
           invoiceNumber: reviewedData.invoiceNumber,
           buyerName: reviewedData.buyerName,
-          conversionFormat: 'xrechnung',
+          conversionFormat: 'XRechnung',
           conversionStatus: 'draft',
-        });
+        }, userClient);
 
     logger.info('Invoice review completed', {
       extractionId,

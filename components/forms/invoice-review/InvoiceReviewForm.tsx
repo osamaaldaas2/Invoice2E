@@ -7,6 +7,7 @@ import { BuyerInfoSection } from './BuyerInfoSection';
 import { LineItemsSection } from './LineItemsSection';
 import { PaymentSection } from './PaymentSection';
 import { TotalsSection } from './TotalsSection';
+import { AllowancesChargesSection } from './AllowancesChargesSection';
 import { ReadinessPanel } from './ReadinessPanel';
 
 interface InvoiceReviewFormProps {
@@ -38,6 +39,7 @@ export default function InvoiceReviewForm({
   compact,
 }: InvoiceReviewFormProps) {
   const t = useTranslations('invoiceReview');
+  const tCommon = useTranslations('common');
   const { form, onSubmit, isSubmitting, submitError, submitSuccess } = useInvoiceReviewForm({
     extractionId,
     userId,
@@ -115,6 +117,10 @@ export default function InvoiceReviewForm({
       </div>
 
       <div className="border-t border-white/10 pt-4">
+        <AllowancesChargesSection register={register} control={control} errors={errors} />
+      </div>
+
+      <div className="border-t border-white/10 pt-4">
         <PaymentSection register={register} errors={errors} />
       </div>
 
@@ -136,8 +142,15 @@ export default function InvoiceReviewForm({
       </div>
 
       {submitError && (
-        <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200">
-          {submitError}
+        <div className="p-3 glass-panel border border-rose-400/30 rounded-xl flex items-center justify-between gap-3">
+          <span className="text-rose-200">❌ {submitError}</span>
+          <button
+            type="button"
+            onClick={onSubmit}
+            className="px-3 py-1.5 bg-sky-500/20 text-sky-200 border border-sky-400/30 rounded-full text-sm font-semibold hover:bg-sky-500/30 transition-colors flex-shrink-0"
+          >
+            🔄 {tCommon('retry')}
+          </button>
         </div>
       )}
 

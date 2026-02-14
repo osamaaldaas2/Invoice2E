@@ -3,6 +3,7 @@ import { invoiceDbService } from '@/services/invoice.db.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
+import { createUserScopedClient } from '@/lib/supabase.server';
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -19,8 +20,11 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
       );
     }
 
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+
     const { id } = await params;
-    const extraction = await invoiceDbService.getExtractionById(id);
+    const extraction = await invoiceDbService.getExtractionById(id, userClient);
 
     // SECURITY FIX (BUG-015): Add ownership verification
     if (extraction.userId !== user.id) {

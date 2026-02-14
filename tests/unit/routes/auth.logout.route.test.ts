@@ -14,6 +14,10 @@ const loggerMock = vi.hoisted(() => ({
 
 vi.mock('@/lib/session', () => sessionMock);
 
+vi.mock('@/lib/csrf', () => ({
+    clearCsrfCookie: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: loggerMock,
 }));

@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { z } from 'zod';
 
 const BulkReviewItemSchema = z.object({
@@ -55,9 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const parsed = BulkReviewSchema.parse(body);
     const results: BulkReviewResult[] = [];
 
+    // P0-2: Create user-scoped client for RLS-based data isolation
+    const userClient = await createUserScopedClient(user.id);
+
     for (const item of parsed.items) {
       try {
-        const extraction = await invoiceDbService.getExtractionById(item.extractionId);
+        const extraction = await invoiceDbService.getExtractionById(item.extractionId, userClient);
         if (extraction.userId !== user.id) {
           results.push({
             extractionId: item.extractionId,
@@ -84,29 +87,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         await invoiceDbService.updateExtraction(item.extractionId, {
           extractionData: persistData,
-        });
+        }, userClient);
 
         const invoiceNumber = String(reviewedData.invoiceNumber || '');
         const buyerName = String(reviewedData.buyerName || '');
 
         const existingConversion = await invoiceDbService.getConversionByExtractionId(
-          item.extractionId
+          item.extractionId,
+          userClient
         );
         const conversion = existingConversion
           ? await invoiceDbService.updateConversion(existingConversion.id, {
               invoiceNumber,
               buyerName,
-              conversionFormat: 'xrechnung',
+              conversionFormat: 'XRechnung',
               conversionStatus: 'draft',
-            })
+            }, userClient)
           : await invoiceDbService.createConversion({
               userId: user.id,
               extractionId: item.extractionId,
               invoiceNumber,
               buyerName,
-              conversionFormat: 'xrechnung',
+              conversionFormat: 'XRechnung',
               conversionStatus: 'draft',
-            });
+            }, userClient);
 
         results.push({
           extractionId: item.extractionId,
@@ -128,7 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const reviewedExtractionIds = new Set(
           results.filter((r) => r.success).map((r) => r.extractionId)
         );
-        const supabase = createServerClient();
+        const supabase = userClient;
         const { data: batchJob } = await supabase
           .from('batch_jobs')
           .select('results, updated_at')

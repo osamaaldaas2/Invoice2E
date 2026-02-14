@@ -7,6 +7,7 @@
 import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
 import { validateBusinessRules } from './business-rules';
 import { validateXRechnungRules } from './xrechnung-rules';
+import { validateCodelists } from './codelist-validator';
 import {
   buildValidationResult,
   createError,
@@ -65,13 +66,16 @@ export function validateForXRechnung(data: XRechnungInvoiceData): ValidationResu
   // Stage 1: Schema validation
   allEntries.push(...validateSchema(data));
 
-  // Stage 2: Business rules (BR-CO monetary cross-checks)
+  // Stage 2: Codelist validation (document type, currency, country, tax category, unit codes)
+  allEntries.push(...validateCodelists(data));
+
+  // Stage 3: Business rules (BR-CO monetary cross-checks)
   // Only run if schema basics pass (need line items and totals)
   if (Array.isArray(data.lineItems) && data.lineItems.length > 0) {
     allEntries.push(...validateBusinessRules(data));
   }
 
-  // Stage 3: Profile rules (BR-DE for XRechnung)
+  // Stage 4: Profile rules (BR-DE for XRechnung)
   allEntries.push(...validateXRechnungRules(data));
 
   return buildValidationResult(XRECHNUNG_PROFILE, allEntries);

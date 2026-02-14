@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import JSZip from 'jszip';
 import { BatchJob, BatchProgress, BatchResult } from './types';
@@ -8,6 +8,7 @@ import { AppError, ValidationError } from '@/lib/errors';
 import { MAX_CONCURRENT_BATCH_JOBS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
+import { creditsDbService } from '@/services/credits.db.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
 
 type BatchJobRow = {
@@ -38,7 +39,7 @@ export class BatchService {
   private bucketEnsured = false;
 
   private getSupabase() {
-    return createServerClient();
+    return createAdminClient();
   }
 
   private async ensureInputBucket(): Promise<void> {
@@ -362,12 +363,13 @@ export class BatchService {
               'application/pdf'
             );
 
+            const adminClient = createAdminClient();
             const extraction = await invoiceDbService.createExtraction({
               userId,
               extractionData: extractedData as unknown as Record<string, unknown>,
               confidenceScore: extractedData.confidence,
               status: 'completed',
-            });
+            }, adminClient);
 
             results.push({
               filename: segmentName,
@@ -415,11 +417,34 @@ export class BatchService {
     }
 
     // Credits already deducted upfront in extract/route.ts (extraction:multi)
-    // No second deduction needed here
+    // Refund credits for any failed extractions
+    let refundSucceeded = false;
+    if (failedFiles > 0) {
+      try {
+        await creditsDbService.addCredits(userId, failedFiles, 'batch_refund:multi', jobId);
+        refundSucceeded = true;
+        logger.info('Refunded credits for failed multi-invoice extractions', {
+          jobId, userId, refunded: failedFiles,
+        });
+      } catch (refundErr) {
+        logger.error('CRITICAL: Failed to refund credits for failed multi-invoice extractions', {
+          jobId, userId, failedFiles,
+          error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+        });
+      }
+    }
 
-    // Final status
-    const finalStatus =
-      failedFiles === 0 ? 'completed' : completedFiles === 0 ? 'failed' : 'partial_success';
+    // Final status — use 'failed_refunded' when all failed but credits were returned
+    let finalStatus: string;
+    if (failedFiles === 0) {
+      finalStatus = 'completed';
+    } else if (completedFiles === 0 && refundSucceeded) {
+      finalStatus = 'failed_refunded';
+    } else if (completedFiles === 0) {
+      finalStatus = 'failed';
+    } else {
+      finalStatus = 'completed'; // partial success — some completed
+    }
 
     const { error: finalUpdateError } = await supabase
       .from('batch_jobs')
@@ -536,7 +561,7 @@ export class BatchService {
         // All files were processed — the final status update must have failed.
         // Finalize directly instead of resetting to pending (prevents double credit deduction).
         const finalStatus =
-          failedFiles === 0 ? 'completed' : completedFiles === 0 ? 'failed' : 'partial_success';
+          failedFiles === 0 ? 'completed' : completedFiles === 0 ? 'failed' : 'completed';
 
         await supabase
           .from('batch_jobs')

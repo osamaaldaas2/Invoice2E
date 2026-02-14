@@ -5,7 +5,7 @@
  * @module services/analytics.service
  */
 
-import { createServerClient } from '@/lib/supabase.server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { API_TIMEOUTS } from '@/lib/constants';
@@ -74,6 +74,21 @@ export interface ChartsData {
 }
 
 export class AnalyticsService {
+  /**
+   * P0-3: Fail-fast pattern - NO ADMIN FALLBACK.
+   * Analytics methods MUST provide a SupabaseClient.
+   * If client is missing, throws an error instead of silently bypassing RLS.
+   */
+  private assertClientProvided(client: SupabaseClient | undefined, methodName: string): asserts client is SupabaseClient {
+    if (!client) {
+      throw new AppError(
+        'MISSING_CLIENT',
+        `${methodName} requires a Supabase client for RLS enforcement. Pass createUserScopedClient(userId) to ensure proper data isolation.`,
+        500
+      );
+    }
+  }
+
   private async queryWithTimeout<T>(
     query: PromiseLike<T>,
     timeoutMs: number = API_TIMEOUTS.DATABASE_QUERY
@@ -99,11 +114,14 @@ export class AnalyticsService {
     userId: string,
     page: number = 1,
     limit: number = 20,
-    filters?: HistoryFilters
+    filters?: HistoryFilters,
+    client?: SupabaseClient
   ): Promise<PaginatedHistory> {
     logger.info('Getting conversion history', { userId, page, limit, filters });
 
-    const supabase = createServerClient();
+    // P0-3: Client required - fail fast if missing
+    this.assertClientProvided(client, 'getConversionHistory');
+    const supabase = client!;
     const offset = (page - 1) * limit;
 
     const statusFilter = filters?.status;
@@ -364,10 +382,12 @@ export class AnalyticsService {
   /**
    * Get user statistics
    */
-  async getStatistics(userId: string): Promise<UserStatistics> {
+  async getStatistics(userId: string, client?: SupabaseClient): Promise<UserStatistics> {
     logger.info('Getting user statistics', { userId });
 
-    const supabase = createServerClient();
+    // P0-3: Client required - fail fast if missing
+    this.assertClientProvided(client, 'getStatistics');
+    const supabase = client!;
 
     // Get credits
     const creditResponse: any = await this.queryWithTimeout(
@@ -458,11 +478,14 @@ export class AnalyticsService {
    */
   async getChartsData(
     userId: string,
-    period: 'week' | 'month' | 'year' = 'month'
+    period: 'week' | 'month' | 'year' = 'month',
+    client?: SupabaseClient
   ): Promise<ChartsData> {
     logger.info('Getting charts data', { userId, period });
 
-    const supabase = createServerClient();
+    // P0-3: Client required - fail fast if missing
+    this.assertClientProvided(client, 'getChartsData');
+    const supabase = client!;
 
     // Calculate date range
     const now = new Date();
@@ -562,10 +585,13 @@ export class AnalyticsService {
   /**
    * Export history as CSV
    */
-  async exportHistoryAsCSV(userId: string): Promise<string> {
+  async exportHistoryAsCSV(userId: string, client?: SupabaseClient): Promise<string> {
     logger.info('Exporting history as CSV', { userId });
 
-    const { items } = await this.getConversionHistory(userId, 1, 10000);
+    // P0-3: Client required - fail fast if missing
+    this.assertClientProvided(client, 'exportHistoryAsCSV');
+
+    const { items } = await this.getConversionHistory(userId, 1, 10000, undefined, client);
 
     // CSV header
     const headers = [

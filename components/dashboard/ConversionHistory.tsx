@@ -15,6 +15,22 @@ interface BatchResultItem {
   extractionId?: string;
 }
 
+interface ValidationResult {
+  extractionId: string;
+  invoiceNumber: string;
+  errors: string[];
+  warnings: string[];
+  missingFields: string[];
+  valid: boolean;
+}
+
+interface BatchValidation {
+  allValid: boolean;
+  total: number;
+  errorCount: number;
+  results: ValidationResult[];
+}
+
 interface Conversion {
   id: string;
   invoice_number: string;
@@ -42,23 +58,23 @@ const getStatusBadge = (status: string) => {
     completed: 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30',
     draft: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
     failed: 'bg-rose-500/15 text-rose-200 border border-rose-400/30',
+    failed_refunded: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
     processing: 'bg-sky-500/15 text-sky-200 border border-sky-400/30',
     pending: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
-    partial_success: 'bg-orange-500/15 text-orange-200 border border-orange-400/30',
   };
   return styles[status] || styles.pending;
 };
 
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    completed: '\u2713 completed',
-    draft: '\u270E draft',
-    failed: '\u2717 failed',
-    processing: '\u21BB processing',
-    pending: '\u25CB pending',
-    partial_success: '\u25D1 partial',
+const getStatusLabelKey = (status: string): string => {
+  const keyMap: Record<string, string> = {
+    completed: 'statusCompleted',
+    draft: 'statusDraft',
+    failed: 'statusFailed',
+    failed_refunded: 'statusFailedRefunded',
+    processing: 'statusProcessing',
+    pending: 'statusPending',
   };
-  return labels[status] || status;
+  return keyMap[status] || '';
 };
 
 const formatDate = (dateString: string) => {
@@ -94,6 +110,129 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
   return err instanceof Error ? err.message : fallback;
 };
 
+function ApplyToAllPanel({
+  extractionIds,
+  onApplied,
+  onClose,
+}: {
+  extractionIds: string[];
+  onApplied: () => void;
+  onClose: () => void;
+}) {
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const isApplyingRef = useRef(false);
+
+  const applyableFields = [
+    { key: 'sellerName', label: 'Seller Name' },
+    { key: 'sellerEmail', label: 'Seller Email (BT-34)' },
+    { key: 'sellerPhone', label: 'Seller Phone' },
+    { key: 'sellerAddress', label: 'Seller Address' },
+    { key: 'sellerStreet', label: 'Seller Street' },
+    { key: 'sellerCity', label: 'Seller City' },
+    { key: 'sellerPostalCode', label: 'Seller Postal Code' },
+    { key: 'sellerCountryCode', label: 'Seller Country Code' },
+    { key: 'sellerTaxId', label: 'Seller Tax ID' },
+    { key: 'sellerTaxNumber', label: 'Seller Tax Number' },
+    { key: 'sellerVatId', label: 'Seller VAT ID' },
+    { key: 'sellerIban', label: 'Seller IBAN' },
+    { key: 'sellerBic', label: 'Seller BIC' },
+    { key: 'sellerContactName', label: 'Seller Contact Name' },
+    { key: 'buyerName', label: 'Buyer Name' },
+    { key: 'buyerEmail', label: 'Buyer Email (BT-49)' },
+    { key: 'buyerAddress', label: 'Buyer Address' },
+    { key: 'buyerStreet', label: 'Buyer Street' },
+    { key: 'buyerCity', label: 'Buyer City' },
+    { key: 'buyerPostalCode', label: 'Buyer Postal Code' },
+    { key: 'buyerCountryCode', label: 'Buyer Country Code' },
+    { key: 'buyerTaxId', label: 'Buyer Tax ID' },
+    { key: 'buyerReference', label: 'Buyer Reference (BR-DE-15)' },
+    { key: 'paymentTerms', label: 'Payment Terms' },
+    { key: 'paymentInstructions', label: 'Payment Instructions' },
+    { key: 'currency', label: 'Currency' },
+  ];
+
+  const handleApply = async () => {
+    // Prevent race condition from rapid double-clicks
+    if (isApplyingRef.current) return;
+
+    const filledFields = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v.trim())
+    );
+    if (Object.keys(filledFields).length === 0) return;
+
+    isApplyingRef.current = true;
+    setApplying(true);
+    try {
+      const res = await fetch('/api/invoices/batch-apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extractionIds, fields: filledFields }),
+      });
+
+      // Check HTTP status before parsing JSON
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setResult(`Error: ${errorData.error || res.statusText}`);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        setResult(`✅ Updated ${data.data.updated} invoices (${data.data.skipped} already had values)`);
+        setTimeout(() => { onApplied(); }, 1500);
+      } else {
+        setResult(`Error: ${data.error}`);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      setResult(`Failed to apply fields: ${errorMsg}`);
+      console.error('Apply to All error:', err);
+    } finally {
+      setApplying(false);
+      isApplyingRef.current = false;
+    }
+  };
+
+  return (
+    <tr className="border-l-2 border-sky-400/30">
+      <td colSpan={6} className="p-4 bg-sky-500/[0.05]">
+        <div className="max-w-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-sky-200">Apply to All Invoices (only fills missing fields)</h4>
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">Close</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {applyableFields.map(({ key, label }) => (
+              <div key={key} className="flex flex-col gap-0.5">
+                <label className="text-[11px] text-slate-400">{label}</label>
+                <input
+                  type="text"
+                  value={fields[key] || ''}
+                  onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))}
+                  placeholder={`Enter ${label.toLowerCase()}`}
+                  className="px-2 py-1 text-xs bg-white/5 border border-white/10 rounded text-white placeholder:text-slate-600 focus:border-sky-400/50 focus:outline-none"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleApply}
+              disabled={applying || Object.values(fields).every((v) => !v.trim())}
+              className="px-4 py-1.5 text-xs font-medium rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-100 hover:bg-sky-500/30 disabled:opacity-40"
+            >
+              {applying ? 'Applying...' : 'Apply to All'}
+            </button>
+            {result && <span className="text-xs text-sky-300">{result}</span>}
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function BatchRow({
   conversion,
   isExpanded,
@@ -101,6 +240,7 @@ function BatchRow({
   onDownloadZip,
   onDownloadSingle,
   downloadingIds,
+  onRefresh,
   t,
 }: {
   conversion: Conversion;
@@ -109,29 +249,64 @@ function BatchRow({
   onDownloadZip: () => void;
   onDownloadSingle: (result: BatchResultItem) => void;
   downloadingIds: Set<string>;
-  t: (key: string) => string;
+  onRefresh?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
 }) {
   const results = conversion.batch_results || [];
   const successCount = results.filter((r) => r.status === 'success').length;
   const failCount = results.filter((r) => r.status === 'failed').length;
+
+  const [validation, setValidation] = useState<BatchValidation | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [showApplyAll, setShowApplyAll] = useState(false);
+
+  const extractionIds = results
+    .filter((r) => r.extractionId && r.status === 'success')
+    .map((r) => r.extractionId!);
+
+  // Validate when expanded
+  useEffect(() => {
+    if (!isExpanded || extractionIds.length === 0 || validation) return;
+    let cancelled = false;
+    setValidating(true);
+    fetch('/api/invoices/batch-validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ extractionIds }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success) setValidation(data.data);
+      })
+      .finally(() => { if (!cancelled) setValidating(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpanded]);
+
+  const getValidationForId = (id: string) =>
+    validation?.results.find((r) => r.extractionId === id);
+
+  const allValid = validation?.allValid ?? false;
+  const errorInvoiceCount = validation?.errorCount ?? 0;
+
+  // Categorize errors: "applyable" (missing fields fixable via Apply to All) vs "data" (math/logic errors needing individual review)
+  const applyableRules = new Set(['PEPPOL-EN16931-R010', 'BR-DE-15', 'BR-DE-02', 'BR-DE-05', 'BR-DE-06', 'BR-DE-07', 'BR-DE-09', 'BR-DE-10']);
+  const hasDataErrors = validation?.results.some(r =>
+    r.errors.some(e => {
+      const ruleId = e.match(/^\[([^\]]+)\]/)?.[1] || '';
+      return !applyableRules.has(ruleId);
+    })
+  ) ?? false;
+  const hasMissingFieldErrors = validation?.results.some(r => r.missingFields.length > 0) ?? false;
 
   return (
     <>
       <tr className="hover:bg-white/5 border-l-4 border-amber-400/60 bg-amber-500/5">
         <td className="px-4 py-3 text-sm font-medium text-white max-w-[200px] truncate">
           <span className="inline-flex items-center gap-2">
-            <svg
-              className="w-4 h-4 text-amber-400 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-              />
+            <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
             {t('batchLabel')} ({conversion.total_files} {t('batchFiles')})
           </span>
@@ -143,13 +318,18 @@ function BatchRow({
             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}
             aria-label={`Status: ${conversion.status}`}
           >
-            {getStatusLabel(conversion.status)}
+            {getStatusLabelKey(conversion.status) ? t(getStatusLabelKey(conversion.status)) : conversion.status}
           </span>
           <span className="ml-2 text-xs">
             {successCount > 0 && <span className="text-emerald-300">{successCount}</span>}
             {successCount > 0 && failCount > 0 && <span className="text-slate-500"> / </span>}
             {failCount > 0 && <span className="text-rose-400">{failCount} failed</span>}
           </span>
+          {validation && !allValid && (
+            <span className="ml-2 text-xs text-amber-400" title={`${errorInvoiceCount} invoices have missing fields`}>
+              ⚠ {errorInvoiceCount} need fixes
+            </span>
+          )}
         </td>
         <td className="px-4 py-3 text-sm text-slate-300">{formatDate(conversion.created_at)}</td>
         <td className="px-4 py-3 text-sm">
@@ -157,8 +337,9 @@ function BatchRow({
             {successCount > 0 && (
               <button
                 onClick={onDownloadZip}
-                disabled={downloadingIds.has(conversion.id)}
-                className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                disabled={downloadingIds.has(conversion.id) || (validation !== null && !allValid)}
+                title={validation && !allValid ? `Fix ${errorInvoiceCount} invoices with errors first` : undefined}
+                className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {downloadingIds.has(conversion.id) ? t('downloading') : t('downloadZip')}
               </button>
@@ -168,19 +349,84 @@ function BatchRow({
               className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-100 hover:bg-white/10"
             >
               {isExpanded ? t('hide') : t('show')}
-              <svg
-                className={`ml-1 w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
+              <svg className={`ml-1 w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
           </div>
         </td>
       </tr>
+
+      {/* Validation summary alert */}
+      {isExpanded && validation && !allValid && (
+        <tr className="border-l-2 border-amber-400/30">
+          <td colSpan={6} className="px-4 py-3 bg-amber-500/[0.08]">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 text-lg">⚠</span>
+                  <span className="text-sm text-amber-200">
+                    <strong>{errorInvoiceCount}</strong> of {validation.total} invoices have errors.
+                    Fix all errors before downloading.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasMissingFieldErrors && (
+                    <button
+                      onClick={() => setShowApplyAll(!showApplyAll)}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
+                    >
+                      {showApplyAll ? 'Hide' : 'Apply to All'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {hasDataErrors && (
+                <div className="flex items-center gap-2 ml-7">
+                  <span className="text-xs text-rose-300">
+                    Some invoices have calculation errors (amounts don&apos;t add up). These need individual review — click &quot;Review&quot; on each invoice to fix.
+                  </span>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {/* Apply to All panel */}
+      {isExpanded && showApplyAll && (
+        <ApplyToAllPanel
+          extractionIds={extractionIds}
+          onApplied={() => {
+            setValidation(null);
+            setShowApplyAll(false);
+            // Re-validate
+            setValidating(true);
+            fetch('/api/invoices/batch-validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ extractionIds }),
+            })
+              .then((r) => r.json())
+              .then((data) => { if (data.success) setValidation(data.data); })
+              .finally(() => {
+                setValidating(false);
+                // Refresh the main conversion history to show updated data
+                onRefresh?.();
+              });
+          }}
+          onClose={() => setShowApplyAll(false)}
+        />
+      )}
+
+      {isExpanded && validating && (
+        <tr className="border-l-2 border-amber-400/30 bg-white/[0.02]">
+          <td colSpan={6} className="px-4 py-2 text-xs text-slate-400 text-center">
+            Validating invoices...
+          </td>
+        </tr>
+      )}
+
       {isExpanded && results.length === 0 && (
         <tr className="border-l-2 border-amber-400/30 bg-white/[0.02]">
           <td colSpan={6} className="px-4 py-3 text-sm text-slate-500 text-center pl-10">
@@ -191,42 +437,76 @@ function BatchRow({
       {isExpanded &&
         results.map((result, idx) => {
           const isFailed = result.status === 'failed';
+          const vResult = result.extractionId ? getValidationForId(result.extractionId) : null;
+          const hasErrors = vResult && !vResult.valid;
+
           return (
             <tr
               key={`${conversion.id}-${idx}`}
-              className={`border-l-2 border-amber-400/30 ${isFailed ? 'bg-rose-500/[0.03] hover:bg-rose-500/[0.06]' : 'bg-white/[0.03] hover:bg-white/[0.06]'}`}
+              className={`border-l-2 border-amber-400/30 ${isFailed ? 'bg-rose-500/[0.03] hover:bg-rose-500/[0.06]' : hasErrors ? 'bg-amber-500/[0.03] hover:bg-amber-500/[0.06]' : 'bg-white/[0.03] hover:bg-white/[0.06]'}`}
             >
-              <td
-                className="px-4 py-2 text-sm text-slate-300 pl-10 max-w-[200px] truncate"
-                title={result.invoiceNumber || '-'}
-              >
+              <td className="px-4 py-2 text-sm text-slate-300 pl-10 max-w-[200px] truncate" title={result.invoiceNumber || '-'}>
                 {result.invoiceNumber || '-'}
               </td>
-              <td
-                className="px-4 py-2 text-sm text-slate-400 max-w-[200px] truncate"
-                title={result.filename}
-              >
+              <td className="px-4 py-2 text-sm text-slate-400 max-w-[200px] truncate" title={result.filename}>
                 {result.filename}
               </td>
               <td className="px-4 py-2 text-sm text-slate-400">XRechnung</td>
               <td className="px-4 py-2">
-                <span
-                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(result.status === 'success' ? 'completed' : result.status)}`}
-                  aria-label={`Status: ${result.status}`}
-                >
-                  {getStatusLabel(result.status === 'success' ? 'completed' : result.status)}
-                </span>
+                {vResult ? (
+                  vResult.valid ? (
+                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/30">
+                      {t('ready')}
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/30 cursor-help"
+                      title={vResult.errors.join(', ')}
+                    >
+                      ⚠ {vResult.errors.length} errors
+                    </span>
+                  )
+                ) : (
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(result.status === 'success' ? 'completed' : result.status)}`}
+                  >
+                    {(() => { const s = result.status === 'success' ? 'completed' : result.status; const k = getStatusLabelKey(s); return k ? t(k) : s; })()}
+                  </span>
+                )}
               </td>
-              <td className="px-4 py-2 text-sm text-slate-400">-</td>
+              <td className="px-4 py-2 text-sm max-w-[250px]">
+                {hasErrors && (
+                  <div className="flex flex-col gap-0.5">
+                    {vResult!.errors.slice(0, 3).map((err, i) => (
+                      <span key={i} className="text-[11px] text-amber-400/80 leading-tight block truncate" title={err}>
+                        {err}
+                      </span>
+                    ))}
+                    {vResult!.errors.length > 3 && (
+                      <span className="text-[11px] text-amber-400/60">+{vResult!.errors.length - 3} more</span>
+                    )}
+                  </div>
+                )}
+              </td>
               <td className="px-4 py-2 text-sm">
                 {result.extractionId && result.status === 'success' ? (
-                  <button
-                    onClick={() => onDownloadSingle(result)}
-                    disabled={downloadingIds.has(result.extractionId!)}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50 text-xs"
-                  >
-                    {downloadingIds.has(result.extractionId!) ? t('downloading') : t('downloadXml')}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <Link
+                      href={`/review/${result.extractionId}`}
+                      className="inline-flex items-center px-2 py-1 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25 text-[11px]"
+                    >
+                      {t('review')}
+                    </Link>
+                    {vResult?.valid && (
+                      <button
+                        onClick={() => onDownloadSingle(result)}
+                        disabled={downloadingIds.has(result.extractionId!)}
+                        className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50 text-[11px]"
+                      >
+                        {downloadingIds.has(result.extractionId!) ? '...' : 'XML'}
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <span className="text-slate-500">-</span>
                 )}
@@ -436,6 +716,14 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
         }
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          if (errorData.code === 'VALIDATION_ERRORS') {
+            const failedDetails = (errorData.details || []) as Array<{ error: string }>;
+            const firstError = failedDetails[0]?.error;
+            const errMsg = firstError
+              ? `${errorData.error}\n\nFirst error: ${firstError}`
+              : errorData.error;
+            throw new Error(errMsg);
+          }
           throw new Error(errorData.error || 'Failed to download batch ZIP');
         }
 
@@ -575,6 +863,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                       onDownloadZip={() => handleBatchDownload(conversion)}
                       onDownloadSingle={handleSingleFromBatch}
                       downloadingIds={downloadingIds}
+                      onRefresh={() => fetchHistory(page, statusFilter)}
                       t={t}
                     />
                   ) : (
@@ -602,7 +891,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}
                           aria-label={`Status: ${conversion.status}`}
                         >
-                          {getStatusLabel(conversion.status)}
+                          {getStatusLabelKey(conversion.status) ? t(getStatusLabelKey(conversion.status)) : conversion.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-300">

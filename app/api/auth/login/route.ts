@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { LOCALE_COOKIE_NAME, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@/lib/constants';
 import { checkRateLimitAsync, getRequestIdentifier, resetRateLimit } from '@/lib/rate-limiter';
 import { setSessionCookie } from '@/lib/session';
+import { setCsrfCookie } from '@/lib/csrf';
 import { LoginSchema } from '@/lib/validators';
 import { authService } from '@/services/auth.service';
 
@@ -55,6 +56,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // SECURITY FIX: Use signed session token instead of plain user ID
         await setSessionCookie(user);
+
+        // Set CSRF token cookie for double-submit pattern
+        await setCsrfCookie();
 
         // Set locale cookie from user's language preference
         const userLocale = SUPPORTED_LOCALES.includes(user.language as 'en' | 'de')

@@ -79,66 +79,136 @@ export class AuthService {
 
         const supabase = this.getSupabase();
 
-        // Create user in database
-        const { data: user, error } = await supabase
-            .from('users')
-            .insert([
-                {
-                    email: normalizedEmail,
-                    password_hash: passwordHash,
-                    first_name: validated.firstName,
-                    last_name: validated.lastName,
-                    address_line1: validated.addressLine1,
-                    address_line2: validated.addressLine2 || null,
-                    city: validated.city,
-                    postal_code: validated.postalCode,
-                    country: normalizedCountry,
-                    phone: validated.phone,
-                    language: 'en',
-                },
-            ])
-            .select()
-            .single();
+        // FIX: Atomic user + credits creation via Supabase RPC to prevent race conditions.
+        // Falls back to sequential insert with retry if the RPC doesn't exist.
+        let user: { id: string; email: string; first_name: string; last_name: string };
 
-        if (error) {
-            // FIX-008: Catch unique constraint violation from concurrent signups
-            if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
-                throw new ValidationError('Email already registered');
-            }
-            logger.error('Signup database error', { error: error.message, code: error.code });
-            throw new AppError('DB_ERROR', 'Failed to create user', 500);
-        }
-
-        // Create initial credits - FIX (BUG-018): Rollback user creation if this fails
-        // FIX (QA-BUG-8): Use DEFAULT_CREDITS_ON_SIGNUP constant instead of hardcoded 0
-        const { error: creditsError } = await supabase.from('user_credits').insert([
-            {
-                user_id: user.id,
-                available_credits: DEFAULT_CREDITS_ON_SIGNUP,
-                used_credits: 0,
-            },
-        ]);
-
-        if (creditsError) {
-            logger.error('Failed to create user credits, rolling back user creation', {
-                userId: user.id,
-                error: creditsError.message
+        try {
+            // Try atomic RPC first (create_user_with_credits)
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('create_user_with_credits', {
+                p_email: normalizedEmail,
+                p_password_hash: passwordHash,
+                p_first_name: validated.firstName,
+                p_last_name: validated.lastName,
+                p_address_line1: validated.addressLine1,
+                p_address_line2: validated.addressLine2 || null,
+                p_city: validated.city,
+                p_postal_code: validated.postalCode,
+                p_country: normalizedCountry,
+                p_phone: validated.phone,
+                p_language: 'en',
+                p_initial_credits: DEFAULT_CREDITS_ON_SIGNUP,
             });
 
-            // Rollback: Delete the user since they can't function without a credits record
-            const { error: deleteError } = await supabase
-                .from('users')
-                .delete()
-                .eq('id', user.id);
-
-            if (deleteError) {
-                logger.error('Failed to rollback user creation', {
-                    userId: user.id,
-                    error: deleteError.message
-                });
+            if (rpcError) {
+                // If RPC doesn't exist, fall back to sequential approach
+                if (rpcError.message?.includes('function') && rpcError.message?.includes('does not exist')) {
+                    throw new Error('RPC_NOT_FOUND');
+                }
+                // Unique constraint from RPC
+                if (rpcError.code === '23505' || rpcError.message?.includes('duplicate') || rpcError.message?.includes('unique')) {
+                    throw new ValidationError('Email already registered');
+                }
+                logger.error('Signup RPC error', { error: rpcError.message, code: rpcError.code });
+                throw new AppError('DB_ERROR', 'Failed to create user', 500);
             }
 
-            throw new AppError('DB_ERROR', 'Failed to complete signup. Please try again.', 500);
+            user = rpcResult as { id: string; email: string; first_name: string; last_name: string };
+        } catch (rpcFallbackError) {
+            if (rpcFallbackError instanceof ValidationError || rpcFallbackError instanceof AppError) {
+                throw rpcFallbackError;
+            }
+
+            // Fallback: sequential insert with retry for credits
+            logger.info('RPC not available, using sequential signup with retry');
+
+            const { data: createdUser, error } = await supabase
+                .from('users')
+                .insert([
+                    {
+                        email: normalizedEmail,
+                        password_hash: passwordHash,
+                        first_name: validated.firstName,
+                        last_name: validated.lastName,
+                        address_line1: validated.addressLine1,
+                        address_line2: validated.addressLine2 || null,
+                        city: validated.city,
+                        postal_code: validated.postalCode,
+                        country: normalizedCountry,
+                        phone: validated.phone,
+                        language: 'en',
+                    },
+                ])
+                .select()
+                .single();
+
+            if (error) {
+                if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+                    throw new ValidationError('Email already registered');
+                }
+                logger.error('Signup database error', { error: error.message, code: error.code });
+                throw new AppError('DB_ERROR', 'Failed to create user', 500);
+            }
+
+            // Create initial credits with retry (up to 3 attempts)
+            let creditsCreated = false;
+            let lastCreditsError: string | undefined;
+
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                const { error: creditsError } = await supabase.from('user_credits').insert([
+                    {
+                        user_id: createdUser.id,
+                        available_credits: DEFAULT_CREDITS_ON_SIGNUP,
+                        used_credits: 0,
+                    },
+                ]);
+
+                if (!creditsError) {
+                    creditsCreated = true;
+                    break;
+                }
+
+                // If duplicate key, credits already exist (concurrent request succeeded)
+                if (creditsError.code === '23505') {
+                    creditsCreated = true;
+                    break;
+                }
+
+                lastCreditsError = creditsError.message;
+                logger.warn(`Credits creation attempt ${attempt}/3 failed`, {
+                    userId: createdUser.id,
+                    error: creditsError.message,
+                });
+
+                // Brief delay before retry
+                if (attempt < 3) {
+                    await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+                }
+            }
+
+            if (!creditsCreated) {
+                logger.error('All credits creation attempts failed, rolling back user', {
+                    userId: createdUser.id,
+                    lastError: lastCreditsError,
+                });
+
+                // Rollback user
+                const { error: deleteError } = await supabase
+                    .from('users')
+                    .delete()
+                    .eq('id', createdUser.id);
+
+                if (deleteError) {
+                    logger.error('CRITICAL: Failed to rollback user after credits failure', {
+                        userId: createdUser.id,
+                        error: deleteError.message,
+                    });
+                }
+
+                throw new AppError('DB_ERROR', 'Failed to complete signup. Please try again.', 500);
+            }
+
+            user = createdUser;
         }
 
         logger.info('User signed up successfully', { userId: user.id, email: user.email });

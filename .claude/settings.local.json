@@ -45,7 +45,32 @@
       "mcp__chrome-devtools__emulate",
       "mcp__chrome-devtools__upload_file",
       "mcp__chrome-devtools__handle_dialog",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(npm audit:*)",
+      "Bash(python3:*)",
+      "Bash(xargs -I {} bash -c 'echo \"\"=== {} ===\"\" && head -30 {}')",
+      "Bash(git rm:*)",
+      "Bash(npm update:*)",
+      "Bash(npm install:*)",
+      "Bash(npx husky init:*)",
+      "WebSearch",
+      "WebFetch(domain:nuextract.ai)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx eslint:*)",
+      "Bash(npm ls:*)",
+      "Bash(npx next dev)",
+      "mcp__chrome-devtools__get_network_request",
+      "Bash(cd:*)",
+      "Bash(if not exist \"c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\validation\" mkdir \"c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\validation\")",
+      "Bash(npx vitest:*)",
+      "Bash(git stash:*)",
+      "Bash(java -version:*)",
+      "Bash(Get-Process -Name node -ErrorAction SilentlyContinue)",
+      "Bash(Where-Object { $_CommandLine -like \"*next dev*\" })",
+      "Bash(Stop-Process -Force)",
+      "Bash(/tmp/test_stripe_body.js << 'EOF'\n// Test to demonstrate the fix\nconst URLSearchParams = require\\('url'\\).URLSearchParams;\n\nconsole.log\\(\"=== BEFORE FIX \\(Simulated\\) ===\"\\);\nconst bodyBefore = new URLSearchParams\\(\\);\nbodyBefore.append\\('mode', 'payment'\\);\nbodyBefore.append\\('line_items[0][quantity]', '1'\\);\nbodyBefore.append\\('line_items[0][quantity]', '1'\\); // DUPLICATE\nconsole.log\\(bodyBefore.toString\\(\\)\\);\nconst matchesBefore = bodyBefore.toString\\(\\).match\\(/line_items%5B0%5D%5Bquantity%5D=1/g\\);\nconsole.log\\('Quantity parameter count:', matchesBefore ? matchesBefore.length : 0\\);\n\nconsole.log\\(\"\\\\n=== AFTER FIX ===\"\\);\nconst bodyAfter = new URLSearchParams\\(\\);\nbodyAfter.append\\('mode', 'payment'\\);\nbodyAfter.append\\('line_items[0][quantity]', '1'\\); // FIXED - only one\nconsole.log\\(bodyAfter.toString\\(\\)\\);\nconst matchesAfter = bodyAfter.toString\\(\\).match\\(/line_items%5B0%5D%5Bquantity%5D=1/g\\);\nconsole.log\\('Quantity parameter count:', matchesAfter ? matchesAfter.length : 0\\);\nEOF)",
+      "Bash(node:*)",
+      "Bash(tail:*)"
     ]
   }
 }

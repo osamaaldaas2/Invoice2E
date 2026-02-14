@@ -199,7 +199,10 @@ export class DeepSeekAdapter implements IDeepSeekAdapter {
 
   private parseResponse(content: string): Record<string, unknown> {
     try {
-      return parseJsonFromAiResponse(content) as Record<string, unknown>;
+      const parsed = parseJsonFromAiResponse(content) as Record<string, unknown>;
+
+      // FORENSIC_STAGE_1: Log parsed JSON types BEFORE normalization
+      return parsed;
     } catch {
       logger.error('JSON parsing failed', { content: content.substring(0, 100) });
       throw new AppError('DEEPSEEK_ERROR', 'Invalid JSON response from DeepSeek', 500);

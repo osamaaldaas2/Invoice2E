@@ -111,7 +111,7 @@ export default function ValidationPipeline() {
                       {t('technicalExample')}
                     </h4>
                     <p className="text-sm text-faded leading-relaxed font-mono">
-                      {t(step.exampleKey)}
+                      {t.raw(step.exampleKey)}
                     </p>
                   </div>
                 </div>

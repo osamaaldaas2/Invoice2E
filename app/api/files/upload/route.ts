@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
+import { requireCsrfToken } from '@/lib/csrf';
 
 /**
  * FIX (BUG-034): Added authentication requirement for file uploads
@@ -11,6 +12,10 @@ import { handleApiError } from '@/lib/api-helpers';
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
+        // CSRF protection
+        const csrfError = await requireCsrfToken(request);
+        if (csrfError) return csrfError as NextResponse;
+
         // Require authentication for file uploads
         const user = await getAuthenticatedUser(request);
         if (!user) {

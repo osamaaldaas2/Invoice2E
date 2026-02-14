@@ -20,6 +20,63 @@ export interface ExternalValidationResult {
   error?: string;
 }
 
+/**
+ * Lightweight post-generation XML structure validation.
+ * Checks well-formedness, required root element/namespaces, and key CII elements.
+ * This is NOT a full XSD validation — KoSIT handles that.
+ */
+export function validateXmlStructure(xml: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!xml || xml.trim().length === 0) {
+    errors.push('XML content is empty');
+    return { valid: false, errors };
+  }
+
+  // Check XML declaration
+  if (!xml.trimStart().startsWith('<?xml')) {
+    errors.push('Missing XML declaration (<?xml version="1.0" encoding="UTF-8"?>)');
+  }
+
+  // Check well-formedness: basic tag balance (lightweight heuristic)
+  const openTags = (xml.match(/<[a-zA-Z][^/> ]*/g) || []).length;
+  const closeTags = (xml.match(/<\/[a-zA-Z][^>]*/g) || []).length;
+  const selfClosing = (xml.match(/<[^>]+\/>/g) || []).length;
+  if (Math.abs(openTags - closeTags - selfClosing) > 2) {
+    errors.push('XML appears malformed: mismatched open/close tags');
+  }
+
+  // Check required root element
+  if (!xml.includes('CrossIndustryInvoice')) {
+    errors.push('Missing required root element: CrossIndustryInvoice');
+  }
+
+  // Check required namespaces
+  const requiredNamespaces = [
+    { ns: 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100', label: 'CII namespace (rsm)' },
+    { ns: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100', label: 'RAM namespace' },
+  ];
+  for (const { ns, label } of requiredNamespaces) {
+    if (!xml.includes(ns)) {
+      errors.push(`Missing required namespace: ${label}`);
+    }
+  }
+
+  // Check key CII elements
+  const requiredElements = [
+    'ExchangedDocumentContext',
+    'ExchangedDocument',
+    'SupplyChainTradeTransaction',
+  ];
+  for (const element of requiredElements) {
+    if (!xml.includes(element)) {
+      errors.push(`Missing required element: ${element}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 export class XRechnungValidator {
   /**
    * Validate invoice data using the full EN 16931 validation pipeline.

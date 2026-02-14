@@ -16,6 +16,7 @@ const paypalAdapterMock = vi.hoisted(() => ({
 }));
 const createServerClientMock = vi.hoisted(() => vi.fn());
 const createUserClientMock = vi.hoisted(() => vi.fn());
+const createUserScopedClientMock = vi.hoisted(() => vi.fn());
 const loggerMock = vi.hoisted(() => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -42,10 +43,20 @@ vi.mock('@/adapters/paypal.adapter', () => ({
 vi.mock('@/lib/supabase.server', () => ({
     createServerClient: () => createServerClientMock(),
     createUserClient: () => createUserClientMock(),
+    createUserScopedClient: (...args: any[]) => createUserScopedClientMock(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
     logger: loggerMock,
+}));
+
+vi.mock('@/lib/rate-limiter', () => ({
+    checkRateLimitAsync: vi.fn().mockResolvedValue({ allowed: true }),
+    getRequestIdentifier: vi.fn().mockReturnValue('test-ip'),
+}));
+
+vi.mock('@/lib/csrf', () => ({
+    requireCsrfToken: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/api-helpers', () => ({
@@ -156,31 +167,34 @@ describe('Payment Checkout API Route', () => {
                 url: 'https://checkout.stripe.com/c/pay/cs_test_123',
             });
 
-            createUserClientMock.mockReturnValue({
-                from: vi.fn(() => ({
-                    select: vi.fn(() => ({
-                        eq: vi.fn(() => ({
-                            single: vi.fn(() => Promise.resolve({
-                                data: { email: 'db@example.com' },
-                                error: null,
+            const mockUserScopedClient = {
+                from: vi.fn((table: string) => {
+                    if (table === 'users') {
+                        return {
+                            select: vi.fn(() => ({
+                                eq: vi.fn(() => ({
+                                    single: vi.fn(() => Promise.resolve({
+                                        data: { email: 'db@example.com' },
+                                        error: null,
+                                    })),
+                                })),
+                            })),
+                        };
+                    }
+                    // payment_transactions
+                    return {
+                        insert: vi.fn(() => ({
+                            select: vi.fn(() => ({
+                                single: vi.fn(() => Promise.resolve({
+                                    data: { id: 'tx-123' },
+                                    error: null,
+                                })),
                             })),
                         })),
-                    })),
-                })),
-            });
-
-            createServerClientMock.mockReturnValue({
-                from: vi.fn(() => ({
-                    insert: vi.fn(() => ({
-                        select: vi.fn(() => ({
-                            single: vi.fn(() => Promise.resolve({
-                                data: { id: 'tx-123' },
-                                error: null,
-                            })),
-                        })),
-                    })),
-                })),
-            });
+                    };
+                }),
+            };
+            createUserScopedClientMock.mockResolvedValue(mockUserScopedClient);
 
             const request = createRequest({
                 packageId: 'basic',

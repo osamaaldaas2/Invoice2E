@@ -32,7 +32,6 @@ export class StripeAdapter implements IStripeAdapter {
         bodyParams.append('line_items[0][price_data][product_data][name]', `Invoice2E Credits - ${params.credits} pack`);
         bodyParams.append('line_items[0][price_data][unit_amount]', params.amount.toString());
         bodyParams.append('line_items[0][quantity]', '1');
-        bodyParams.append('line_items[0][quantity]', '1');
 
         if (params.metadata) {
             Object.entries(params.metadata).forEach(([key, value]) => {
