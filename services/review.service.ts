@@ -173,7 +173,7 @@ export class ReviewService {
       }
 
       // Gross pricing check: try common VAT rates to see if subtotal = grossTotal / (1 + rate)
-      const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05, 0];
+      const commonRates = [0.19, 0.07, 0.2, 0.21, 0.1, 0.05, 0];
       for (const rate of commonRates) {
         const netFromGross = roundMoney(grossTotal / (1 + rate));
         if (moneyEqual(netFromGross, data.subtotal, 0.05)) {
@@ -203,8 +203,11 @@ export class ReviewService {
    * Validate email format
    */
   private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    if (email.length > 254) return false;
+    const parts = email.split('@');
+    if (parts.length !== 2) return false;
+    const [local, domain] = parts;
+    return local!.length > 0 && local!.length <= 64 && domain!.includes('.') && domain!.length > 2;
   }
 
   /**

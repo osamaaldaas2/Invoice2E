@@ -109,9 +109,10 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
       [contentId]
     );
 
-    // eslint-disable-next-line -- standard client-mount hydration pattern
     useEffect(() => {
-      setMounted(true);
+      // Defer to avoid synchronous setState-in-effect lint rule
+      const frame = requestAnimationFrame(() => setMounted(true));
+      return () => cancelAnimationFrame(frame);
     }, []);
 
     useEffect(() => {

@@ -39,9 +39,10 @@ export function validateXmlStructure(xml: string): { valid: boolean; errors: str
   }
 
   // Check well-formedness: basic tag balance (lightweight heuristic)
-  const openTags = (xml.match(/<[a-zA-Z][^/> ]*/g) || []).length;
-  const closeTags = (xml.match(/<\/[a-zA-Z][^>]*/g) || []).length;
-  const selfClosing = (xml.match(/<[^>]+\/>/g) || []).length;
+  // Use bounded character classes to avoid ReDoS on malformed input
+  const openTags = (xml.match(/<[a-zA-Z][^/> ]{0,200}/g) || []).length;
+  const closeTags = (xml.match(/<\/[a-zA-Z][^>]{0,200}/g) || []).length;
+  const selfClosing = (xml.match(/<[^>]{1,200}\/>/g) || []).length;
   if (Math.abs(openTags - closeTags - selfClosing) > 2) {
     errors.push('XML appears malformed: mismatched open/close tags');
   }
@@ -53,8 +54,14 @@ export function validateXmlStructure(xml: string): { valid: boolean; errors: str
 
   // Check required namespaces
   const requiredNamespaces = [
-    { ns: 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100', label: 'CII namespace (rsm)' },
-    { ns: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100', label: 'RAM namespace' },
+    {
+      ns: 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
+      label: 'CII namespace (rsm)',
+    },
+    {
+      ns: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100',
+      label: 'RAM namespace',
+    },
   ];
   for (const { ns, label } of requiredNamespaces) {
     if (!xml.includes(ns)) {
