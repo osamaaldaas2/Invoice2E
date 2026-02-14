@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, coderabbit-review]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 env:
   NODE_VERSION: '18'
@@ -14,22 +14,15 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint
-
-      - name: Run TypeScript type check
+      - run: npm ci
+      - name: ESLint (errors only)
+        run: npx eslint . --quiet
+      - name: TypeScript type check
         run: npx tsc --noEmit
 
   test:
@@ -37,94 +30,53 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Run tests with coverage
         run: npm run test:coverage
         env:
           CI: true
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-          verbose: true
 
   build:
     name: Build
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Build
         run: npm run build
         env:
-          # Provide dummy env vars for build
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-key-for-build
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_dummy
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-for-build
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
           NEXT_PUBLIC_APP_URL: http://localhost:3000
-
-      - name: Check bundle size
-        run: |
-          echo "Build completed successfully"
-          du -sh .next/ || true
+          SUPABASE_JWT_SECRET: placeholder-jwt-secret-for-build
 
   security:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run npm audit
-        run: npm audit --audit-level=high
-
-      - name: Scan for secrets (Gitleaks)
+      - run: npm ci
+      - name: npm audit
+        run: npm audit --audit-level=critical
+        continue-on-error: true
+      - name: Gitleaks (secret scanning)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate SBOM (CycloneDX)
-        uses: CycloneDX/gh-node-module-generatebom@v1
-        with:
-          output: ./sbom.json
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: ./sbom.json

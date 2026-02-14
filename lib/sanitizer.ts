@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 
 // Create a JSDOM window for server-side DOMPurify
 const window = new JSDOM('').window;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const purify = DOMPurify(window as any);
 
 /**
@@ -16,11 +16,11 @@ const purify = DOMPurify(window as any);
  * Removes dangerous tags and attributes while preserving safe HTML
  */
 export function sanitizeHtml(dirty: string): string {
-    return purify.sanitize(dirty, {
-        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li', 'span'],
-        ALLOWED_ATTR: ['class'],
-        KEEP_CONTENT: true,
-    });
+  return purify.sanitize(dirty, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li', 'span'],
+    ALLOWED_ATTR: ['class'],
+    KEEP_CONTENT: true,
+  });
 }
 
 /**
@@ -28,11 +28,13 @@ export function sanitizeHtml(dirty: string): string {
  * Use for user inputs that should not contain any HTML
  */
 export function sanitizeText(dirty: string): string {
-    return purify.sanitize(dirty, {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
-        KEEP_CONTENT: true,
-    }).trim();
+  return purify
+    .sanitize(dirty, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true,
+    })
+    .trim();
 }
 
 /**
@@ -40,15 +42,15 @@ export function sanitizeText(dirty: string): string {
  * Returns empty string for null/undefined, sanitizes strings
  */
 export function sanitizeForDisplay(value: unknown): string {
-    if (value === null || value === undefined) {
-        return '';
-    }
+  if (value === null || value === undefined) {
+    return '';
+  }
 
-    if (typeof value === 'string') {
-        return sanitizeText(value);
-    }
+  if (typeof value === 'string') {
+    return sanitizeText(value);
+  }
 
-    return String(value);
+  return String(value);
 }
 
 /**
@@ -56,35 +58,35 @@ export function sanitizeForDisplay(value: unknown): string {
  * Useful for sanitizing form data or API responses
  */
 export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
-    const result: Record<string, unknown> = {};
+  const result: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(obj)) {
-        if (typeof value === 'string') {
-            result[key] = sanitizeText(value);
-        } else if (Array.isArray(value)) {
-            result[key] = sanitizeArray(value);
-        } else if (value !== null && typeof value === 'object') {
-            result[key] = sanitizeObject(value as Record<string, unknown>);
-        } else {
-            result[key] = value;
-        }
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string') {
+      result[key] = sanitizeText(value);
+    } else if (Array.isArray(value)) {
+      result[key] = sanitizeArray(value);
+    } else if (value !== null && typeof value === 'object') {
+      result[key] = sanitizeObject(value as Record<string, unknown>);
+    } else {
+      result[key] = value;
     }
+  }
 
-    return result as T;
+  return result as T;
 }
 
 /**
  * Sanitize array values recursively
  */
 export function sanitizeArray(arr: unknown[]): unknown[] {
-    return arr.map((item) => {
-        if (typeof item === 'string') {
-            return sanitizeText(item);
-        } else if (Array.isArray(item)) {
-            return sanitizeArray(item);
-        } else if (item !== null && typeof item === 'object') {
-            return sanitizeObject(item as Record<string, unknown>);
-        }
-        return item;
-    });
+  return arr.map((item) => {
+    if (typeof item === 'string') {
+      return sanitizeText(item);
+    } else if (Array.isArray(item)) {
+      return sanitizeArray(item);
+    } else if (item !== null && typeof item === 'object') {
+      return sanitizeObject(item as Record<string, unknown>);
+    }
+    return item;
+  });
 }
