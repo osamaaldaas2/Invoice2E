@@ -34,7 +34,13 @@ function parseAddressComponents(address: string | null | undefined): {
     const city = postalCityMatch[2]!.replace(/[,.\s]+$/, '').trim();
     // Everything before the postal code match is the street
     const matchIndex = trimmed.indexOf(postalCityMatch[0]!);
-    const beforePostal = matchIndex > 0 ? trimmed.slice(0, matchIndex).replace(/[,\s]+$/, '').trim() : '';
+    const beforePostal =
+      matchIndex > 0
+        ? trimmed
+            .slice(0, matchIndex)
+            .replace(/[,\s]+$/, '')
+            .trim()
+        : '';
     return {
       street: beforePostal || null,
       postalCode,
@@ -70,17 +76,91 @@ export function safeNumberStrict(value: unknown): number {
   return n;
 }
 
+/** Expected IBAN lengths per country code (ISO 13616). */
+const IBAN_LENGTHS: Record<string, number> = {
+  DE: 22,
+  AT: 20,
+  CH: 21,
+  FR: 27,
+  IT: 27,
+  ES: 24,
+  NL: 18,
+  BE: 16,
+  LU: 20,
+  PL: 28,
+  GB: 22,
+  SE: 24,
+  DK: 18,
+  NO: 15,
+  FI: 18,
+  PT: 25,
+  IE: 22,
+  CZ: 24,
+  SK: 24,
+  HU: 28,
+  RO: 24,
+  BG: 22,
+  HR: 21,
+  SI: 19,
+  LT: 20,
+  LV: 21,
+  EE: 20,
+  GR: 27,
+  CY: 28,
+  MT: 31,
+  LI: 21,
+};
+
 /**
- * Normalize IBAN: remove whitespace, uppercase, validate basic structure.
+ * Validate IBAN checksum using ISO 7064 Mod 97-10.
+ * Returns true if the IBAN has a valid check digit pair.
+ */
+export function validateIbanChecksum(iban: string): boolean {
+  if (iban.length < 5 || !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
+  // Move first 4 chars to end, replace letters with numbers (A=10..Z=35)
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  const digits = rearranged.replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
+  // Compute mod 97 using successive chunks (number can be 50+ digits)
+  let remainder = 0;
+  for (let i = 0; i < digits.length; i++) {
+    remainder = (remainder * 10 + Number(digits[i])) % 97;
+  }
+  return remainder === 1;
+}
+
+/**
+ * Normalize IBAN: remove whitespace, uppercase, validate structure + checksum.
  */
 export function normalizeIban(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const text = String(value).replace(/\s+/g, '').toUpperCase();
   if (!text) return null;
-  if (text.length >= 15 && text.length <= 34 && /^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(text)) {
+
+  if (text.length < 15 || text.length > 34 || !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(text)) {
+    logger.warn('Invalid IBAN format detected', { iban: text.substring(0, 4) + '...' });
     return text;
   }
-  logger.warn('Invalid IBAN format detected', { iban: text.substring(0, 4) + '...' });
+
+  // Country-specific length check
+  const country = text.slice(0, 2);
+  const expectedLen = IBAN_LENGTHS[country];
+  if (expectedLen && text.length !== expectedLen) {
+    logger.warn('IBAN length mismatch — possible AI extraction error', {
+      country,
+      expected: expectedLen,
+      actual: text.length,
+      iban: text.substring(0, 4) + '***',
+    });
+  }
+
+  // Checksum validation (mod 97)
+  if (!validateIbanChecksum(text)) {
+    logger.warn('IBAN checksum invalid — likely misread digits', {
+      iban: text.substring(0, 4) + '***',
+      length: text.length,
+    });
+  }
+
   return text;
 }
 
@@ -407,7 +487,9 @@ function normalizeAllowanceCharges(raw: unknown): AllowanceCharge[] {
         reason: (item.reason as string) || null,
         reasonCode: (item.reasonCode as string) || null,
         taxRate: isNaN(taxRate) ? null : taxRate,
-        taxCategoryCode: normalizeTaxCategoryCode(item.taxCategoryCode, isNaN(taxRate) ? undefined : taxRate) ?? null,
+        taxCategoryCode:
+          normalizeTaxCategoryCode(item.taxCategoryCode, isNaN(taxRate) ? undefined : taxRate) ??
+          null,
       } as AllowanceCharge;
     })
     .filter((item): item is AllowanceCharge => item !== null);

@@ -569,6 +569,7 @@
     "ibanHint": "(BR-DE-23-a)",
     "ibanRequired": "IBAN is required for bank transfers (BR-DE-23-a)",
     "ibanInvalid": "Invalid IBAN format (e.g., DE89370400440532013000)",
+    "ibanChecksumInvalid": "IBAN checksum is invalid — please verify the digits are correct",
     "bic": "BIC (Swift)",
     "bankName": "Bank Name",
     "paymentTerms": "Payment Terms / Notes",

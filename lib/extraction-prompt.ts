@@ -82,7 +82,7 @@ Return ONLY valid JSON matching this structure:
   "sellerContactName": "string|null",
   "sellerElectronicAddress": "string|null",
   "sellerElectronicAddressScheme": "string|null",
-  "sellerIban": "IBAN from payment/bank section or footer|null",
+  "sellerIban": "IBAN — copy EXACTLY as printed, digit by digit. German IBANs are always 22 chars (e.g. DE89370400440532013000). Count the digits.|null",
   "sellerBic": "BIC/SWIFT (8-11 chars)|null",
   "bankName": "string|null",
   "buyerName": "string|null",

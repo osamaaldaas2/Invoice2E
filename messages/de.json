@@ -568,6 +568,7 @@
     "iban": "IBAN",
     "ibanHint": "(BR-DE-23-a)",
     "ibanRequired": "IBAN ist für Banküberweisungen erforderlich (BR-DE-23-a)",
+    "ibanChecksumInvalid": "IBAN-Pr\u00fcfsumme ist ung\u00fcltig \u2014 bitte \u00fcberpr\u00fcfen Sie die Ziffern",
     "ibanInvalid": "Ungültiges IBAN-Format (z.B. DE89370400440532013000)",
     "bic": "BIC (Swift)",
     "bankName": "Bankname",
