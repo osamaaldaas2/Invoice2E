@@ -1,0 +1,65 @@
+/**
+ * Phase 8: OCR via Tesseract.js
+ * Extracts text from images using Tesseract OCR with German + English language support.
+ * Gated behind ENABLE_OCR feature flag.
+ */
+
+import { ENABLE_OCR } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
+export interface OcrResult {
+  text: string;
+  confidence: number;
+}
+
+let workerPromise: Promise<import('tesseract.js').Worker> | null = null;
+
+async function getWorker(): Promise<import('tesseract.js').Worker> {
+  if (!workerPromise) {
+    workerPromise = (async () => {
+      const Tesseract = await import('tesseract.js');
+      const worker = await Tesseract.createWorker('deu+eng');
+      return worker;
+    })();
+  }
+  return workerPromise;
+}
+
+/**
+ * Run OCR on an image buffer.
+ * Returns extracted text and confidence score.
+ * If confidence < 0.5 or OCR is disabled, returns empty text.
+ */
+export async function extractTextWithOcr(
+  imageBuffer: Buffer,
+  _mimeType: string
+): Promise<OcrResult> {
+  if (!ENABLE_OCR) {
+    return { text: '', confidence: 0 };
+  }
+
+  try {
+    const worker = await getWorker();
+    const result = await worker.recognize(imageBuffer);
+
+    const confidence = result.data.confidence / 100; // Tesseract returns 0-100
+    const text = result.data.text;
+
+    logger.info('OCR extraction complete', {
+      textLength: text.length,
+      confidence: Math.round(confidence * 100) / 100,
+    });
+
+    if (confidence < 0.5) {
+      logger.warn('OCR confidence too low, discarding result', { confidence });
+      return { text: '', confidence };
+    }
+
+    return { text, confidence };
+  } catch (error) {
+    logger.warn('OCR extraction failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { text: '', confidence: 0 };
+  }
+}

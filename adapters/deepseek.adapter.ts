@@ -4,7 +4,11 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { IDeepSeekAdapter, DeepSeekExtractionResult } from './interfaces';
 import { ExtractedInvoiceData } from '@/types';
-import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
+import {
+  EXTRACTION_PROMPT,
+  EXTRACTION_PROMPT_WITH_TEXT,
+  EXTRACTION_PROMPT_VISION,
+} from '@/lib/extraction-prompt';
 import { normalizeExtractedData, parseJsonFromAiResponse } from '@/lib/extraction-normalizer';
 
 export class DeepSeekAdapter implements IDeepSeekAdapter {
@@ -188,6 +192,135 @@ export class DeepSeekAdapter implements IDeepSeekAdapter {
       throw new AppError(
         'DEEPSEEK_ERROR',
         `DeepSeek sendPrompt failed: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Extract with optional pre-extracted text.
+   */
+  async extractWithText(
+    fileBuffer: Buffer,
+    mimeType: string,
+    options?: { extractedText?: string }
+  ): Promise<DeepSeekExtractionResult> {
+    const startTime = Date.now();
+
+    if (!this.apiKey) {
+      throw new AppError('CONFIG_ERROR', 'DeepSeek API not configured', 500);
+    }
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new ValidationError('Empty file buffer');
+    }
+
+    const hasText = !!options?.extractedText;
+    const prompt = hasText
+      ? EXTRACTION_PROMPT_WITH_TEXT + options!.extractedText!.substring(0, 50000)
+      : EXTRACTION_PROMPT_VISION;
+
+    const data = await this.callDeepSeek(fileBuffer, mimeType, prompt);
+    const normalizedData = normalizeExtractedData(data);
+
+    const processingTimeMs = Date.now() - startTime;
+    const finalResult: ExtractedInvoiceData = {
+      ...normalizedData,
+      processingTimeMs,
+      confidence: normalizedData.confidence || 0.7,
+    };
+
+    return {
+      data: finalResult,
+      confidence: finalResult.confidence ?? 0.7,
+      processingTimeMs,
+    };
+  }
+
+  /**
+   * Retry extraction with a correction prompt.
+   */
+  async extractWithRetry(
+    fileBuffer: Buffer,
+    mimeType: string,
+    retryPrompt: string
+  ): Promise<DeepSeekExtractionResult> {
+    const startTime = Date.now();
+
+    if (!this.apiKey) {
+      throw new AppError('CONFIG_ERROR', 'DeepSeek API not configured', 500);
+    }
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new ValidationError('Empty file buffer');
+    }
+
+    const data = await this.callDeepSeek(fileBuffer, mimeType, retryPrompt);
+    const normalizedData = normalizeExtractedData(data);
+
+    const processingTimeMs = Date.now() - startTime;
+    const finalResult: ExtractedInvoiceData = {
+      ...normalizedData,
+      processingTimeMs,
+      confidence: normalizedData.confidence || 0.7,
+    };
+
+    return {
+      data: finalResult,
+      confidence: finalResult.confidence ?? 0.7,
+      processingTimeMs,
+    };
+  }
+
+  private async callDeepSeek(
+    fileBuffer: Buffer,
+    mimeType: string,
+    prompt: string
+  ): Promise<Record<string, unknown>> {
+    const base64Data = fileBuffer.toString('base64');
+
+    const payload = {
+      model: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${base64Data}` },
+            },
+          ],
+        },
+      ],
+      max_tokens: 2000,
+      temperature: 0,
+    };
+
+    try {
+      const response = await axios.post(this.apiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        timeout: this.timeout,
+      });
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new AppError('DEEPSEEK_ERROR', 'Empty response from DeepSeek API', 500);
+      }
+
+      return parseJsonFromAiResponse(content) as Record<string, unknown>;
+    } catch (error) {
+      if (
+        axios.isAxiosError(error) &&
+        (error.code === 'ECONNABORTED' || error.message?.includes('timeout'))
+      ) {
+        throw new AppError('DEEPSEEK_TIMEOUT', 'DeepSeek API request timed out', 504);
+      }
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        'DEEPSEEK_ERROR',
+        `DeepSeek call failed: ${error instanceof Error ? error.message : String(error)}`,
         500
       );
     }

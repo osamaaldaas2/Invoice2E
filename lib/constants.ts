@@ -97,7 +97,7 @@ export const OPENAI_RATE_LIMIT = {
 export const ENABLE_TEXT_EXTRACTION = true;
 export const ENABLE_STRUCTURED_OUTPUTS = true;
 export const ENABLE_EXTRACTION_RETRY = true;
-export const ENABLE_OCR = true; // OCR implementation is Phase 8 — stub only
+export const ENABLE_OCR = true; // OCR via Tesseract.js (Phase 8)
 
 // Extraction retry configuration
 export const EXTRACTION_MAX_RETRIES = 2;

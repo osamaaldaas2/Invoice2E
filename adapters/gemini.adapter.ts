@@ -4,7 +4,11 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { IGeminiAdapter, GeminiExtractionResult } from './interfaces';
 import { ExtractedInvoiceData } from '@/types';
-import { EXTRACTION_PROMPT } from '@/lib/extraction-prompt';
+import {
+  EXTRACTION_PROMPT,
+  EXTRACTION_PROMPT_WITH_TEXT,
+  EXTRACTION_PROMPT_VISION,
+} from '@/lib/extraction-prompt';
 import { normalizeExtractedData, parseJsonFromAiResponse } from '@/lib/extraction-normalizer';
 import { geminiThrottle } from '@/lib/api-throttle';
 
@@ -17,11 +21,16 @@ export class GeminiAdapter implements IGeminiAdapter {
   private model: GenerativeModel | null = null;
   private lastApiKey: string | null = null;
 
-  constructor(config?: { apiKey?: string; timeout?: number; model?: string; enableThinking?: boolean }) {
+  constructor(config?: {
+    apiKey?: string;
+    timeout?: number;
+    model?: string;
+    enableThinking?: boolean;
+  }) {
     this.configApiKey = config?.apiKey;
     this.timeout = config?.timeout ?? API_TIMEOUTS.GEMINI_EXTRACTION;
     this.modelName = config?.model ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-    this.enableThinking = config?.enableThinking ?? (process.env.GEMINI_ENABLE_THINKING !== 'false');
+    this.enableThinking = config?.enableThinking ?? process.env.GEMINI_ENABLE_THINKING !== 'false';
   }
 
   private get apiKey(): string {
@@ -41,9 +50,7 @@ export class GeminiAdapter implements IGeminiAdapter {
         model: this.modelName,
         generationConfig: {
           // @ts-ignore – thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
-          thinkingConfig: this.enableThinking
-            ? { thinkingBudget: 4096 }
-            : { thinkingBudget: 0 },
+          thinkingConfig: this.enableThinking ? { thinkingBudget: 4096 } : { thinkingBudget: 0 },
         },
       });
     }
@@ -187,6 +194,126 @@ export class GeminiAdapter implements IGeminiAdapter {
       throw new AppError(
         'GEMINI_ERROR',
         `Gemini sendPrompt failed: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
+    }
+  }
+
+  /**
+   * Extract with optional pre-extracted text + text-aware prompt.
+   * Does NOT use Structured Outputs (Gemini doesn't support them).
+   */
+  async extractWithText(
+    fileBuffer: Buffer,
+    mimeType: string,
+    options?: { extractedText?: string }
+  ): Promise<GeminiExtractionResult> {
+    const startTime = Date.now();
+    const model = this.getModel();
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new ValidationError('Empty file buffer');
+    }
+
+    const hasText = !!options?.extractedText;
+    const prompt = hasText
+      ? EXTRACTION_PROMPT_WITH_TEXT + options!.extractedText!.substring(0, 50000)
+      : EXTRACTION_PROMPT_VISION;
+
+    const data = await this.callGemini(model, fileBuffer, mimeType, prompt);
+    const normalizedData = normalizeExtractedData(data);
+
+    const processingTimeMs = Date.now() - startTime;
+    const finalResult: ExtractedInvoiceData = {
+      ...normalizedData,
+      processingTimeMs,
+      confidence: normalizedData.confidence || this.calculateConfidenceScore(normalizedData),
+    };
+
+    return {
+      data: finalResult,
+      confidence: finalResult.confidence ?? 0.8,
+      processingTimeMs,
+    };
+  }
+
+  /**
+   * Retry extraction with a correction prompt.
+   */
+  async extractWithRetry(
+    fileBuffer: Buffer,
+    mimeType: string,
+    retryPrompt: string
+  ): Promise<GeminiExtractionResult> {
+    const startTime = Date.now();
+    const model = this.getModel();
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new ValidationError('Empty file buffer');
+    }
+
+    const data = await this.callGemini(model, fileBuffer, mimeType, retryPrompt);
+    const normalizedData = normalizeExtractedData(data);
+
+    const processingTimeMs = Date.now() - startTime;
+    const finalResult: ExtractedInvoiceData = {
+      ...normalizedData,
+      processingTimeMs,
+      confidence: normalizedData.confidence || this.calculateConfidenceScore(normalizedData),
+    };
+
+    return {
+      data: finalResult,
+      confidence: finalResult.confidence ?? 0.8,
+      processingTimeMs,
+    };
+  }
+
+  private async callGemini(
+    model: GenerativeModel,
+    fileBuffer: Buffer,
+    mimeType: string,
+    prompt: string
+  ): Promise<Record<string, unknown>> {
+    const imagePart = {
+      inlineData: {
+        data: fileBuffer.toString('base64'),
+        mimeType,
+      },
+    };
+
+    await geminiThrottle.acquire();
+
+    let raceTimerId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      raceTimerId = setTimeout(() => reject(new Error('Gemini API timeout')), this.timeout);
+    });
+
+    try {
+      let result;
+      try {
+        result = await Promise.race([
+          model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }, imagePart] }],
+            generationConfig: { temperature: 0 },
+          }),
+          timeoutPromise,
+        ]);
+      } finally {
+        clearTimeout(raceTimerId!);
+      }
+
+      // @ts-ignore
+      const textContent = result.response.text();
+      return parseJsonFromAiResponse(textContent) as Record<string, unknown>;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('timeout')) {
+        throw new AppError('GEMINI_TIMEOUT', 'Gemini API request timed out', 504);
+      }
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        'GEMINI_ERROR',
+        `Gemini call failed: ${error instanceof Error ? error.message : String(error)}`,
         500
       );
     }
