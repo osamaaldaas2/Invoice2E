@@ -144,3 +144,64 @@ Return ONLY valid JSON matching this structure:
 }
 
 Extract the data now.`;
+
+/**
+ * Phase 5: Shorter prompt for when pre-extracted text is available.
+ * No JSON schema section — Structured Outputs handles the shape.
+ * ~800 tokens, focuses on extraction rules only.
+ */
+export const EXTRACTION_PROMPT_WITH_TEXT = `You are a European invoice data extraction specialist. Extract structured data from the provided invoice text for XRechnung / EN 16931 compliance.
+
+RULES:
+1. NET PRICES ONLY: unitPrice and totalPrice are NET (before VAT). If gross, convert: NET = GROSS / (1 + taxRate/100).
+2. totalPrice = quantity × unitPrice (NET). Self-check this.
+3. subtotal = sum of all lineItems.totalPrice (NET, after allowances/charges).
+4. Extract ALL line items. Continuation lines (no qty/price) merge into previous description.
+5. TAX IDs are CRITICAL: sellerVatId (USt-IdNr, format DE123456789), sellerTaxNumber (Steuernummer). Extract at least one. sellerTaxId = copy of whichever found.
+6. Split addresses into street, postalCode, city, countryCode. Never leave city/postalCode null if an address block exists.
+7. Dates in YYYY-MM-DD format.
+8. Decimals use dot: 5.508,99 → 5508.99. Null if not visible.
+9. allowanceCharges: chargeIndicator false=discount, true=surcharge. amount always positive. Empty array if none.
+10. currency: ISO 4217 (e.g. EUR).
+11. documentTypeCode: 380=invoice, 381=credit note, 384=corrected, 389=self-billed. Default 380.
+12. buyerReference: Leitweg-ID, Kundennummer, Referenz, Ihr Zeichen, or buyer contact name.
+13. sellerIban: Copy EXACTLY as printed. German IBANs = 22 chars.
+14. confidence: 0-1 float.
+
+INVOICE TEXT:
+`;
+
+/**
+ * Phase 5: Vision prompt for images/scanned PDFs.
+ * Stronger layout reading instructions.
+ */
+export const EXTRACTION_PROMPT_VISION = `You are a European invoice data extraction specialist. You extract structured data from invoice IMAGES (scanned/photographed) into JSON for XRechnung and EN 16931 compliance.
+
+IMAGE READING INSTRUCTIONS:
+- Read the ENTIRE image carefully, including headers, footers, margins, watermarks, and fine print.
+- Tables may have misaligned columns in scans — use column headers to determine which value belongs where.
+- If text is blurry or partially obscured, use context clues (e.g. "19%" near a number likely means tax rate).
+- Handwritten annotations should be ignored unless they modify printed values.
+- Rotated or skewed text: mentally straighten before reading.
+- Multi-page images: process all pages.
+
+SCAN ORDER:
+1. HEADER: Seller name, address, contact, tax IDs (top + letterhead)
+2. RECIPIENT: Buyer name, address, reference numbers
+3. INVOICE META: Number, date, due date, currency, payment terms
+4. LINE ITEMS TABLE: Every row — descriptions, quantities, NET prices
+5. BELOW TABLE: Allowances/charges, subtotal, tax, total
+6. FOOTER/MARGINS: IBAN, BIC, bank name, VAT ID, tax number
+
+CRITICAL RULES:
+- NET PRICES ONLY: unitPrice/totalPrice before VAT. Convert if gross: NET = GROSS / (1 + taxRate/100).
+- totalPrice = quantity × unitPrice. Self-check.
+- TAX IDs: sellerVatId (USt-IdNr), sellerTaxNumber (Steuernummer) — search ENTIRE document.
+- Split addresses: street, postalCode, city, countryCode.
+- Dates: YYYY-MM-DD. Decimals: dot notation.
+- Extract ALL line items. Merge continuation lines.
+- allowanceCharges: false=discount, true=surcharge. amount positive. [] if none.
+- sellerIban: EXACT copy. German IBANs = 22 chars.
+- confidence: 0-1 float.
+
+Return ONLY valid JSON. Extract the data now.`;

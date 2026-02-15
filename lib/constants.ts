@@ -93,6 +93,29 @@ export const OPENAI_RATE_LIMIT = {
   REFILL_PER_SEC: 2, // Tokens refilled per second
 } as const;
 
+// Extraction upgrade feature flags
+export const ENABLE_TEXT_EXTRACTION = true;
+export const ENABLE_STRUCTURED_OUTPUTS = true;
+export const ENABLE_EXTRACTION_RETRY = true;
+export const ENABLE_OCR = true; // OCR implementation is Phase 8 — stub only
+
+// Extraction retry configuration
+export const EXTRACTION_MAX_RETRIES = 2;
+
+// Extraction validation tolerances
+export const EXTRACTION_VALIDATION_TOLERANCE = {
+  LINE_ITEM: 0.02, // unitPrice × quantity ≈ totalPrice
+  SUBTOTAL: 0.1, // sum(lineItems.totalPrice) ≈ subtotal
+  TAX: 0.05, // taxAmount ≈ subtotal × taxRate / 100
+  TOTAL: 0.05, // subtotal + taxAmount ≈ totalAmount
+} as const;
+
+// Text extraction thresholds
+export const TEXT_EXTRACTION = {
+  MIN_CHARS_PER_PAGE: 50, // Below this → treat as scanned
+  MAX_TEXT_LENGTH: 50000, // Truncate extracted text beyond this
+} as const;
+
 export const GEMINI_RATE_LIMIT = {
   MAX_TOKENS: 5, // Burst capacity (5 calls fire instantly, then 2/sec sustained)
   REFILL_PER_SEC: 2, // Tokens refilled per second (~120 RPM, under Gemini's 150 RPM)
