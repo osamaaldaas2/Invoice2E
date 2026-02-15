@@ -43,7 +43,7 @@ const triggerBatchWorker = async (req: NextRequest): Promise<void> => {
 };
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
-export const maxDuration = 60; // Set max duration to 60 seconds for AI processing
+export const maxDuration = 300; // 5 min — covers inline (≤3) and large batch processing
 
 export async function POST(request: NextRequest) {
   try {

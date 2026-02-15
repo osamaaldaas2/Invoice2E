@@ -5,9 +5,9 @@ export const APP_VERSION = '1.0.0';
 // API Timeouts (in milliseconds)
 // CONSTITUTION RULE: All external API calls must have explicit timeout
 export const API_TIMEOUTS = {
-  GEMINI_EXTRACTION: 60000, // 60 seconds (AI processing)
-  DEEPSEEK_EXTRACTION: 60000, // 60 seconds (AI processing)
-  OPENAI_EXTRACTION: 60000, // 60 seconds (AI processing)
+  GEMINI_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
+  DEEPSEEK_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
+  OPENAI_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
   BOUNDARY_DETECTION: 30000, // 30 seconds (lighter AI call)
   STRIPE_API: 30000, // 30 seconds (payment processing)
   PAYPAL_API: 30000, // 30 seconds (payment processing)
