@@ -218,13 +218,16 @@ export async function POST(request: NextRequest) {
             try {
               const extractedData = await extractor.extractFromFile(buf, segmentName, file.type);
 
-              const extraction = await invoiceDbService.createExtraction({
-                userId,
-                extractionData: extractedData as unknown as Record<string, unknown>,
-                confidenceScore: extractedData.confidence,
-                geminiResponseTimeMs: extractedData.processingTimeMs,
-                status: 'completed',
-              }, userClient);
+              const extraction = await invoiceDbService.createExtraction(
+                {
+                  userId,
+                  extractionData: extractedData as unknown as Record<string, unknown>,
+                  confidenceScore: extractedData.confidence,
+                  geminiResponseTimeMs: extractedData.processingTimeMs,
+                  status: 'completed',
+                },
+                userClient
+              );
 
               // Credits already deducted upfront — no per-segment deduction
 
@@ -255,11 +258,16 @@ export async function POST(request: NextRequest) {
         try {
           await creditsDbService.addCredits(userId, failCount, 'extraction_refund:multi');
         } catch (refundErr) {
-          logger.error('Failed to refund credits for failed multi-invoice segments', {
-            userId,
-            failCount,
-            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-          });
+          logger.error(
+            'CRITICAL: Failed to refund credits for failed multi-invoice segments — MANUAL RECOVERY NEEDED',
+            {
+              userId,
+              failCount,
+              creditsLost: failCount,
+              action: 'manual_credit_add',
+              error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+            }
+          );
         }
       }
 
@@ -302,10 +310,15 @@ export async function POST(request: NextRequest) {
       try {
         await creditsDbService.addCredits(userId, 1, 'extraction_refund');
       } catch (refundErr) {
-        logger.error('Failed to refund credit after extraction failure', {
-          userId,
-          error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-        });
+        logger.error(
+          'CRITICAL: Failed to refund credit after extraction failure — MANUAL RECOVERY NEEDED',
+          {
+            userId,
+            creditsLost: 1,
+            action: 'manual_credit_add',
+            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+          }
+        );
       }
 
       logger.error('Detailed extraction error information', {
@@ -333,13 +346,16 @@ export async function POST(request: NextRequest) {
     const responseTime = Date.now() - startTime;
 
     // Save extraction to database (RLS enforced)
-    const extraction = await invoiceDbService.createExtraction({
-      userId,
-      extractionData: extractedData as unknown as Record<string, unknown>,
-      confidenceScore: extractedData.confidence,
-      geminiResponseTimeMs: responseTime,
-      status: 'completed',
-    }, userClient);
+    const extraction = await invoiceDbService.createExtraction(
+      {
+        userId,
+        extractionData: extractedData as unknown as Record<string, unknown>,
+        confidenceScore: extractedData.confidence,
+        geminiResponseTimeMs: responseTime,
+        status: 'completed',
+      },
+      userClient
+    );
 
     // Credits already deducted before AI call — no post-extraction deduction needed
 
