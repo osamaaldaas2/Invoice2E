@@ -4,7 +4,7 @@ const withNextIntl = require('next-intl/plugin')('./i18n/request.ts');
 const nextConfig = {
     reactStrictMode: true,
     pageExtensions: ['ts', 'tsx'],
-    serverExternalPackages: ['pdf-parse'],
+    serverExternalPackages: ['pdf-parse', 'tesseract.js'],
     experimental: {
         optimizePackageImports: ['@/lib', '@/components'],
         proxyClientMaxBodySize: '200mb',
