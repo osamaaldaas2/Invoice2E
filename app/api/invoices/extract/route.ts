@@ -321,17 +321,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      logger.error('Detailed extraction error information', {
-        provider: extractor.getProviderName(),
-        errorName: extractionError instanceof Error ? extractionError.constructor.name : 'Unknown',
-        errorMessage:
-          extractionError instanceof Error ? extractionError.message : String(extractionError),
-        errorStack: extractionError instanceof Error ? extractionError.stack : undefined,
-        ...(extractionError instanceof AppError && {
-          appErrorCode: extractionError.name,
-          appErrorStatus: extractionError.statusCode,
-        }),
-      });
+      logger.error(
+        `Extraction failed [${extractor.getProviderName()}]: ${extractionError instanceof Error ? extractionError.message : String(extractionError)}`,
+        extractionError instanceof Error ? extractionError : new Error(String(extractionError))
+      );
 
       if (extractionError instanceof AppError) {
         return NextResponse.json(
