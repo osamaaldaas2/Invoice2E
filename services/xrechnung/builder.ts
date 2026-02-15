@@ -115,7 +115,7 @@ export class XRechnungBuilder {
     if (Math.abs(grossAfterAdjustments - providedSubtotal) <= 0.05) return data;
 
     // Try common VAT rates to detect gross pricing
-    const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05];
+    const commonRates = [0.19, 0.07, 0.2, 0.21, 0.1, 0.05];
     let detectedRate: number | null = null;
     for (const rate of commonRates) {
       if (Math.abs(roundMoney(grossAfterAdjustments / (1 + rate)) - providedSubtotal) < 0.05) {
@@ -578,7 +578,7 @@ export class XRechnungBuilder {
         let baseAmount = ac.baseAmount != null ? Number(ac.baseAmount) : null;
         if (percentage != null && percentage > 0 && baseAmount == null) {
           // Derive base amount from actual amount and percentage
-          baseAmount = roundMoney((Number(ac.amount) || 0) * 100 / percentage);
+          baseAmount = roundMoney(((Number(ac.amount) || 0) * 100) / percentage);
         }
         const baseAmountXml =
           baseAmount != null
@@ -642,7 +642,7 @@ export class XRechnungBuilder {
     let isGrossPriced = false;
     const providedSubtotal = this.safeNumber(data.subtotal);
     if (hasAllowancesOrCharges && Math.abs(computedTaxBasis - providedSubtotal) > 0.05) {
-      const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05];
+      const commonRates = [0.19, 0.07, 0.2, 0.21, 0.1, 0.05];
       for (const rate of commonRates) {
         const netFromGross = roundMoney(computedTaxBasis / (1 + rate));
         if (Math.abs(netFromGross - providedSubtotal) < 0.05) {
@@ -662,9 +662,10 @@ export class XRechnungBuilder {
     if (isGrossPriced) {
       // Gross pricing: use provided values, compute tax rate from subtotal/taxAmount
       const providedTaxAmount = this.safeNumber(data.taxAmount);
-      const inferredRate = providedSubtotal > 0
-        ? roundMoney((providedTaxAmount / providedSubtotal) * 100)
-        : DEFAULT_VAT_RATE;
+      const inferredRate =
+        providedSubtotal > 0
+          ? roundMoney((providedTaxAmount / providedSubtotal) * 100)
+          : DEFAULT_VAT_RATE;
       const categoryCode = this.getVatCategoryCode(inferredRate);
       const exemptionXml = this.buildExemptionReason(categoryCode);
 
@@ -707,12 +708,42 @@ export class XRechnungBuilder {
       const taxGroups = this.buildTaxGroups(items, allowanceCharges);
       let computedTaxAmount = 0;
       for (const group of taxGroups) {
-        computedTaxAmount = roundMoney(computedTaxAmount + computeTax(group.basisAmount, group.rate));
+        computedTaxAmount = roundMoney(
+          computedTaxAmount + computeTax(group.basisAmount, group.rate)
+        );
       }
-      taxAmount = taxBreakdownXml.length > 0 ? computedTaxAmount : this.safeNumber(data.taxAmount);
-      // NOTE: Do NOT override taxAmount with data.taxAmount here — the CalculatedAmount
-      // in each ApplicableTradeTax block was computed from basisAmount × rate.
+
       // BR-CO-14 requires TaxTotalAmount = Σ CalculatedAmount, so they must stay in sync.
+      // However, rounding of basisAmount × rate can differ from the invoice's own tax amount
+      // by up to 1 cent. When the extracted taxAmount is within tolerance, prefer it and
+      // adjust the last tax group's CalculatedAmount to match exactly.
+      const extractedTaxAmount = this.safeNumber(data.taxAmount);
+      const taxRoundingDiff = roundMoney(extractedTaxAmount - computedTaxAmount);
+
+      if (
+        extractedTaxAmount > 0 &&
+        Math.abs(taxRoundingDiff) > 0 &&
+        Math.abs(taxRoundingDiff) <= 0.02
+      ) {
+        // Adjust the last tax breakdown's CalculatedAmount to absorb the rounding difference
+        if (taxBreakdownXml.length > 0) {
+          const lastXml = taxBreakdownXml[taxBreakdownXml.length - 1]!;
+          const adjustedCalc = roundMoney(
+            computeTax(
+              taxGroups[taxGroups.length - 1]!.basisAmount,
+              taxGroups[taxGroups.length - 1]!.rate
+            ) + taxRoundingDiff
+          );
+          taxBreakdownXml[taxBreakdownXml.length - 1] = lastXml.replace(
+            /<ram:CalculatedAmount>[^<]+<\/ram:CalculatedAmount>/,
+            `<ram:CalculatedAmount>${adjustedCalc.toFixed(2)}</ram:CalculatedAmount>`
+          );
+        }
+        taxAmount = extractedTaxAmount;
+      } else {
+        taxAmount = taxBreakdownXml.length > 0 ? computedTaxAmount : extractedTaxAmount;
+      }
+
       total = roundMoney(taxBasis + taxAmount);
     }
 
@@ -741,12 +772,14 @@ export class XRechnungBuilder {
     const allowanceChargeXml = this.buildAllowanceChargeXml(allowanceCharges);
 
     // Monetary summation XML
-    const allowanceTotalXml = totalAllowances > 0
-      ? `\n                <ram:AllowanceTotalAmount>${totalAllowances.toFixed(2)}</ram:AllowanceTotalAmount>`
-      : '';
-    const chargeTotalXml = totalCharges > 0
-      ? `\n                <ram:ChargeTotalAmount>${totalCharges.toFixed(2)}</ram:ChargeTotalAmount>`
-      : '';
+    const allowanceTotalXml =
+      totalAllowances > 0
+        ? `\n                <ram:AllowanceTotalAmount>${totalAllowances.toFixed(2)}</ram:AllowanceTotalAmount>`
+        : '';
+    const chargeTotalXml =
+      totalCharges > 0
+        ? `\n                <ram:ChargeTotalAmount>${totalCharges.toFixed(2)}</ram:ChargeTotalAmount>`
+        : '';
 
     return `
         <ram:ApplicableHeaderTradeSettlement>
@@ -801,7 +834,7 @@ ${allowanceChargeXml}
       for (const ac of allowanceCharges) {
         const taxRate = ac.taxRate != null ? Number(ac.taxRate) : DEFAULT_VAT_RATE;
         const categoryCode = ac.taxCategoryCode || this.getVatCategoryCode(taxRate);
-        const adjustment = ac.chargeIndicator ? (Number(ac.amount) || 0) : -(Number(ac.amount) || 0);
+        const adjustment = ac.chargeIndicator ? Number(ac.amount) || 0 : -(Number(ac.amount) || 0);
 
         const key = `${taxRate}:${categoryCode}`;
         const existing = groups.get(key);
