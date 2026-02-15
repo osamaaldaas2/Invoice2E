@@ -1,28 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockGetText = vi.fn();
-const mockDestroy = vi.fn().mockResolvedValue(undefined);
+const mockExtractText = vi.fn();
 
-vi.mock('pdf-parse', () => {
-  return {
-    PDFParse: class {
-      getText = mockGetText;
-      destroy = mockDestroy;
-      constructor(_opts: unknown) {}
-    },
-  };
-});
+vi.mock('unpdf', () => ({
+  extractText: (...args: unknown[]) => mockExtractText(...args),
+}));
 
 import { extractTextFromPdf } from '@/lib/pdf-text-extractor';
 
 beforeEach(() => {
-  mockGetText.mockReset();
-  mockDestroy.mockReset().mockResolvedValue(undefined);
+  mockExtractText.mockReset();
 });
 
 describe('extractTextFromPdf', () => {
   it('returns hasText: true for digital PDFs with sufficient text', async () => {
-    mockGetText.mockResolvedValue({ text: 'A'.repeat(200), total: 1, pages: [] });
+    mockExtractText.mockResolvedValue({ text: ['A'.repeat(200)], totalPages: 1 });
 
     const result = await extractTextFromPdf(Buffer.from('fake pdf'));
     expect(result.hasText).toBe(true);
@@ -30,8 +22,17 @@ describe('extractTextFromPdf', () => {
     expect(result.pageCount).toBe(1);
   });
 
+  it('joins multiple pages with double newline', async () => {
+    mockExtractText.mockResolvedValue({ text: ['A'.repeat(100), 'B'.repeat(100)], totalPages: 2 });
+
+    const result = await extractTextFromPdf(Buffer.from('fake pdf'));
+    expect(result.hasText).toBe(true);
+    expect(result.text).toBe('A'.repeat(100) + '\n\n' + 'B'.repeat(100));
+    expect(result.pageCount).toBe(2);
+  });
+
   it('returns hasText: false for scanned PDFs with little text', async () => {
-    mockGetText.mockResolvedValue({ text: 'Hi', total: 1, pages: [] });
+    mockExtractText.mockResolvedValue({ text: ['Hi'], totalPages: 1 });
 
     const result = await extractTextFromPdf(Buffer.from('fake pdf'));
     expect(result.hasText).toBe(false);
@@ -39,7 +40,7 @@ describe('extractTextFromPdf', () => {
   });
 
   it('returns hasText: false on parse error', async () => {
-    mockGetText.mockRejectedValue(new Error('corrupt PDF'));
+    mockExtractText.mockRejectedValue(new Error('corrupt PDF'));
 
     const result = await extractTextFromPdf(Buffer.from('bad'));
     expect(result.hasText).toBe(false);
