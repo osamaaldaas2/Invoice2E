@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('extractTextFromPdf', () => {
   it('returns hasText: true for digital PDFs with sufficient text', async () => {
-    mockGetText.mockResolvedValue({ pages: [{ text: 'A'.repeat(200) }] });
+    mockGetText.mockResolvedValue({ text: 'A'.repeat(200), total: 1, pages: [] });
 
     const result = await extractTextFromPdf(Buffer.from('fake pdf'));
     expect(result.hasText).toBe(true);
@@ -31,7 +31,7 @@ describe('extractTextFromPdf', () => {
   });
 
   it('returns hasText: false for scanned PDFs with little text', async () => {
-    mockGetText.mockResolvedValue({ pages: [{ text: 'Hi' }] });
+    mockGetText.mockResolvedValue({ text: 'Hi', total: 1, pages: [] });
 
     const result = await extractTextFromPdf(Buffer.from('fake pdf'));
     expect(result.hasText).toBe(false);

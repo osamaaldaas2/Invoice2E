@@ -17,11 +17,11 @@ const MIN_CHARS_PER_PAGE = 50;
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<PdfTextExtractionResult> {
   try {
     const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: pdfBuffer });
+    const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
     const textResult = await parser.getText();
 
-    const pageCount = textResult.pages?.length || 1;
-    const text = textResult.pages?.map((p) => p.text).join('\n') || '';
+    const pageCount = textResult.total || 1;
+    const text = textResult.text || '';
     const avgCharsPerPage = text.length / pageCount;
     const hasText = avgCharsPerPage >= MIN_CHARS_PER_PAGE;
 
