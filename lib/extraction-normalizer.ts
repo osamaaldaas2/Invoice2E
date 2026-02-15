@@ -301,7 +301,7 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
       ? data.items
       : [];
 
-  return {
+  const result: ExtractedInvoiceData = {
     invoiceNumber: (data.invoiceNumber as string) || null,
     invoiceDate: (data.invoiceDate as string) || null,
     // Fallback: parse address components from combined address string if city/postalCode missing
@@ -410,6 +410,61 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
     // Document-level allowances and charges (BG-20 / BG-21)
     allowanceCharges: normalizeAllowanceCharges(data.allowanceCharges),
   };
+
+  // FIX-031: Detect and convert gross (VAT-inclusive) prices to net.
+  // EN 16931 requires all line item prices to be NET (before VAT).
+  // Heuristic: if sum(lines) - sum(allowances) + sum(charges) ≈ totalAmount
+  // WITHOUT adding tax, then prices are gross (already include VAT).
+  // In a net-priced invoice, that sum would be the tax basis, and
+  // taxBasis + taxAmount ≈ totalAmount.
+  if (result.totalAmount > 0 && result.taxAmount > 0) {
+    const lineTotal = result.lineItems.reduce((s, li) => s + li.totalPrice, 0);
+    const allowanceSum = (result.allowanceCharges || [])
+      .filter((ac) => !ac.chargeIndicator)
+      .reduce((s, ac) => s + ac.amount, 0);
+    const chargeSum = (result.allowanceCharges || [])
+      .filter((ac) => ac.chargeIndicator)
+      .reduce((s, ac) => s + ac.amount, 0);
+
+    const basis = lineTotal - allowanceSum + chargeSum;
+    const grossMatch = Math.abs(basis - result.totalAmount) < 1;
+    const netMatch = Math.abs(basis + result.taxAmount - result.totalAmount) < 1;
+
+    if (grossMatch && !netMatch) {
+      logger.info('Gross pricing detected — converting line items and allowances to NET', {
+        lineTotal: Math.round(lineTotal * 100) / 100,
+        totalAmount: result.totalAmount,
+        taxAmount: result.taxAmount,
+      });
+
+      // Convert line items: net = gross / (1 + taxRate/100)
+      for (const item of result.lineItems) {
+        const rate = item.taxRate ?? 0;
+        if (rate > 0) {
+          const factor = 1 + rate / 100;
+          item.unitPrice = Math.round((item.unitPrice / factor) * 100) / 100;
+          item.totalPrice = Math.round((item.totalPrice / factor) * 100) / 100;
+        }
+      }
+
+      // Convert allowances/charges
+      for (const ac of result.allowanceCharges || []) {
+        const rate = ac.taxRate ?? 0;
+        if (rate > 0) {
+          const factor = 1 + rate / 100;
+          ac.amount = Math.round((ac.amount / factor) * 100) / 100;
+          if (ac.baseAmount) {
+            ac.baseAmount = Math.round((ac.baseAmount / factor) * 100) / 100;
+          }
+        }
+      }
+
+      // Recalculate subtotal as actual net (totalAmount − taxAmount)
+      result.subtotal = Math.round((result.totalAmount - result.taxAmount) * 100) / 100;
+    }
+  }
+
+  return result;
 }
 
 /**
