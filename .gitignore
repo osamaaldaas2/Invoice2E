@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+
+# Tesseract OCR language data (downloaded at runtime)
+*.traineddata
 .pnp
 .pnp.js
 
