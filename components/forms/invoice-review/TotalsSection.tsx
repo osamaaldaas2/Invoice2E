@@ -23,28 +23,35 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({
   const totalAmount = watch('totalAmount');
 
   // FIX-028: Use integer cents to avoid floating point errors
-  // FIX-029: When allowances/charges exist, we cannot reliably auto-calculate
-  // totals because we don't know if line item prices are net (VAT-exclusive)
-  // or gross (VAT-inclusive). Use AI-extracted values for invoices with
-  // allowances; only auto-calculate for simple invoices without them.
+  // FIX-030: Always compute totals deterministically from line items + allowances/charges.
+  // Previous approach (FIX-029) trusted AI-extracted totals when allowances existed,
+  // but AI frequently returned wrong subtotals (e.g. gross sum instead of net-after-allowances).
+  // Deterministic calculation guarantees subtotal + tax = total, always.
   useEffect(() => {
-    const hasAllowances = allowanceCharges.some(
-      (ac: { amount?: number }) => Math.round((Number(ac.amount) || 0) * 100) > 0
-    );
-
-    if (hasAllowances) {
-      // When allowances/charges exist, the AI-extracted totals are more reliable
-      // because the AI can read the actual Netto/MwSt/Brutto from the invoice.
-      // Don't override — let the user edit manually if needed.
-      return;
-    }
-
-    // Simple case: no allowances/charges — auto-calculate from line items (net pricing)
-    const calculatedSubtotalCents = items.reduce((sum: number, item: { totalPrice?: number }) => {
+    // 1. Sum of net line item totals (LineTotalAmount equivalent)
+    const lineTotalCents = items.reduce((sum: number, item: { totalPrice?: number }) => {
       return sum + Math.round((Number(item.totalPrice) || 0) * 100);
     }, 0);
 
-    const calculatedTaxCents = items.reduce(
+    // 2. Sum of allowances (discounts, chargeIndicator=false) and charges (surcharges, chargeIndicator=true)
+    let allowanceTotalCents = 0;
+    let chargeTotalCents = 0;
+    for (const ac of allowanceCharges) {
+      const amountCents = Math.round((Number(ac.amount) || 0) * 100);
+      if (amountCents <= 0) continue;
+      const isCharge = ac.chargeIndicator === true || ac.chargeIndicator === 'true';
+      if (isCharge) {
+        chargeTotalCents += amountCents;
+      } else {
+        allowanceTotalCents += amountCents;
+      }
+    }
+
+    // 3. Tax basis = line totals − allowances + charges (EN 16931 BT-109)
+    const taxBasisCents = lineTotalCents - allowanceTotalCents + chargeTotalCents;
+
+    // 4. Tax: per-component rounding (line item tax − allowance tax + charge tax)
+    const lineTaxCents = items.reduce(
       (sum: number, item: { totalPrice?: number; taxRate?: number | string }) => {
         const amountCents = Math.round((Number(item.totalPrice) || 0) * 100);
         const rate = Number(item.taxRate) || 0;
@@ -53,9 +60,26 @@ export const TotalsSection: React.FC<TotalsSectionProps> = ({
       0
     );
 
-    setValue('subtotal', calculatedSubtotalCents / 100);
+    let allowanceTaxCents = 0;
+    let chargeTaxCents = 0;
+    for (const ac of allowanceCharges) {
+      const amountCents = Math.round((Number(ac.amount) || 0) * 100);
+      if (amountCents <= 0) continue;
+      const rate = Number(ac.taxRate) || 0;
+      const taxCents = Math.round(amountCents * (rate / 100));
+      const isCharge = ac.chargeIndicator === true || ac.chargeIndicator === 'true';
+      if (isCharge) {
+        chargeTaxCents += taxCents;
+      } else {
+        allowanceTaxCents += taxCents;
+      }
+    }
+
+    const calculatedTaxCents = lineTaxCents - allowanceTaxCents + chargeTaxCents;
+
+    setValue('subtotal', taxBasisCents / 100);
     setValue('taxAmount', calculatedTaxCents / 100);
-    setValue('totalAmount', (calculatedSubtotalCents + calculatedTaxCents) / 100);
+    setValue('totalAmount', (taxBasisCents + calculatedTaxCents) / 100);
   }, [items, allowanceCharges, setValue]);
 
   const showDiff = (current: number, extracted: number | undefined) => {
