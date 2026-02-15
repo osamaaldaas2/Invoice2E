@@ -14,7 +14,16 @@ export interface PdfTextExtractionResult {
 
 const MIN_CHARS_PER_PAGE = 50;
 
+// pdfjs-dist requires DOMMatrix/ImageData/Path2D which don't exist on Vercel
+// serverless. Skip and let AI extract from the visual PDF.
+const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<PdfTextExtractionResult> {
+  if (IS_VERCEL) {
+    logger.info('Skipping pdf-parse on Vercel (DOMMatrix unavailable)');
+    return { hasText: false, text: '', pageCount: 0 };
+  }
+
   try {
     const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
