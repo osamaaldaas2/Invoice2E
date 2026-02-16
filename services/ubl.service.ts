@@ -107,7 +107,9 @@ export class UBLService {
         logger.info('Generating UBL 2.1 XRechnung invoice', { invoiceNumber: data.invoiceNumber });
 
         try {
-            const xml = this.buildUBLDocument(data);
+            const xml = data.documentTypeCode === 381
+                ? this.buildCreditNoteDocument(data)
+                : this.buildUBLDocument(data);
             logger.info('UBL XRechnung invoice generated successfully');
             return xml;
         } catch (error) {
@@ -130,6 +132,7 @@ export class UBLService {
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
     <cbc:CustomizationID>${this.customizationId}</cbc:CustomizationID>
     <cbc:ProfileID>${this.profileId}</cbc:ProfileID>
     <cbc:ID>${this.escapeXml(data.invoiceNumber)}</cbc:ID>
@@ -151,6 +154,82 @@ export class UBLService {
     ${this.buildLegalMonetaryTotal(data)}
     ${this.buildInvoiceLines(data)}
 </Invoice>`;
+    }
+
+    /**
+     * Build complete UBL CreditNote document — uses CreditNote root element and line tags
+     */
+    private buildCreditNoteDocument(data: UBLInvoiceData): string {
+        const issueDate = this.formatDate(data.invoiceDate);
+        const dueDate = data.dueDate ? this.formatDate(data.dueDate) : issueDate;
+        const buyerRef = data.buyerReference || data.invoiceNumber || 'LEITWEG-ID';
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>${this.customizationId}</cbc:CustomizationID>
+    <cbc:ProfileID>${this.profileId}</cbc:ProfileID>
+    <cbc:ID>${this.escapeXml(data.invoiceNumber)}</cbc:ID>
+    <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+    ${this.buildInvoicePeriod(data)}
+    <cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>
+    ${data.notes ? `<cbc:Note>${this.escapeXml(data.notes)}</cbc:Note>` : ''}
+    <cbc:DocumentCurrencyCode>${data.currency}</cbc:DocumentCurrencyCode>
+    <cbc:BuyerReference>${this.escapeXml(buyerRef)}</cbc:BuyerReference>
+    ${this.buildPrecedingInvoiceReference(data)}
+    ${this.buildAccountingSupplierParty(data)}
+    ${this.buildAccountingCustomerParty(data)}
+    ${this.buildDelivery(data)}
+    ${this.buildPaymentMeans(data)}
+    ${data.paymentTerms ? this.buildPaymentTerms(data.paymentTerms) : ''}
+    ${this.buildAllowanceCharges(data)}
+    ${this.buildTaxTotal(data)}
+    ${this.buildLegalMonetaryTotal(data)}
+    ${this.buildCreditNoteLines(data)}
+</CreditNote>`;
+    }
+
+    /**
+     * Build CreditNoteLines
+     */
+    private buildCreditNoteLines(data: UBLInvoiceData): string {
+        return data.lineItems.map((item, index) => this.buildCreditNoteLine(item, index + 1, data.currency)).join('\n');
+    }
+
+    /**
+     * Build single CreditNoteLine
+     */
+    private buildCreditNoteLine(
+        item: UBLInvoiceData['lineItems'][0],
+        lineId: number,
+        currency: string
+    ): string {
+        const unitCode = item.unitCode || 'C62';
+        const taxPercent = item.taxPercent ?? DEFAULT_VAT_RATE;
+        const categoryCode = item.taxCategoryCode || (taxPercent > 0 ? 'S' : 'E');
+
+        return `
+    <cac:CreditNoteLine>
+        <cbc:ID>${lineId}</cbc:ID>
+        <cbc:CreditedQuantity unitCode="${unitCode}">${item.quantity.toFixed(4)}</cbc:CreditedQuantity>
+        <cbc:LineExtensionAmount currencyID="${currency}">${this.formatAmount(item.totalPrice)}</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Description>${this.escapeXml(item.description)}</cbc:Description>
+            <cbc:Name>${this.escapeXml(item.description.substring(0, 100))}</cbc:Name>
+            <cac:ClassifiedTaxCategory>
+                <cbc:ID>${categoryCode}</cbc:ID>
+                <cbc:Percent>${taxPercent.toFixed(2)}</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:ClassifiedTaxCategory>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="${currency}">${this.formatAmount(item.unitPrice)}</cbc:PriceAmount>
+        </cac:Price>
+    </cac:CreditNoteLine>`;
     }
 
     /**
@@ -402,7 +481,7 @@ export class UBLService {
             <cbc:TaxAmount currencyID="${data.currency}">${taxAmount.toFixed(2)}</cbc:TaxAmount>
             <cac:TaxCategory>
                 <cbc:ID>${group.categoryCode}</cbc:ID>
-                <cbc:Percent>${rate.toFixed(2)}</cbc:Percent>
+                <cbc:Percent>${rate.toFixed(2)}</cbc:Percent>${this.buildTaxExemptionReason(group.categoryCode)}
                 <cac:TaxScheme>
                     <cbc:ID>VAT</cbc:ID>
                 </cac:TaxScheme>
@@ -414,6 +493,26 @@ export class UBLService {
     <cac:TaxTotal>
         <cbc:TaxAmount currencyID="${data.currency}">${this.formatAmount(data.taxAmount)}</cbc:TaxAmount>${subtotals}
     </cac:TaxTotal>`;
+    }
+
+    /** Tax exemption reason mapping for non-standard VAT categories */
+    private static readonly TAX_EXEMPTION_MAP: Record<string, { reason: string; code: string }> = {
+        'E':  { reason: 'Exempt from tax', code: 'vatex-eu-132' },
+        'AE': { reason: 'Reverse charge', code: 'vatex-eu-ae' },
+        'K':  { reason: 'Intra-community supply', code: 'vatex-eu-ic' },
+        'G':  { reason: 'Export outside the EU', code: 'vatex-eu-g' },
+        'O':  { reason: 'Not subject to VAT', code: 'vatex-eu-o' },
+    };
+
+    /**
+     * Build TaxExemptionReasonCode + TaxExemptionReason for applicable tax categories
+     */
+    private buildTaxExemptionReason(categoryCode: string): string {
+        const entry = UBLService.TAX_EXEMPTION_MAP[categoryCode];
+        if (!entry) return '';
+        return `
+                <cbc:TaxExemptionReasonCode>${entry.code}</cbc:TaxExemptionReasonCode>
+                <cbc:TaxExemptionReason>${entry.reason}</cbc:TaxExemptionReason>`;
     }
 
     /**
@@ -546,19 +645,20 @@ export class UBLService {
      */
     async validate(xml: string): Promise<{ valid: boolean; errors: string[] }> {
         const errors: string[] = [];
+        const isCreditNote = xml.includes('<CreditNote ') || xml.includes('<CreditNote>');
 
         const requiredElements = [
             'CustomizationID',
             'ProfileID',
             'ID',
             'IssueDate',
-            'InvoiceTypeCode',
+            isCreditNote ? 'CreditNoteTypeCode' : 'InvoiceTypeCode',
             'DocumentCurrencyCode',
             'BuyerReference',
             'AccountingSupplierParty',
             'AccountingCustomerParty',
             'LegalMonetaryTotal',
-            'InvoiceLine',
+            isCreditNote ? 'CreditNoteLine' : 'InvoiceLine',
             'Delivery',
             'PaymentMeans',
         ];

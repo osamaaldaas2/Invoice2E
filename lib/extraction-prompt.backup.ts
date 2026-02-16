@@ -63,7 +63,7 @@ ALLOWANCES/CHARGES (between line items and totals):
 - amount is always positive. Extract percentage if shown.
 - Empty array [] if none exist.
 
-Return ONLY valid JSON matching this structure:
+Return ONLY valid JSON matching this structure, changes are not allowed:
 
 {
   "invoiceNumber": "string|null",

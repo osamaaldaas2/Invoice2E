@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use XRechnungCIIGenerator (services/format/xrechnung-cii.generator.ts) instead.
+ * This file is kept only because tests still import it directly.
+ */
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';

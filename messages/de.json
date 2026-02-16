@@ -663,5 +663,43 @@
     "loading": "Rechnungsdaten werden geladen...",
     "errorTitle": "Fehler beim Laden der Rechnung",
     "backToDashboard": "Zurück zum Dashboard"
+  },
+  "formats": {
+    "xrechnung-cii": {
+      "name": "XRechnung (CII)",
+      "description": "Deutscher E-Rechnungsstandard basierend auf UN/CEFACT Cross-Industry Invoice."
+    },
+    "xrechnung-ubl": {
+      "name": "XRechnung (UBL)",
+      "description": "Deutscher E-Rechnungsstandard basierend auf UBL 2.1."
+    },
+    "peppol-bis": {
+      "name": "PEPPOL BIS 3.0",
+      "description": "Paneuropäisches E-Rechnungsformat für das PEPPOL-Netzwerk."
+    },
+    "facturx-en16931": {
+      "name": "Factur-X EN 16931",
+      "description": "Hybride PDF/A-3-Rechnung mit eingebettetem CII-XML auf EN-16931-Konformitätsstufe."
+    },
+    "facturx-basic": {
+      "name": "Factur-X Basic",
+      "description": "Hybride PDF/A-3-Rechnung mit eingebettetem CII-XML auf Basic-Konformitätsstufe."
+    },
+    "fatturapa": {
+      "name": "FatturaPA",
+      "description": "Italienisches E-Rechnungsformat der Agenzia delle Entrate."
+    },
+    "ksef": {
+      "name": "KSeF FA(2)",
+      "description": "Polnische strukturierte E-Rechnung für das Krajowy System e-Faktur."
+    },
+    "nlcius": {
+      "name": "NLCIUS / SI-UBL 2.0",
+      "description": "Niederländische CIUS von EN 16931 basierend auf UBL (SI-UBL 2.0)."
+    },
+    "cius-ro": {
+      "name": "CIUS-RO",
+      "description": "Rumänische CIUS von EN 16931 basierend auf UBL für das RO e-Factura System."
+    }
   }
 }

@@ -5,10 +5,89 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 import { ValidationError } from '@/lib/errors';
-import { validateForXRechnung } from '@/validation/validation-pipeline';
+import { validateForProfile } from '@/validation/validation-pipeline';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { logger } from '@/lib/logger';
 import type { XRechnungInvoiceData } from './types';
 import type { ValidationResult } from '@/validation/validation-result';
+
+/**
+ * Convert legacy XRechnungInvoiceData (flat) to CanonicalInvoice (nested).
+ * Used for backward compatibility in the XRechnungValidator class.
+ */
+function xrechnungToCanonical(data: XRechnungInvoiceData): CanonicalInvoice {
+  return {
+    outputFormat: 'xrechnung-cii',
+    invoiceNumber: data.invoiceNumber,
+    invoiceDate: data.invoiceDate,
+    currency: data.currency || 'EUR',
+    documentTypeCode: data.documentTypeCode,
+    buyerReference: data.buyerReference,
+    notes: data.notes,
+    precedingInvoiceReference: data.precedingInvoiceReference,
+    billingPeriodStart: data.billingPeriodStart,
+    billingPeriodEnd: data.billingPeriodEnd,
+    seller: {
+      name: data.sellerName,
+      email: data.sellerEmail,
+      address: data.sellerAddress,
+      city: data.sellerCity,
+      postalCode: data.sellerPostalCode,
+      countryCode: data.sellerCountryCode,
+      phone: data.sellerPhoneNumber || data.sellerPhone,
+      vatId: data.sellerVatId,
+      taxNumber: data.sellerTaxNumber,
+      taxId: data.sellerTaxId,
+      electronicAddress: data.sellerElectronicAddress,
+      electronicAddressScheme: data.sellerElectronicAddressScheme,
+      contactName: data.sellerContactName || data.sellerContact,
+    },
+    buyer: {
+      name: data.buyerName || '',
+      email: data.buyerEmail,
+      address: data.buyerAddress,
+      city: data.buyerCity,
+      postalCode: data.buyerPostalCode,
+      countryCode: data.buyerCountryCode,
+      vatId: data.buyerVatId,
+      taxId: data.buyerTaxId,
+      electronicAddress: data.buyerElectronicAddress,
+      electronicAddressScheme: data.buyerElectronicAddressScheme,
+    },
+    payment: {
+      iban: data.sellerIban,
+      bic: data.sellerBic,
+      paymentTerms: data.paymentTerms,
+      dueDate: data.paymentDueDate || data.dueDate,
+      prepaidAmount: data.prepaidAmount,
+    },
+    lineItems: (data.lineItems || []).map((item) => ({
+      description: item.description || item.name || '',
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || 0,
+      totalPrice: item.totalPrice ?? item.lineTotal ?? 0,
+      taxRate: item.taxRate ?? item.vatRate,
+      taxCategoryCode: item.taxCategoryCode,
+      unitCode: item.unitCode,
+    })),
+    totals: {
+      subtotal: data.subtotal || 0,
+      taxAmount: data.taxAmount || 0,
+      totalAmount: data.totalAmount,
+    },
+    taxRate: data.taxRate ?? data.vatRate,
+    allowanceCharges: data.allowanceCharges?.map((ac) => ({
+      chargeIndicator: ac.chargeIndicator,
+      amount: ac.amount,
+      baseAmount: ac.baseAmount,
+      percentage: ac.percentage,
+      reason: ac.reason,
+      reasonCode: ac.reasonCode,
+      taxRate: ac.taxRate,
+      taxCategoryCode: ac.taxCategoryCode,
+    })),
+  };
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -90,7 +169,8 @@ export class XRechnungValidator {
    * Returns structured result; throws ValidationError if blocking errors exist.
    */
   validateInvoiceData(data: XRechnungInvoiceData): ValidationResult {
-    const result = validateForXRechnung(data);
+    const canonical = xrechnungToCanonical(data);
+    const result = validateForProfile(canonical, 'xrechnung-cii');
 
     if (!result.valid) {
       // Build a human-readable error string from structured errors
@@ -108,7 +188,8 @@ export class XRechnungValidator {
    * Useful when the caller wants to collect warnings without failing.
    */
   validateInvoiceDataSafe(data: XRechnungInvoiceData): ValidationResult {
-    return validateForXRechnung(data);
+    const canonical = xrechnungToCanonical(data);
+    return validateForProfile(canonical, 'xrechnung-cii');
   }
 
   /**

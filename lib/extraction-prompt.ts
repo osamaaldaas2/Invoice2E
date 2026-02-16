@@ -63,7 +63,7 @@ ALLOWANCES/CHARGES (between line items and totals):
 - amount is always positive. Extract percentage if shown.
 - Empty array [] if none exist.
 
-Return ONLY valid JSON matching this structure:
+Return ONLY valid JSON matching this structure no changes are allowed:
 
 {
   "invoiceNumber": "string|null",
@@ -167,6 +167,24 @@ RULES:
 12. buyerReference: Leitweg-ID, Kundennummer, Referenz, Ihr Zeichen, or buyer contact name.
 13. sellerIban: Copy EXACTLY as printed. German IBANs = 22 chars.
 14. confidence: 0-1 float.
+15. taxRate on EVERY line item is REQUIRED — extract the VAT percentage (e.g. 19, 7, 0). Look for "MwSt", "USt", "%", "Mehrwertsteuer".
+16. totalAmount MUST be a number — the gross total payable. Never null, never a string.
+
+OUTPUT JSON SCHEMA (return ONLY this structure):
+{
+  "invoiceNumber": "string", "invoiceDate": "YYYY-MM-DD", "dueDate": "YYYY-MM-DD|null",
+  "sellerName": "string", "sellerStreet": "string", "sellerPostalCode": "string", "sellerCity": "string", "sellerCountryCode": "DE",
+  "sellerEmail": "string|null", "sellerPhone": "string|null", "sellerVatId": "string|null", "sellerTaxNumber": "string|null", "sellerTaxId": "string",
+  "sellerIban": "string", "sellerBic": "string|null", "bankName": "string|null", "sellerContactName": "string|null",
+  "buyerName": "string", "buyerStreet": "string", "buyerPostalCode": "string", "buyerCity": "string", "buyerCountryCode": "DE",
+  "buyerEmail": "string|null", "buyerPhone": "string|null", "buyerTaxId": "string|null", "buyerReference": "string|null",
+  "currency": "EUR", "paymentTerms": "string|null", "notes": "string|null",
+  "documentTypeCode": 380,
+  "lineItems": [{ "description": "string", "quantity": 1, "unitPrice": 100.00, "totalPrice": 100.00, "taxRate": 19, "taxCategoryCode": "S" }],
+  "allowanceCharges": [],
+  "subtotal": 100.00, "taxRate": 19, "taxAmount": 19.00, "totalAmount": 119.00,
+  "confidence": 0.95
+}
 
 INVOICE TEXT:
 `;

@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+                          xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+                          xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
+                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    
+    <rsm:ExchangedDocumentContext>
+        <ram:GuidelineSpecifiedDocumentContextParameter>
+            <ram:ID>urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic</ram:ID>
+        </ram:GuidelineSpecifiedDocumentContextParameter>
+    </rsm:ExchangedDocumentContext>
+    
+    <rsm:ExchangedDocument>
+        <ram:ID>GOLDEN-2024-001</ram:ID>
+        <ram:TypeCode>380</ram:TypeCode>
+        <ram:IssueDateTime>
+            <udt:DateTimeString format="102">20240715</udt:DateTimeString>
+        </ram:IssueDateTime>
+        <ram:IncludedNote>
+            <ram:Content>Golden file reference invoice</ram:Content>
+        </ram:IncludedNote>
+    </rsm:ExchangedDocument>
+    
+    <rsm:SupplyChainTradeTransaction>
+        
+        <ram:IncludedSupplyChainTradeLineItem>
+            <ram:AssociatedDocumentLineDocument>
+                <ram:LineID>1</ram:LineID>
+            </ram:AssociatedDocumentLineDocument>
+            <ram:SpecifiedTradeProduct>
+                <ram:Name>Consulting Services</ram:Name>
+            </ram:SpecifiedTradeProduct>
+            <ram:SpecifiedLineTradeAgreement>
+                <ram:NetPriceProductTradePrice>
+                    <ram:ChargeAmount>150.00</ram:ChargeAmount>
+                </ram:NetPriceProductTradePrice>
+            </ram:SpecifiedLineTradeAgreement>
+            <ram:SpecifiedLineTradeDelivery>
+                <ram:BilledQuantity unitCode="HUR">10.0000</ram:BilledQuantity>
+            </ram:SpecifiedLineTradeDelivery>
+            <ram:SpecifiedLineTradeSettlement>
+                <ram:ApplicableTradeTax>
+                    <ram:TypeCode>VAT</ram:TypeCode>
+                    <ram:CategoryCode>S</ram:CategoryCode>
+                    <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
+                </ram:ApplicableTradeTax>
+                <ram:SpecifiedTradeSettlementLineMonetarySummation>
+                    <ram:LineTotalAmount>1500.00</ram:LineTotalAmount>
+                </ram:SpecifiedTradeSettlementLineMonetarySummation>
+            </ram:SpecifiedLineTradeSettlement>
+        </ram:IncludedSupplyChainTradeLineItem>
+        <ram:IncludedSupplyChainTradeLineItem>
+            <ram:AssociatedDocumentLineDocument>
+                <ram:LineID>2</ram:LineID>
+            </ram:AssociatedDocumentLineDocument>
+            <ram:SpecifiedTradeProduct>
+                <ram:Name>Software License</ram:Name>
+            </ram:SpecifiedTradeProduct>
+            <ram:SpecifiedLineTradeAgreement>
+                <ram:NetPriceProductTradePrice>
+                    <ram:ChargeAmount>250.00</ram:ChargeAmount>
+                </ram:NetPriceProductTradePrice>
+            </ram:SpecifiedLineTradeAgreement>
+            <ram:SpecifiedLineTradeDelivery>
+                <ram:BilledQuantity unitCode="C62">2.0000</ram:BilledQuantity>
+            </ram:SpecifiedLineTradeDelivery>
+            <ram:SpecifiedLineTradeSettlement>
+                <ram:ApplicableTradeTax>
+                    <ram:TypeCode>VAT</ram:TypeCode>
+                    <ram:CategoryCode>S</ram:CategoryCode>
+                    <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
+                </ram:ApplicableTradeTax>
+                <ram:SpecifiedTradeSettlementLineMonetarySummation>
+                    <ram:LineTotalAmount>500.00</ram:LineTotalAmount>
+                </ram:SpecifiedTradeSettlementLineMonetarySummation>
+            </ram:SpecifiedLineTradeSettlement>
+        </ram:IncludedSupplyChainTradeLineItem>
+        
+    <ram:ApplicableHeaderTradeAgreement>
+        <ram:BuyerReference>04011000-12345-03</ram:BuyerReference>
+        
+        <ram:SellerTradeParty>
+            <ram:Name>Golden Seller GmbH</ram:Name>
+            
+            
+            <ram:DefinedTradeContact>
+                <ram:PersonName>Max Mustermann</ram:PersonName>
+                <ram:TelephoneUniversalCommunication>
+                    <ram:CompleteNumber>+49 30 12345678</ram:CompleteNumber>
+                </ram:TelephoneUniversalCommunication>
+                <ram:EmailURIUniversalCommunication>
+                    <ram:URIID>seller@golden.de</ram:URIID>
+                </ram:EmailURIUniversalCommunication>
+            </ram:DefinedTradeContact>
+            
+            <ram:PostalTradeAddress>
+                <ram:PostcodeCode>10115</ram:PostcodeCode>
+                <ram:LineOne>Hauptstraße 42</ram:LineOne>
+                <ram:CityName>Berlin</ram:CityName>
+                <ram:CountryID>DE</ram:CountryID>
+            </ram:PostalTradeAddress>
+            
+            <ram:URIUniversalCommunication>
+                <ram:URIID schemeID="0204">0204:golden-seller</ram:URIID>
+            </ram:URIUniversalCommunication>
+            <ram:SpecifiedTaxRegistration>
+                <ram:ID schemeID="VA">DE123456789</ram:ID>
+            </ram:SpecifiedTaxRegistration>
+            <ram:SpecifiedTaxRegistration>
+                <ram:ID schemeID="FC">30/123/45678</ram:ID>
+            </ram:SpecifiedTaxRegistration>
+        </ram:SellerTradeParty>
+        
+        <ram:BuyerTradeParty>
+            <ram:Name>Golden Buyer B.V.</ram:Name>
+            
+            <ram:PostalTradeAddress>
+                <ram:PostcodeCode>1015 AA</ram:PostcodeCode>
+                <ram:LineOne>Keizersgracht 200</ram:LineOne>
+                <ram:CityName>Amsterdam</ram:CityName>
+                <ram:CountryID>NL</ram:CountryID>
+            </ram:PostalTradeAddress>
+            
+            <ram:URIUniversalCommunication>
+                <ram:URIID schemeID="0190">0190:00000000000000000001</ram:URIID>
+            </ram:URIUniversalCommunication>
+            <ram:SpecifiedTaxRegistration>
+                <ram:ID schemeID="VA">NL123456789B01</ram:ID>
+            </ram:SpecifiedTaxRegistration>
+        </ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+        
+    <ram:ApplicableHeaderTradeDelivery>
+        <ram:ActualDeliverySupplyChainEvent>
+            <ram:OccurrenceDateTime>
+                <udt:DateTimeString format="102">20240715</udt:DateTimeString>
+            </ram:OccurrenceDateTime>
+        </ram:ActualDeliverySupplyChainEvent>
+    </ram:ApplicableHeaderTradeDelivery>
+        
+        <ram:ApplicableHeaderTradeSettlement>
+            <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+
+            <ram:BillingSpecifiedPeriod>
+                <ram:StartDateTime>
+                    <udt:DateTimeString format="102">20240701</udt:DateTimeString>
+                </ram:StartDateTime>
+                <ram:EndDateTime>
+                    <udt:DateTimeString format="102">20240731</udt:DateTimeString>
+                </ram:EndDateTime>
+            </ram:BillingSpecifiedPeriod>
+            
+            <ram:SpecifiedTradeSettlementPaymentMeans>
+                <ram:TypeCode>58</ram:TypeCode>
+                <ram:PayeePartyCreditorFinancialAccount>
+                    <ram:IBANID>DE89370400440532013000</ram:IBANID>
+                </ram:PayeePartyCreditorFinancialAccount>
+                
+                <ram:PayeeSpecifiedCreditorFinancialInstitution>
+                    <ram:BICID>COBADEFFXXX</ram:BICID>
+                </ram:PayeeSpecifiedCreditorFinancialInstitution>
+            </ram:SpecifiedTradeSettlementPaymentMeans>
+
+            
+            <ram:ApplicableTradeTax>
+                <ram:CalculatedAmount>380.00</ram:CalculatedAmount>
+                <ram:TypeCode>VAT</ram:TypeCode>
+                <ram:BasisAmount>2000.00</ram:BasisAmount>
+                <ram:CategoryCode>S</ram:CategoryCode>
+                <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
+            </ram:ApplicableTradeTax>
+            <ram:SpecifiedTradePaymentTerms><ram:Description>Net 30 days</ram:Description>
+            <ram:DueDateDateTime>
+                <udt:DateTimeString format="102">20240814</udt:DateTimeString>
+            </ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>
+
+            <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+                <ram:LineTotalAmount>2000.00</ram:LineTotalAmount>
+                <ram:TaxBasisTotalAmount>2000.00</ram:TaxBasisTotalAmount>
+                <ram:TaxTotalAmount currencyID="EUR">380.00</ram:TaxTotalAmount>
+                <ram:GrandTotalAmount>2380.00</ram:GrandTotalAmount>
+                <ram:DuePayableAmount>2380.00</ram:DuePayableAmount>
+            </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        </ram:ApplicableHeaderTradeSettlement>
+    </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>

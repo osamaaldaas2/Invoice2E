@@ -12,7 +12,6 @@ interface HealthCheckResponse {
     database: 'ok' | 'error';
     redis: 'ok' | 'not_configured' | 'error';
     ai: {
-      deepseek: 'configured' | 'not_configured';
       gemini: 'configured' | 'not_configured';
       openai: 'configured' | 'not_configured';
     };
@@ -38,9 +37,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     database: 'error' as 'ok' | 'error',
     redis: 'not_configured' as 'ok' | 'not_configured' | 'error',
     ai: {
-      deepseek: (process.env.DEEPSEEK_API_KEY ? 'configured' : 'not_configured') as
-        | 'configured'
-        | 'not_configured',
       gemini: (process.env.GEMINI_API_KEY ? 'configured' : 'not_configured') as
         | 'configured'
         | 'not_configured',

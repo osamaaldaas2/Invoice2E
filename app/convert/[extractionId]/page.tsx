@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { useUser } from '@/lib/user-context';
+import { getFormatMetadata } from '@/lib/format-registry';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 interface ValidationIssue {
     ruleId?: string;
@@ -26,6 +28,8 @@ export default function ConvertPage() {
     const [validationWarnings, setValidationWarnings] = useState<ValidationIssue[]>([]);
     const [success, setSuccess] = useState('');
     const [xmlContent, setXmlContent] = useState('');
+    const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+    const [outputFormat, setOutputFormat] = useState<OutputFormat>('xrechnung-cii');
 
     const handleConvert = async () => {
         setConverting(true);
@@ -43,6 +47,9 @@ export default function ConvertPage() {
             }
 
             const invoiceData = JSON.parse(reviewData);
+            const selectedFormat: OutputFormat = invoiceData.outputFormat || 'xrechnung-cii';
+            setOutputFormat(selectedFormat);
+            const formatMeta = getFormatMetadata(selectedFormat);
 
             const response = await fetch('/api/invoices/convert', {
                 method: 'POST',
@@ -51,8 +58,24 @@ export default function ConvertPage() {
                     conversionId: extractionId,
                     userId: user?.id,
                     invoiceData,
+                    format: selectedFormat,
                 }),
             });
+
+            // Handle PDF responses (binary) vs XML (JSON)
+            if (formatMeta.mimeType === 'application/pdf') {
+                if (!response.ok) {
+                    const errData = await response.json();
+                    if (Array.isArray(errData.validationErrors) && errData.validationErrors.length > 0) {
+                        setValidationErrors(errData.validationErrors);
+                    }
+                    throw new Error(errData.error || 'Conversion failed');
+                }
+                const blob = await response.blob();
+                setPdfBlob(blob);
+                setSuccess(t('success'));
+                return;
+            }
 
             const data = await response.json();
 
@@ -81,11 +104,25 @@ export default function ConvertPage() {
     };
 
     const handleDownload = () => {
-        if (!xmlContent) return;
-
+        const formatMeta = getFormatMetadata(outputFormat);
+        const filename = `invoice_${outputFormat}${formatMeta.fileExtension}`;
         const element = document.createElement('a');
+
+        if (pdfBlob) {
+            const url = URL.createObjectURL(pdfBlob);
+            element.setAttribute('href', url);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            URL.revokeObjectURL(url);
+            return;
+        }
+
+        if (!xmlContent) return;
         element.setAttribute('href', `data:text/xml;charset=utf-8,${encodeURIComponent(xmlContent)}`);
-        element.setAttribute('download', 'invoice_xrechnung.xml');
+        element.setAttribute('download', filename);
         element.style.display = 'none';
         document.body.appendChild(element);
         element.click();
@@ -231,7 +268,7 @@ export default function ConvertPage() {
                                     </div>
                                 )}
 
-                                {!xmlContent ? (
+                                {!xmlContent && !pdfBlob ? (
                                     <div className="space-y-3">
                                         {!error && (
                                             <>
@@ -261,21 +298,29 @@ export default function ConvertPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        {xmlContent && (
                                         <div className="p-4 glass-panel border border-white/10 rounded-lg">
                                             <div className="flex justify-between items-center mb-2">
                                                 <span className="text-xs font-semibold text-faded uppercase tracking-wider">{t('xmlPreview')}</span>
-                                                <span className="text-xs text-faded">invoice_xrechnung.xml</span>
+                                                <span className="text-xs text-faded">invoice_{outputFormat}{getFormatMetadata(outputFormat).fileExtension}</span>
                                             </div>
                                             <pre className="text-xs text-slate-200 font-mono overflow-x-auto p-2 bg-slate-950/80 border border-white/10 rounded-xl h-48">
                                                 {xmlContent}
                                             </pre>
                                         </div>
+                                        )}
+
+                                        {pdfBlob && (
+                                        <div className="p-4 glass-panel border border-white/10 rounded-lg text-center">
+                                            <p className="text-sm text-slate-300 mb-2">📄 PDF invoice generated ({(pdfBlob.size / 1024).toFixed(1)} KB)</p>
+                                        </div>
+                                        )}
 
                                         <button
                                             onClick={handleDownload}
                                             className="w-full px-6 py-4 bg-gradient-to-r from-emerald-400 to-green-500 text-white rounded-full font-bold text-lg hover:brightness-110 transition-colors shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                                         >
-                                            📥 {t('downloadXml')}
+                                            📥 {pdfBlob ? t('downloadXml').replace('XML', 'PDF') : t('downloadXml')}
                                         </button>
 
                                         <button

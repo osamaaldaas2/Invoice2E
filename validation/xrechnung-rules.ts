@@ -3,17 +3,17 @@
  * Implements German-specific business rules for XRechnung compliance.
  */
 
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { createError, createWarning, type ValidationError } from './validation-result';
 
 /**
  * Run all BR-DE profile rules for XRechnung 3.0 CII.
  */
-export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationError[] {
+export function validateXRechnungRules(data: CanonicalInvoice): ValidationError[] {
   const errors: ValidationError[] = [];
 
   // BR-DE-1: Seller address street is required
-  if (!data.sellerAddress?.trim()) {
+  if (!data.seller?.address?.trim()) {
     errors.push(
       createError(
         'BR-DE-1',
@@ -24,9 +24,9 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-2: Seller contact is MANDATORY (PersonName + Phone + Email)
-  const hasContactName = !!(data.sellerContactName || data.sellerContact || data.sellerName);
-  const hasPhone = !!(data.sellerPhoneNumber || data.sellerPhone);
-  const hasEmail = !!data.sellerEmail;
+  const hasContactName = !!(data.seller?.contactName || data.seller?.name);
+  const hasPhone = !!data.seller?.phone;
+  const hasEmail = !!data.seller?.email;
 
   if (!hasContactName || !hasPhone || !hasEmail) {
     const missing: string[] = [];
@@ -44,12 +44,12 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-3: Seller city is required
-  if (!data.sellerCity?.trim()) {
+  if (!data.seller?.city?.trim()) {
     errors.push(createError('BR-DE-3', 'invoice.seller.city', 'Seller city is required (BR-DE-3)'));
   }
 
   // BR-DE-4: Seller postal code is required
-  if (!data.sellerPostalCode?.trim()) {
+  if (!data.seller?.postalCode?.trim()) {
     errors.push(
       createError(
         'BR-DE-4',
@@ -60,7 +60,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-5/9: Seller country code is required
-  if (!data.sellerCountryCode?.trim()) {
+  if (!data.seller?.countryCode?.trim()) {
     errors.push(
       createError(
         'BR-DE-5',
@@ -71,7 +71,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-6: Buyer address street is required
-  if (!data.buyerAddress?.trim()) {
+  if (!data.buyer?.address?.trim()) {
     errors.push(
       createError(
         'BR-DE-6',
@@ -83,7 +83,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-7: Buyer city is required
-  if (!data.buyerCity?.trim()) {
+  if (!data.buyer?.city?.trim()) {
     errors.push(
       createError(
         'BR-DE-7',
@@ -95,7 +95,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-8: Buyer postal code is required
-  if (!data.buyerPostalCode?.trim()) {
+  if (!data.buyer?.postalCode?.trim()) {
     errors.push(
       createError(
         'BR-DE-8',
@@ -107,7 +107,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-DE-9/11: Buyer country code is required
-  if (!data.buyerCountryCode?.trim()) {
+  if (!data.buyer?.countryCode?.trim()) {
     errors.push(
       createError(
         'BR-DE-11',
@@ -134,14 +134,9 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-CO-26 / BR-S-02 / BR-DE-16: Seller tax identifier is required
-  // When VAT category S/Z/E/AE/K/G/L/M is used, at least one of:
-  //   - Seller VAT Identifier (BT-31)
-  //   - Seller tax registration identifier (BT-32)
-  //   - Seller tax representative VAT identifier (BT-63)
-  // must be present.
-  const hasSellerVatId = !!(data.sellerVatId?.trim());
-  const hasSellerTaxNumber = !!(data.sellerTaxNumber?.trim());
-  const hasSellerTaxId = !!(data.sellerTaxId?.trim());
+  const hasSellerVatId = !!(data.seller?.vatId?.trim());
+  const hasSellerTaxNumber = !!(data.seller?.taxNumber?.trim());
+  const hasSellerTaxId = !!(data.seller?.taxId?.trim());
   const hasAnySellerTaxIdentifier = hasSellerVatId || hasSellerTaxNumber || hasSellerTaxId;
 
   if (!hasAnySellerTaxIdentifier) {
@@ -170,15 +165,9 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
     );
   }
 
-  // BR-DE-13/19: Payment means type code must be from allowed set
-  // Allowed codes: 10, 30, 48, 49, 57, 58, 59, 97
-  // (Further validated during XML generation based on IBAN presence)
-
   // BR-DE-23-a: When payment means is 58 (SEPA CT), IBAN is MANDATORY
-  const iban = data.sellerIban?.trim();
+  const iban = data.payment?.iban?.trim();
   if (!iban) {
-    // If IBAN is missing and no explicit payment means code, this is a blocking error
-    // because the default TypeCode is 58 (SEPA credit transfer)
     errors.push(
       createError(
         'BR-DE-23-a',
@@ -190,7 +179,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // P0-5: Buyer electronic address (BT-49) is required for XRechnung
-  if (!data.buyerElectronicAddress?.trim()) {
+  if (!data.buyer?.electronicAddress?.trim()) {
     errors.push(
       createError(
         'PEPPOL-EN16931-R010',
@@ -202,7 +191,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // P0-6: Seller electronic address (BT-34) is required for XRechnung
-  if (!data.sellerElectronicAddress?.trim()) {
+  if (!data.seller?.electronicAddress?.trim()) {
     errors.push(
       createError(
         'BR-DE-SELLER-EADDR',
@@ -227,7 +216,7 @@ export function validateXRechnungRules(data: XRechnungInvoiceData): ValidationEr
   }
 
   // BR-CO-25: Payment terms or due date
-  if (!data.paymentTerms?.trim() && !data.paymentDueDate?.trim() && !data.dueDate?.trim()) {
+  if (!data.payment?.paymentTerms?.trim() && !data.payment?.dueDate?.trim()) {
     errors.push(
       createError(
         'BR-CO-25',

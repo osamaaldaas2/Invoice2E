@@ -9,7 +9,6 @@ import { adminUserService } from '@/services/admin';
 import { z } from 'zod';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
-
 const BanUserSchema = z.object({
     action: z.enum(['ban', 'unban']),
     reason: z.string().min(5, 'Reason must be at least 5 characters').optional(),

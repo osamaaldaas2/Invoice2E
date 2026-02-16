@@ -3,7 +3,7 @@
  * Validates monetary integrity of invoice data before XML rendering.
  */
 
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { validateMonetaryCrossChecks, type MonetaryLineItem, type MonetaryAllowanceCharge } from '@/lib/monetary-validator';
 import { roundMoney } from '@/lib/monetary';
 import { DEFAULT_VAT_RATE } from '@/lib/constants';
@@ -15,7 +15,7 @@ import { createError, type ValidationError } from './validation-result';
  *
  * F3: Includes semantic NET vs GROSS validation to catch extraction errors early.
  */
-export function validateBusinessRules(data: XRechnungInvoiceData): ValidationError[] {
+export function validateBusinessRules(data: CanonicalInvoice): ValidationError[] {
   const items = data.lineItems || [];
   if (items.length === 0) return [];
 
@@ -25,8 +25,8 @@ export function validateBusinessRules(data: XRechnungInvoiceData): ValidationErr
   const lineItems: MonetaryLineItem[] = items.map((item, index) => {
     const unitPrice = Number(item.unitPrice) || 0;
     const quantity = Number(item.quantity) || 1;
-    const totalPrice = Number(item.totalPrice ?? item.lineTotal) || unitPrice * quantity;
-    const rawRate = Number(item.taxRate ?? item.vatRate);
+    const totalPrice = Number(item.totalPrice) || unitPrice * quantity;
+    const rawRate = Number(item.taxRate);
     const taxRate = Number.isFinite(rawRate) && rawRate >= 0 ? rawRate : DEFAULT_VAT_RATE;
 
     // F3: Check if totalPrice looks like GROSS instead of NET
@@ -94,9 +94,9 @@ export function validateBusinessRules(data: XRechnungInvoiceData): ValidationErr
   // Run standard BR-CO monetary cross-checks
   const monetaryErrors = validateMonetaryCrossChecks({
     lineItems,
-    subtotal: Number(data.subtotal) || 0,
-    taxAmount: Number(data.taxAmount) || 0,
-    totalAmount: Number(data.totalAmount) || 0,
+    subtotal: Number(data.totals?.subtotal) || 0,
+    taxAmount: Number(data.totals?.taxAmount) || 0,
+    totalAmount: Number(data.totals?.totalAmount) || 0,
     allowanceCharges: monetaryAllowanceCharges,
   });
 

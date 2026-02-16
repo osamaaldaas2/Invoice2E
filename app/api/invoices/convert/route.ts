@@ -1,20 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { xrechnungService } from '@/services/xrechnung.service';
-import { ublService } from '@/services/ubl.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
-import { isEuVatId } from '@/lib/extraction-normalizer';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
-import { requireCsrfToken } from '@/lib/csrf';
 import { createUserScopedClient } from '@/lib/supabase.server';
-import { validateForXRechnung } from '@/validation/validation-pipeline';
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import { validateForProfile } from '@/validation/validation-pipeline';
+import { getFormatMetadata } from '@/lib/format-registry';
+import type { ProfileId } from '@/validation/profiles/IProfileValidator';
+import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
+import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+import type { OutputFormat } from '@/types/canonical-invoice';
+export type ConversionFormat = 'CII' | 'UBL' | OutputFormat;
 
-export type ConversionFormat = 'CII' | 'UBL';
+/** Explicit mapping from OutputFormat to ProfileId for validation. */
+function formatToProfileId(format: OutputFormat): ProfileId {
+  switch (format) {
+    case 'xrechnung-cii': return 'xrechnung-cii';
+    case 'xrechnung-ubl': return 'xrechnung-ubl';
+    case 'peppol-bis':    return 'peppol-bis';
+    case 'facturx-en16931':
+    case 'facturx-basic': return 'en16931-base';
+    case 'fatturapa':     return 'fatturapa';
+    case 'ksef':          return 'ksef';
+    case 'nlcius':        return 'nlcius';
+    case 'cius-ro':       return 'cius-ro';
+    default:
+      return format satisfies never;
+  }
+}
+
+/** Map legacy format strings to OutputFormat */
+function resolveOutputFormat(format: string): OutputFormat {
+  switch (format) {
+    case 'CII': return 'xrechnung-cii';
+    case 'UBL': return 'xrechnung-ubl';
+    default: return format as OutputFormat;
+  }
+}
+
+/** Map OutputFormat back to legacy DB format string */
+function toLegacyFormat(format: OutputFormat): string {
+  switch (format) {
+    case 'xrechnung-cii': return 'XRechnung';
+    case 'xrechnung-ubl': return 'UBL';
+    case 'peppol-bis':    return 'PEPPOL BIS';
+    case 'facturx-en16931': return 'Factur-X EN16931';
+    case 'facturx-basic': return 'Factur-X Basic';
+    case 'fatturapa':     return 'FatturaPA';
+    case 'ksef':          return 'KSeF';
+    case 'nlcius':        return 'NLCIUS';
+    case 'cius-ro':       return 'CIUS-RO';
+    default: return format;
+  }
+}
 
 const ConvertRequestSchema = z.object({
   conversionId: z.string().min(1, 'Extraction ID is required'),
@@ -33,16 +74,12 @@ const ConvertRequestSchema = z.object({
     .refine((data) => Array.isArray(data.lineItems) && data.lineItems.length > 0, {
       message: 'At least one line item is required',
     }),
-  format: z.enum(['CII', 'UBL']).default('CII'),
+  format: z.enum(['CII', 'UBL', 'xrechnung-cii', 'xrechnung-ubl', 'peppol-bis', 'facturx-en16931', 'facturx-basic', 'fatturapa', 'ksef', 'nlcius', 'cius-ro']).default('CII'),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     logger.info('Convert request received');
-
-    // CSRF protection
-    const csrfError = await requireCsrfToken(request);
-    if (csrfError) return csrfError as NextResponse;
 
     // SECURITY FIX (BUG-003): Authenticate user from session, not request body
     const user = await getAuthenticatedUser(request);
@@ -83,10 +120,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: firstError }, { status: 400 });
     }
 
-    // Zod validated required fields. Use raw body for downstream access
-    // since invoiceData has 20+ optional fields used by UBL/CII generators.
     const extractionId = parsed.data.conversionId;
-    const invoiceData = body.invoiceData;
+    const invoiceData = parsed.data.invoiceData;
     const outputFormat = parsed.data.format;
 
     logger.info('Starting XRechnung conversion', {
@@ -95,38 +130,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userId,
     });
 
-    // Generate XML based on format
-    // Need to map ReviewedInvoiceData (from review form) to ExtractedInvoiceData (for service)
-    //
-    // FIX: Normalize seller tax identifiers (BT-31 / BT-32) from the legacy sellerTaxId field.
-    // The review form only has a single "sellerTaxId" field, but EN 16931 requires separate
-    // VAT ID (BT-31, schemeID=VA) and tax number (BT-32, schemeID=FC). Split them here.
-    const rawSellerTaxId = invoiceData.sellerTaxId || '';
-    let sellerVatId = invoiceData.sellerVatId || null;
-    let sellerTaxNumber = invoiceData.sellerTaxNumber || null;
-    if (!sellerVatId && !sellerTaxNumber && rawSellerTaxId) {
-      if (isEuVatId(rawSellerTaxId)) {
-        sellerVatId = rawSellerTaxId;
-      } else {
-        sellerTaxNumber = rawSellerTaxId;
-      }
-    }
+    // Map input data to canonical invoice model (handles sellerTaxId splitting,
+    // country code defaults, electronic address fallback, etc.)
+    const resolvedFormat = resolveOutputFormat(outputFormat);
+    const canonical = toCanonicalInvoice(invoiceData, resolvedFormat);
 
-    const serviceData = {
-      ...invoiceData,
-      sellerVatId,
-      sellerTaxNumber,
-      sellerCountryCode: invoiceData.sellerCountryCode || 'DE',
-      buyerCountryCode: invoiceData.buyerCountryCode || 'DE',
-      // Backward compat: derive electronic addresses from email for pre-migration DB records
-      buyerElectronicAddress: invoiceData.buyerElectronicAddress || invoiceData.buyerEmail || null,
-      buyerElectronicAddressScheme:
-        invoiceData.buyerElectronicAddressScheme || (invoiceData.buyerEmail ? 'EM' : null),
-      sellerElectronicAddress:
-        invoiceData.sellerElectronicAddress || invoiceData.sellerEmail || null,
-      sellerElectronicAddressScheme:
-        invoiceData.sellerElectronicAddressScheme || (invoiceData.sellerEmail ? 'EM' : null),
-    };
+    logger.info('Canonical invoice mapped', {
+      invoiceNumber: canonical.invoiceNumber,
+      format: resolvedFormat,
+    });
 
     let result: {
       xmlContent: string;
@@ -138,153 +150,86 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
 
     try {
-      if (outputFormat === 'UBL') {
-        logger.info('Generating UBL 2.1 invoice', {
-          invoiceNumber: serviceData.invoiceNumber,
+      // Pre-generation validation: pass canonical directly to the validation pipeline
+      const preValidation = validateForProfile(canonical, formatToProfileId(resolvedFormat));
+      if (!preValidation.valid) {
+        const errorMessages = preValidation.errors.map((e: { ruleId: string; message: string }) => `[${e.ruleId}] ${e.message}`);
+        throw new ValidationError(
+          `${resolvedFormat === 'xrechnung-ubl' ? 'UBL' : 'XRechnung'} validation failed:\n` + errorMessages.join('\n'),
+          { structuredErrors: preValidation.errors as unknown as Record<string, unknown> }
+        );
+      }
+
+      // Generate XML via the format generator factory
+      const generator = GeneratorFactory.create(resolvedFormat);
+      const genResult = await generator.generate(canonical);
+
+      // If the generator produced PDF content (e.g. Factur-X), return it as PDF
+      if (genResult.pdfContent) {
+        logger.info('Returning PDF output', {
+          format: resolvedFormat,
+          fileName: genResult.fileName,
+          fileSize: genResult.pdfContent.length,
         });
 
-        // Run the same BR-DE validation pipeline as CII path
-        // Map UBL-shaped data to XRechnungInvoiceData for validation
-        const validationData: XRechnungInvoiceData = {
-          invoiceNumber: serviceData.invoiceNumber || '',
-          invoiceDate: serviceData.invoiceDate || new Date().toISOString().split('T')[0],
-          sellerName: serviceData.sellerName || '',
-          sellerEmail: serviceData.sellerEmail,
-          sellerAddress: serviceData.sellerAddress,
-          sellerCity: serviceData.sellerCity,
-          sellerPostalCode: serviceData.sellerPostalCode,
-          sellerCountryCode: serviceData.sellerCountryCode || 'DE',
-          sellerTaxId: serviceData.sellerTaxId,
-          sellerVatId: sellerVatId,
-          sellerTaxNumber: sellerTaxNumber,
-          sellerElectronicAddress: serviceData.sellerElectronicAddress,
-          sellerElectronicAddressScheme: serviceData.sellerElectronicAddressScheme,
-          sellerIban: serviceData.sellerIban,
-          sellerBic: serviceData.sellerBic,
-          sellerContactName: serviceData.sellerContactName || serviceData.sellerContact,
-          sellerPhoneNumber: serviceData.sellerPhoneNumber || serviceData.sellerPhone,
-          buyerName: serviceData.buyerName,
-          buyerEmail: serviceData.buyerEmail,
-          buyerAddress: serviceData.buyerAddress,
-          buyerCity: serviceData.buyerCity,
-          buyerPostalCode: serviceData.buyerPostalCode,
-          buyerCountryCode: serviceData.buyerCountryCode || 'DE',
-          buyerReference: serviceData.buyerReference,
-          buyerVatId: serviceData.buyerVatId,
-          buyerElectronicAddress: serviceData.buyerElectronicAddress,
-          buyerElectronicAddressScheme: serviceData.buyerElectronicAddressScheme,
-          lineItems: (serviceData.lineItems || []).map((item: Record<string, unknown>) => ({
-            description: (item.description as string) || '',
-            quantity: Number(item.quantity) || 1,
-            unitPrice: Number(item.unitPrice) || 0,
-            totalPrice: Number(item.totalPrice) || Number(item.lineTotal) || 0,
-            unitCode: item.unitCode as string | undefined,
-            taxRate: item.taxRate as number | undefined,
-            taxCategoryCode: item.taxCategoryCode as string | undefined,
-          })),
-          subtotal: Number(serviceData.subtotal) || 0,
-          taxAmount: Number(serviceData.taxAmount) || 0,
-          totalAmount: Number(serviceData.totalAmount) || 0,
-          currency: serviceData.currency || 'EUR',
-          paymentTerms: serviceData.paymentTerms,
-          dueDate: serviceData.dueDate,
-          documentTypeCode: serviceData.documentTypeCode,
-          precedingInvoiceReference: serviceData.precedingInvoiceReference,
-          prepaidAmount: serviceData.prepaidAmount != null ? Number(serviceData.prepaidAmount) : undefined,
-          allowanceCharges: serviceData.allowanceCharges,
-        };
-
-        const ublValidation = validateForXRechnung(validationData);
-        if (!ublValidation.valid) {
-          const errorMessages = ublValidation.errors.map((e: { ruleId: string; message: string }) => `[${e.ruleId}] ${e.message}`);
-          throw new ValidationError('UBL validation failed:\n' + errorMessages.join('\n'), {
-            structuredErrors: ublValidation.errors as unknown as Record<string, unknown>,
-          });
+        // Still update DB before returning
+        try {
+          let conversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
+          if (!conversion) {
+            conversion = await invoiceDbService.createConversion({
+              userId,
+              extractionId,
+              invoiceNumber: String(invoiceData.invoiceNumber || ''),
+              buyerName: String(invoiceData.buyerName || ''),
+              conversionFormat: toLegacyFormat(resolvedFormat),
+              outputFormat: resolvedFormat,
+              conversionStatus: 'completed',
+            }, userClient);
+          }
+          if (conversion.userId !== userId) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
+          }
+          await invoiceDbService.updateConversion(conversion.id, {
+            validationStatus: genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
+            validationErrors: genResult.validationErrors.length > 0
+              ? ({ errors: genResult.validationErrors } as Record<string, unknown>)
+              : undefined,
+            conversionStatus: 'completed',
+            xmlContent: genResult.xmlContent,
+            xmlFileName: genResult.fileName,
+          }, userClient);
+          await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
+        } catch (dbErr) {
+          logger.error('Failed to update DB for PDF conversion', { error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
         }
 
-        const xml = await ublService.generate({
-          invoiceNumber: serviceData.invoiceNumber || '',
-          invoiceDate: serviceData.invoiceDate || new Date().toISOString().split('T')[0],
-          dueDate: serviceData.dueDate,
-          currency: serviceData.currency || 'EUR',
-          sellerName: serviceData.sellerName || '',
-          sellerEmail: serviceData.sellerEmail || '',
-          sellerPhone: serviceData.sellerPhoneNumber || serviceData.sellerPhone,
-          sellerContactName: serviceData.sellerContactName || serviceData.sellerContact,
-          sellerTaxId: serviceData.sellerTaxId || '',
-          sellerVatId: serviceData.sellerVatId,
-          sellerTaxNumber: serviceData.sellerTaxNumber,
-          sellerAddress: serviceData.sellerAddress,
-          sellerCity: serviceData.sellerCity,
-          sellerPostalCode: serviceData.sellerPostalCode,
-          sellerCountryCode: serviceData.sellerCountryCode || 'DE',
-          sellerElectronicAddress: serviceData.sellerElectronicAddress,
-          sellerElectronicAddressScheme: serviceData.sellerElectronicAddressScheme,
-          sellerIban: serviceData.sellerIban,
-          sellerBic: serviceData.sellerBic,
-          buyerName: serviceData.buyerName || '',
-          buyerEmail: serviceData.buyerEmail,
-          buyerAddress: serviceData.buyerAddress,
-          buyerCity: serviceData.buyerCity,
-          buyerPostalCode: serviceData.buyerPostalCode,
-          buyerCountryCode: serviceData.buyerCountryCode || 'DE',
-          buyerReference: serviceData.buyerReference,
-          buyerVatId: serviceData.buyerVatId,
-          buyerElectronicAddress: serviceData.buyerElectronicAddress,
-          buyerElectronicAddressScheme: serviceData.buyerElectronicAddressScheme,
-          lineItems: (serviceData.lineItems || []).map((item: Record<string, unknown>) => ({
-            description: (item.description as string) || '',
-            quantity: Number(item.quantity) || 1,
-            unitPrice: Number(item.unitPrice) || 0,
-            totalPrice: Number(item.totalPrice) || Number(item.lineTotal) || 0,
-            unitCode: item.unitCode as string | undefined,
-            taxPercent: item.taxRate as number | undefined,
-            taxCategoryCode: item.taxCategoryCode as string | undefined,
-          })),
-          subtotal: Number(serviceData.subtotal) || 0,
-          taxAmount: Number(serviceData.taxAmount) || 0,
-          totalAmount: Number(serviceData.totalAmount) || 0,
-          notes: serviceData.notes,
-          paymentTerms: serviceData.paymentTerms,
-          documentTypeCode: serviceData.documentTypeCode,
-          precedingInvoiceReference: serviceData.precedingInvoiceReference,
-          prepaidAmount: serviceData.prepaidAmount != null ? Number(serviceData.prepaidAmount) : undefined,
-          billingPeriodStart: serviceData.billingPeriodStart,
-          billingPeriodEnd: serviceData.billingPeriodEnd,
-          allowanceCharges: serviceData.allowanceCharges,
-        });
-
-        const validation = await ublService.validate(xml);
-
-        result = {
-          xmlContent: xml,
-          fileName: `${serviceData.invoiceNumber || 'invoice'}_ubl.xml`,
-          fileSize: new TextEncoder().encode(xml).length,
-          validationStatus: validation.valid ? 'valid' : 'invalid',
-          validationErrors: validation.errors,
-          validationWarnings: [],
-        };
-
-        logger.info('UBL invoice generated successfully', {
-          xmlSize: result.xmlContent.length,
-          fileName: result.fileName,
-        });
-      } else {
-        // Default: CII/XRechnung format
-        logger.info('Generating XRechnung (CII) invoice', {
-          invoiceNumber: serviceData.invoiceNumber,
-        });
-
-        result = await xrechnungService.generateXRechnung(serviceData);
-
-        logger.info('XRechnung generated successfully', {
-          xmlSize: result.xmlContent?.length,
-          fileName: result.fileName,
+        return new NextResponse(new Uint8Array(genResult.pdfContent), {
+          status: 200,
+          headers: {
+            'Content-Type': genResult.mimeType || 'application/pdf',
+            'Content-Disposition': `attachment; filename="${genResult.fileName}"`,
+            'Content-Length': String(genResult.pdfContent.length),
+          },
         });
       }
+
+      result = {
+        xmlContent: genResult.xmlContent,
+        fileName: genResult.fileName,
+        fileSize: genResult.fileSize,
+        validationStatus: genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
+        validationErrors: genResult.validationErrors,
+        validationWarnings: genResult.validationWarnings,
+      };
+
+      logger.info('Invoice generated successfully', {
+        format: resolvedFormat,
+        xmlSize: result.xmlContent.length,
+        fileName: result.fileName,
+      });
     } catch (generationError) {
       logger.error('XML generation failed', {
-        format: outputFormat,
+        format: resolvedFormat,
         errorType:
           generationError instanceof Error
             ? generationError.constructor.name
@@ -292,7 +237,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         errorMessage:
           generationError instanceof Error ? generationError.message : String(generationError),
         errorStack: generationError instanceof Error ? generationError.stack : undefined,
-        invoiceNumber: serviceData?.invoiceNumber,
+        invoiceNumber: canonical.invoiceNumber,
       });
 
       if (generationError instanceof ValidationError) {
@@ -340,7 +285,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           extractionId,
           invoiceNumber: String(invoiceData.invoiceNumber || ''),
           buyerName: String(invoiceData.buyerName || ''),
-          conversionFormat: outputFormat === 'UBL' ? 'UBL' : 'XRechnung',
+          conversionFormat: toLegacyFormat(resolvedFormat),
+          outputFormat: resolvedFormat,
           conversionStatus: 'completed',
         }, userClient);
       }
@@ -396,6 +342,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       validationStatus: result.validationStatus,
     });
 
+    const formatMeta = getFormatMetadata(resolvedFormat);
+
     return NextResponse.json(
       {
         success: true,
@@ -406,6 +354,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           validationStatus: result.validationStatus,
           validationErrors: result.validationErrors,
           validationWarnings: result.validationWarnings,
+          formatId: formatMeta.id,
+          displayName: formatMeta.displayName,
+          mimeType: formatMeta.mimeType,
+          fileExtension: formatMeta.fileExtension,
         },
       },
       { status: 200 }

@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { ForbiddenError, NotFoundError, UnauthorizedError } from '@/lib/errors';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
-
 const ModifyCreditsSchema = z.object({
     amount: z.number().int().refine((n) => n !== 0, 'Amount cannot be zero'),
     reason: z.string().min(5, 'Reason must be at least 5 characters'),

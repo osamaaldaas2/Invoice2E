@@ -125,6 +125,10 @@ export async function GET(req: NextRequest) {
             sellerCountryCode: data.sellerCountryCode || 'DE',
             buyerCountryCode: data.buyerCountryCode || 'DE',
             totalAmount: Number(data.totalAmount) || 0,
+            // Map email fields → electronicAddress for XRechnung validation (BR-DE)
+            sellerElectronicAddress: data.sellerElectronicAddress || data.sellerEmail || '',
+            buyerElectronicAddress: data.buyerElectronicAddress || data.buyerEmail || '',
+            paymentTerms: data.paymentTerms || '',
           } as Record<string, unknown>;
 
           const xmlResult = await xrechnungService.generateXRechnung(

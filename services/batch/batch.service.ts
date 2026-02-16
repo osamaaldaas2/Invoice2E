@@ -10,7 +10,6 @@ import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { creditsDbService } from '@/services/credits.db.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
-
 type BatchJobRow = {
   id: string;
   user_id: string;
@@ -21,6 +20,7 @@ type BatchJobRow = {
   results: BatchResult[] | null;
   input_file_path?: string | null;
   source_type?: string | null;
+  output_format?: string | null;
   boundary_data?: Record<string, unknown> | null;
   created_at: string;
   completed_at?: string | null;
@@ -259,6 +259,7 @@ export class BatchService {
       completedFiles: job.completed_files,
       failedFiles: job.failed_files,
       results: (job.results as BatchResult[] | null) || initialResults,
+      outputFormat: job.output_format || 'xrechnung-cii',
       createdAt: job.created_at,
     };
   }
@@ -609,9 +610,12 @@ export class BatchService {
 
   /**
    * Pick and process one pending job from the queue.
+   * Also checks processing Mistral batch jobs for status updates.
    */
   async runWorkerOnce(): Promise<boolean> {
     const supabase = this.getSupabase();
+
+    // Pick a pending job
     const { data: pending, error: pendingError } = await supabase
       .from('batch_jobs')
       .select('id')
@@ -641,7 +645,7 @@ export class BatchService {
       })
       .eq('id', pending.id)
       .eq('status', 'pending')
-      .select('id, user_id, input_file_path, source_type')
+      .select('id, user_id, input_file_path, source_type, output_format')
       .maybeSingle();
 
     if (claimError) {
@@ -657,6 +661,7 @@ export class BatchService {
 
     const jobId = claimed.id as string;
     const sourceType = (claimed.source_type as string) || 'zip_upload';
+    const jobOutputFormat = (claimed.output_format as string) || 'xrechnung-cii';
     try {
       if (sourceType === 'multi_invoice_split') {
         await this.processMultiInvoiceJob(jobId);
@@ -671,7 +676,7 @@ export class BatchService {
 
       const zipBuffer = await this.downloadInputZip(inputPath);
       const parsed = await this.parseZip(zipBuffer);
-      await this.processBatch(jobId, parsed.files, 'CII');
+      await this.processBatch(jobId, parsed.files, jobOutputFormat === 'xrechnung-ubl' ? 'UBL' : 'CII');
 
       logger.info('Worker processed batch job', {
         jobId,
@@ -787,6 +792,7 @@ export class BatchService {
       completedFiles: row.completed_files,
       failedFiles: row.failed_files,
       results: row.results || [],
+      outputFormat: row.output_format || 'xrechnung-cii',
       createdAt: row.created_at,
       completedAt: row.completed_at || undefined,
     }));

@@ -1,6 +1,6 @@
 /**
  * Shared extraction normalization logic.
- * Used by all AI adapters (DeepSeek, Gemini batch adapter, Gemini single-file service)
+ * Used by all AI adapters (Gemini batch adapter, Gemini single-file service, OpenAI, Mistral)
  * to ensure consistent data normalization from raw AI responses.
  *
  * SINGLE SOURCE OF TRUTH for: tax rate normalization, IBAN normalization,
@@ -292,7 +292,10 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
         : 0;
 
   // Tax rate — only use what AI explicitly provided (T3: no implicit derivation)
-  const parsedTaxRate = normalizeTaxRate(data.taxRate);
+  // FIX: Mistral sometimes returns taxRate as array (e.g., [19, 7] for mixed rates)
+  // Convert to null — mixed-rate invoices should use per-line-item rates only
+  const rawTaxRate = Array.isArray(data.taxRate) ? null : data.taxRate;
+  const parsedTaxRate = normalizeTaxRate(rawTaxRate);
 
   // Line items (support both "lineItems" and legacy "items" key)
   const rawItems = Array.isArray(data.lineItems)
@@ -348,7 +351,9 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
     bankName: (data.bankName as string) || null,
     lineItems: rawItems.map((item: Record<string, unknown>, index: number) => {
       // T3: Use only the per-item rate from AI; do NOT fallback to invoice-level rate
-      const itemTaxRate = normalizeTaxRate(item?.taxRate);
+      // FIX: Handle array taxRate on line items too (Mistral edge case)
+      const rawItemRate = Array.isArray(item?.taxRate) ? null : item?.taxRate;
+      const itemTaxRate = normalizeTaxRate(rawItemRate);
       const resolvedRate = !isNaN(itemTaxRate) ? itemTaxRate : undefined;
       const qty = safeNumberStrict(item?.quantity);
       const up = safeNumberStrict(item?.unitPrice);

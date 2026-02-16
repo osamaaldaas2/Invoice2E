@@ -54,6 +54,24 @@ npm run lint
 npm run format
 ```
 
+## Supported Formats
+
+Invoice2E supports 9 e-invoicing output formats:
+
+| Format | Standard | Countries | Output |
+|--------|----------|-----------|--------|
+| XRechnung CII | EN 16931 / CII | DE | XML |
+| XRechnung UBL | EN 16931 / UBL | DE | XML |
+| PEPPOL BIS 3.0 | PEPPOL BIS Billing | 30 EU/EEA | XML |
+| Factur-X EN 16931 | ZUGFeRD 2.x | FR, DE, AT, CH, LU, BE | PDF |
+| Factur-X Basic | ZUGFeRD 2.x | FR, DE, AT, CH, LU, BE | PDF |
+| FatturaPA | FatturaPA 1.2.2 | IT | XML |
+| KSeF FA(2) | KSeF | PL | XML |
+| NLCIUS / SI-UBL 2.0 | Dutch CIUS | NL | XML |
+| CIUS-RO | Romanian CIUS | RO | XML |
+
+See [docs/FORMAT-ARCHITECTURE.md](docs/FORMAT-ARCHITECTURE.md), [docs/FORMAT-REFERENCE.md](docs/FORMAT-REFERENCE.md), [docs/ADDING-NEW-FORMAT.md](docs/ADDING-NEW-FORMAT.md), and [docs/MIGRATION-MULTI-FORMAT.md](docs/MIGRATION-MULTI-FORMAT.md) for details.
+
 ## Project Structure
 
 - `app/` - Next.js app directory
@@ -82,6 +100,20 @@ Response:
   "version": "1.0.0"
 }
 ```
+
+## Invoice Format Validation
+
+Validate generated invoices against official standards (XRechnung, PEPPOL, Factur-X, FatturaPA, KSeF, NLCIUS, CIUS-RO).
+
+```bash
+# Generate test invoices in all 9 formats
+npx tsx scripts/generate-test-invoices.ts
+
+# Validate with KoSIT Validator + xmllint (requires Java 17+)
+bash scripts/validate-with-kosit.sh
+```
+
+Results are saved to `tmp/validation-reports/`. This also runs automatically in CI on every push/PR to main.
 
 ## CONSTITUTION Rules
 

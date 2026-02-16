@@ -86,33 +86,24 @@ if (isRedisConfigured) {
             token: process.env.UPSTASH_REDIS_REST_TOKEN!,
         });
 
-        // Create rate limiters for each preset
-        redisRateLimiters = {
-            login: new Ratelimit({
-                redis,
-                limiter: Ratelimit.slidingWindow(5, '15 m'),
-                analytics: true,
-                prefix: 'ratelimit:login',
-            }),
-            api: new Ratelimit({
-                redis,
-                limiter: Ratelimit.slidingWindow(100, '1 m'),
-                analytics: true,
-                prefix: 'ratelimit:api',
-            }),
-            upload: new Ratelimit({
-                redis,
-                limiter: Ratelimit.slidingWindow(10, '1 m'),
-                analytics: true,
-                prefix: 'ratelimit:upload',
-            }),
-            convert: new Ratelimit({
-                redis,
-                limiter: Ratelimit.slidingWindow(20, '1 m'),
-                analytics: true,
-                prefix: 'ratelimit:convert',
-            }),
-        };
+        // Create rate limiters for each preset programmatically
+        const windowStrings: Record<string, string> = {};
+        for (const [name, cfg] of Object.entries(RATE_LIMIT_PRESETS)) {
+            const minutes = cfg.windowMs / 60000;
+            windowStrings[name] = minutes >= 1 ? `${minutes} m` : `${cfg.windowMs / 1000} s`;
+        }
+
+        redisRateLimiters = Object.fromEntries(
+            Object.entries(RATE_LIMIT_PRESETS).map(([name, cfg]) => [
+                name,
+                new Ratelimit({
+                    redis: redis!,
+                    limiter: Ratelimit.slidingWindow(cfg.maxAttempts, windowStrings[name] as Parameters<typeof Ratelimit.slidingWindow>[1]),
+                    analytics: true,
+                    prefix: `ratelimit:${name}`,
+                }),
+            ])
+        );
 
         logger.info('Redis rate limiter initialized (Upstash)');
     } catch (error) {
@@ -196,8 +187,17 @@ export async function checkRateLimitAsync(
                 resetInSeconds: Math.ceil((result.reset - Date.now()) / 1000),
             };
         } catch (error) {
+            if (process.env.NODE_ENV === 'production') {
+                logger.error('Redis rate limit error in production — failing closed', { error });
+                return {
+                    allowed: false,
+                    remainingAttempts: 0,
+                    resetInSeconds: 60,
+                    blockedForSeconds: 60,
+                };
+            }
             logger.error('Redis rate limit error, falling back to in-memory', { error });
-            // Fall through to in-memory
+            // Fall through to in-memory in development
         }
     }
 
@@ -325,16 +325,26 @@ export function getRequestIdentifier(request: Request, email?: string): string {
 
     let ip: string;
 
+    // Auto-detect trusted proxy: Vercel sets VERCEL env var and is always the proxy
+    const isTrustedProxy = process.env.TRUSTED_PROXY === 'true' ||
+        (!process.env.TRUSTED_PROXY && !!process.env.VERCEL);
+
     if (cfConnectingIp) {
         // FIX-002: Cloudflare provides verified client IP
         ip = cfConnectingIp.trim();
-    } else if (process.env.TRUSTED_PROXY === 'true' && forwardedFor) {
-        // FIX-002: When behind a trusted proxy, use the rightmost IP (last hop before proxy)
+    } else if (isTrustedProxy && forwardedFor) {
+        // FIX-002: When behind a trusted proxy (or Vercel), use the leftmost IP (original client)
         const ips = forwardedFor.split(',').map(s => s.trim());
-        ip = ips[ips.length - 1] || 'unknown';
+        ip = ips[0] || 'unknown';
     } else {
         // FIX-002: Don't trust forwarded headers by default
         ip = realIp?.trim() || 'unknown';
+    }
+
+    // Avoid all unknowns sharing a single bucket
+    if (ip === 'unknown') {
+        const ua = request.headers.get('user-agent') || 'no-ua';
+        ip = `unknown-${ua.length}-${ua.slice(0, 32)}`;
     }
 
     if (email) {

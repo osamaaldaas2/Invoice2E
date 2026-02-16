@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">
+  <FatturaElettronicaHeader>
+    <DatiTrasmissione>
+      <IdTrasmittente>
+        <IdPaese>DE</IdPaese>
+        <IdCodice>123456789</IdCodice>
+      </IdTrasmittente>
+      <ProgressivoInvio>GOLDEN2024</ProgressivoInvio>
+      <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+      <CodiceDestinatario>0000000</CodiceDestinatario>
+    </DatiTrasmissione>
+    <CedentePrestatore>
+      <DatiAnagrafici>
+        <IdFiscaleIVA>
+          <IdPaese>DE</IdPaese>
+          <IdCodice>123456789</IdCodice>
+        </IdFiscaleIVA>
+        <CodiceFiscale>30/123/45678</CodiceFiscale>
+        <Anagrafica>
+          <Denominazione>Golden Seller GmbH</Denominazione>
+        </Anagrafica>
+        <RegimeFiscale>RF01</RegimeFiscale>
+      </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>Hauptstraße 42</Indirizzo>
+        <CAP>10115</CAP>
+        <Comune>Berlin</Comune>
+        <Nazione>DE</Nazione>
+      </Sede>
+    </CedentePrestatore>
+    <CessionarioCommittente>
+      <DatiAnagrafici>
+        <IdFiscaleIVA>
+          <IdPaese>NL</IdPaese>
+          <IdCodice>123456789B01</IdCodice>
+        </IdFiscaleIVA>
+        <Anagrafica>
+          <Denominazione>Golden Buyer B.V.</Denominazione>
+        </Anagrafica>
+      </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>Keizersgracht 200</Indirizzo>
+        <CAP>1015 AA</CAP>
+        <Comune>Amsterdam</Comune>
+        <Nazione>NL</Nazione>
+      </Sede>
+    </CessionarioCommittente>
+  </FatturaElettronicaHeader>
+  <FatturaElettronicaBody>
+    <DatiGenerali>
+      <DatiGeneraliDocumento>
+        <TipoDocumento>TD01</TipoDocumento>
+        <Divisa>EUR</Divisa>
+        <Data>2024-07-15</Data>
+        <Numero>GOLDEN-2024-001</Numero>
+        <ImportoTotaleDocumento>2380.00</ImportoTotaleDocumento>
+      </DatiGeneraliDocumento>
+    </DatiGenerali>
+    <DatiBeniServizi>
+      <DettaglioLinee>
+        <NumeroLinea>1</NumeroLinea>
+        <Descrizione>Consulting Services</Descrizione>
+        <Quantita>10.00</Quantita>
+        <PrezzoUnitario>150.00</PrezzoUnitario>
+        <PrezzoTotale>1500.00</PrezzoTotale>
+        <AliquotaIVA>19.00</AliquotaIVA>
+      </DettaglioLinee>
+      <DettaglioLinee>
+        <NumeroLinea>2</NumeroLinea>
+        <Descrizione>Software License</Descrizione>
+        <Quantita>2.00</Quantita>
+        <PrezzoUnitario>250.00</PrezzoUnitario>
+        <PrezzoTotale>500.00</PrezzoTotale>
+        <AliquotaIVA>19.00</AliquotaIVA>
+      </DettaglioLinee>
+      <DatiRiepilogo>
+        <AliquotaIVA>19.00</AliquotaIVA>
+        <ImponibileImporto>2000.00</ImponibileImporto>
+        <Imposta>380.00</Imposta>
+      </DatiRiepilogo>
+    </DatiBeniServizi>
+    <DatiPagamento>
+      <CondizioniPagamento>TP02</CondizioniPagamento>
+      <DettaglioPagamento>
+        <ModalitaPagamento>MP05</ModalitaPagamento>
+        <ImportoPagamento>2380.00</ImportoPagamento>
+        <IBAN>DE89370400440532013000</IBAN>
+      </DettaglioPagamento>
+    </DatiPagamento>
+  </FatturaElettronicaBody>
+</p:FatturaElettronica>

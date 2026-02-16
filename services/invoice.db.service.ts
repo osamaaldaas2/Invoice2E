@@ -19,6 +19,7 @@ export type CreateConversionData = {
     invoiceNumber?: string;
     buyerName?: string;
     conversionFormat: string;
+    outputFormat?: string;
     creditsUsed?: number;
     conversionStatus?: string;
 };
@@ -27,6 +28,7 @@ export type UpdateConversionData = {
     invoiceNumber?: string;
     buyerName?: string;
     conversionFormat?: string;
+    outputFormat?: string;
     validationStatus?: string;
     validationErrors?: Record<string, unknown>;
     conversionStatus?: string;

@@ -6,8 +6,9 @@ export const APP_VERSION = '1.0.0';
 // CONSTITUTION RULE: All external API calls must have explicit timeout
 export const API_TIMEOUTS = {
   GEMINI_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
-  DEEPSEEK_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
   OPENAI_EXTRACTION: 90000, // 90 seconds (AI processing, large batches)
+  MISTRAL_OCR: 60000, // 60 seconds (Mistral OCR step)
+  MISTRAL_EXTRACTION: 90000, // 90 seconds (Mistral Chat extraction)
   BOUNDARY_DETECTION: 30000, // 30 seconds (lighter AI call)
   STRIPE_API: 30000, // 30 seconds (payment processing)
   PAYPAL_API: 30000, // 30 seconds (payment processing)
@@ -23,9 +24,9 @@ export const FILE_LIMITS = {
   MAX_FILE_SIZE_MB: 25,
   ALLOWED_MIME_TYPES: ['application/pdf', 'image/jpeg', 'image/png'] as const,
   MAX_BULK_FILES: 100,
-  MAX_ZIP_SIZE_BYTES: 200 * 1024 * 1024, // 200MB (EXP-9: reduced from 500MB)
-  MAX_ZIP_SIZE_MB: 200,
-  MAX_ZIP_FILES: 50, // EXP-9: max files per batch to limit memory
+  MAX_ZIP_SIZE_BYTES: 500 * 1024 * 1024, // 500MB
+  MAX_ZIP_SIZE_MB: 500,
+  MAX_ZIP_FILES: 100, // Max files per batch
 } as const;
 
 // Credit system
@@ -87,18 +88,20 @@ export const BATCH_EXTRACTION = {
   MAX_BACKOFF_MS: 60000, // 60s max backoff
 } as const;
 
-// Gemini API rate limiting (token bucket)
+// OpenAI API rate limiting (token bucket)
 export const OPENAI_RATE_LIMIT = {
   MAX_TOKENS: 5, // Burst capacity
   REFILL_PER_SEC: 2, // Tokens refilled per second
 } as const;
 
+// Multi-format feature flag
+// When false, only xrechnung-cii and xrechnung-ubl are available
+export const ENABLE_MULTI_FORMAT = (process.env.ENABLE_MULTI_FORMAT ?? 'true') === 'true';
+
 // Extraction upgrade feature flags
 export const ENABLE_TEXT_EXTRACTION = true;
 export const ENABLE_STRUCTURED_OUTPUTS = true;
 export const ENABLE_EXTRACTION_RETRY = true;
-export const ENABLE_OCR = true; // OCR via Tesseract.js (Phase 8)
-
 // Extraction retry configuration
 export const EXTRACTION_MAX_RETRIES = 2;
 
@@ -119,4 +122,9 @@ export const TEXT_EXTRACTION = {
 export const GEMINI_RATE_LIMIT = {
   MAX_TOKENS: 5, // Burst capacity (5 calls fire instantly, then 2/sec sustained)
   REFILL_PER_SEC: 2, // Tokens refilled per second (~120 RPM, under Gemini's 150 RPM)
+} as const;
+
+export const MISTRAL_RATE_LIMIT = {
+  MAX_TOKENS: 5, // Scale plan — higher burst allowed
+  REFILL_PER_SEC: 2, // 2/sec sustained (~120 RPM)
 } as const;

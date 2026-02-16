@@ -9,6 +9,7 @@ import { PaymentSection } from './PaymentSection';
 import { TotalsSection } from './TotalsSection';
 import { AllowancesChargesSection } from './AllowancesChargesSection';
 import { ReadinessPanel } from './ReadinessPanel';
+import { FormatSelector, useFormatPreference } from './FormatSelector';
 
 interface InvoiceReviewFormProps {
   extractionId: string;
@@ -40,11 +41,13 @@ export default function InvoiceReviewForm({
 }: InvoiceReviewFormProps) {
   const t = useTranslations('invoiceReview');
   const tCommon = useTranslations('common');
+  const [outputFormat, setOutputFormat] = useFormatPreference();
   const { form, onSubmit, isSubmitting, submitError, submitSuccess } = useInvoiceReviewForm({
     extractionId,
     userId,
     initialData,
     onSubmitSuccess,
+    outputFormat,
   });
 
   const {
@@ -130,6 +133,9 @@ export default function InvoiceReviewForm({
         setValue={setValue}
         initialTotals={initialTotals}
       />
+
+      {/* Output Format Selector */}
+      <FormatSelector value={outputFormat} onChange={setOutputFormat} />
 
       {/* Notes */}
       <div className="border-t border-white/10 pt-4">

@@ -8,7 +8,6 @@ export { fileService, type FileUploadResult } from './file.service';
 // AI Extractors
 export { ExtractorFactory, type AIProvider } from './ai/extractor.factory';
 export { GeminiExtractor } from './ai/gemini.extractor';
-export { DeepSeekExtractor } from './ai/deepseek.extractor';
 export { OpenAIExtractor } from './ai/openai.extractor';
 export type { IAIExtractor, ExtractedInvoiceData } from './ai/IAIExtractor';
 

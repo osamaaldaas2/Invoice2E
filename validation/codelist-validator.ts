@@ -4,7 +4,7 @@
  * tax category codes, payment means codes, and unit codes.
  */
 
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { createError, createWarning, type ValidationError } from './validation-result';
 
 /** EN 16931 document type codes (BT-3) */
@@ -58,7 +58,7 @@ const VALID_UNIT_CODES = new Set([
  * Validate codelist values in invoice data.
  * Returns validation errors for invalid codelist entries.
  */
-export function validateCodelists(data: XRechnungInvoiceData): ValidationError[] {
+export function validateCodelists(data: CanonicalInvoice): ValidationError[] {
   const errors: ValidationError[] = [];
 
   // BT-3: Document type code
@@ -88,7 +88,7 @@ export function validateCodelists(data: XRechnungInvoiceData): ValidationError[]
   }
 
   // BT-40: Seller country code
-  const sellerCountry = data.sellerCountryCode?.trim().toUpperCase();
+  const sellerCountry = data.seller?.countryCode?.trim().toUpperCase();
   if (sellerCountry && !VALID_COUNTRY_CODES.has(sellerCountry)) {
     errors.push(
       createError(
@@ -101,7 +101,7 @@ export function validateCodelists(data: XRechnungInvoiceData): ValidationError[]
   }
 
   // BT-55: Buyer country code
-  const buyerCountry = data.buyerCountryCode?.trim().toUpperCase();
+  const buyerCountry = data.buyer?.countryCode?.trim().toUpperCase();
   if (buyerCountry && !VALID_COUNTRY_CODES.has(buyerCountry)) {
     errors.push(
       createError(

@@ -8,17 +8,29 @@
 
 import { describe, it, expect } from 'vitest';
 import { validateBusinessRules } from '@/validation/business-rules';
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
+
+/** Helper to create a minimal CanonicalInvoice for business rule testing */
+function createTestInvoice(overrides: Partial<CanonicalInvoice> & {
+  lineItems: CanonicalInvoice['lineItems'];
+  totals: CanonicalInvoice['totals'];
+}): CanonicalInvoice {
+  return {
+    outputFormat: 'xrechnung-cii',
+    invoiceNumber: 'TEST-001',
+    invoiceDate: '2026-02-13',
+    currency: 'EUR',
+    seller: { name: 'Test Seller' },
+    buyer: { name: 'Test Buyer' },
+    payment: {},
+    ...overrides,
+  };
+}
 
 describe('NET vs GROSS semantic detection', () => {
   describe('GROSS line total detection', () => {
     it('should detect and report when line item totalPrice is GROSS instead of NET', () => {
-      // Scenario: AI extracted GROSS line total (23.68 with 19% tax) instead of NET (19.9)
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-001',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 23.68,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Test Item',
@@ -29,9 +41,8 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'S',
           },
         ],
-        subtotal: 19.9,
-        taxAmount: 3.78,
-      };
+        totals: { subtotal: 19.9, taxAmount: 3.78, totalAmount: 23.68 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
@@ -49,11 +60,7 @@ describe('NET vs GROSS semantic detection', () => {
     });
 
     it('should detect GROSS with multiple line items', () => {
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-002',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 47.36,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Item 1',
@@ -72,9 +79,8 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'S',
           },
         ],
-        subtotal: 39.8,
-        taxAmount: 7.56,
-      };
+        totals: { subtotal: 39.8, taxAmount: 7.56, totalAmount: 47.36 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
@@ -86,12 +92,7 @@ describe('NET vs GROSS semantic detection', () => {
 
   describe('NET line total acceptance', () => {
     it('should pass when line item totalPrice is correctly NET', () => {
-      // Scenario: Correct NET line total
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-003',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 23.68,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Test Item',
@@ -102,32 +103,23 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'S',
           },
         ],
-        subtotal: 19.9,
-        taxAmount: 3.78,
-      };
+        totals: { subtotal: 19.9, taxAmount: 3.78, totalAmount: 23.68 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
-      // Should NOT contain semantic error about NET vs GROSS
       const semanticError = errors.find((e) => e.ruleId === 'SEMANTIC-NET-GROSS');
       expect(semanticError).toBeUndefined();
 
-      // Should pass BR-CO-10 (sum of line net == subtotal)
       const brCo10Error = errors.find((e) => e.ruleId === 'BR-CO-10');
       expect(brCo10Error).toBeUndefined();
 
-      // Should pass BR-CO-14-SUM (tax computed correctly)
       const brCo14Error = errors.find((e) => e.ruleId === 'BR-CO-14-SUM');
       expect(brCo14Error).toBeUndefined();
     });
 
     it('should allow small rounding differences in NET totals', () => {
-      // Scenario: totalPrice has minor rounding difference from qty × unitPrice
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-004',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 119.04,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Test Item',
@@ -138,13 +130,11 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'S',
           },
         ],
-        subtotal: 99.99,
-        taxAmount: 19.05,
-      };
+        totals: { subtotal: 99.99, taxAmount: 19.05, totalAmount: 119.04 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
-      // Should NOT flag as GROSS (within tolerance)
       const semanticError = errors.find((e) => e.ruleId === 'SEMANTIC-NET-GROSS');
       expect(semanticError).toBeUndefined();
     });
@@ -152,11 +142,7 @@ describe('NET vs GROSS semantic detection', () => {
 
   describe('Edge cases', () => {
     it('should not flag items with zero tax rate', () => {
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-005',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 100.0,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Tax-exempt item',
@@ -167,23 +153,17 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'E',
           },
         ],
-        subtotal: 100.0,
-        taxAmount: 0,
-      };
+        totals: { subtotal: 100.0, taxAmount: 0, totalAmount: 100.0 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
-      // Should not flag as GROSS (no tax applied)
       const semanticError = errors.find((e) => e.ruleId === 'SEMANTIC-NET-GROSS');
       expect(semanticError).toBeUndefined();
     });
 
     it('should detect when totalPrice is way off (not just GROSS)', () => {
-      const invoice: XRechnungInvoiceData = {
-        invoiceNumber: 'TEST-006',
-        invoiceDate: '2026-02-13',
-        sellerName: 'Test Seller',
-        totalAmount: 50.0,
+      const invoice = createTestInvoice({
         lineItems: [
           {
             description: 'Incorrect total',
@@ -194,13 +174,11 @@ describe('NET vs GROSS semantic detection', () => {
             taxCategoryCode: 'S',
           },
         ],
-        subtotal: 50.0,
-        taxAmount: 9.5,
-      };
+        totals: { subtotal: 50.0, taxAmount: 9.5, totalAmount: 50.0 },
+      });
 
       const errors = validateBusinessRules(invoice);
 
-      // Should detect semantic error (not specifically GROSS, but mismatch)
       const semanticErrors = errors.filter(
         (e) => e.ruleId === 'SEMANTIC-NET-GROSS' || e.ruleId === 'SEMANTIC-LINE-TOTAL-MISMATCH'
       );

@@ -4,10 +4,11 @@
  * Collects ALL errors (not fail-fast) for better usability.
  */
 
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { validateBusinessRules } from './business-rules';
-import { validateXRechnungRules } from './xrechnung-rules';
 import { validateCodelists } from './codelist-validator';
+import { getProfileValidator } from './ProfileValidatorFactory';
+import type { ProfileId } from './profiles/IProfileValidator';
 import {
   buildValidationResult,
   createError,
@@ -20,7 +21,7 @@ const XRECHNUNG_PROFILE = 'xrechnung-3.0-cii';
 /**
  * Stage 1: Schema validation — required fields and type checks.
  */
-function validateSchema(data: XRechnungInvoiceData): ValidationError[] {
+function validateSchema(data: CanonicalInvoice): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!data.invoiceNumber?.trim()) {
@@ -29,20 +30,20 @@ function validateSchema(data: XRechnungInvoiceData): ValidationError[] {
   if (!data.invoiceDate?.trim()) {
     errors.push(createError('SCHEMA-002', 'invoice.invoiceDate', 'Invoice date is required'));
   }
-  if (!data.sellerName?.trim()) {
+  if (!data.seller?.name?.trim()) {
     errors.push(createError('SCHEMA-003', 'invoice.seller.name', 'Seller name is required'));
   }
-  if (!data.buyerName?.trim()) {
+  if (!data.buyer?.name?.trim()) {
     errors.push(createError('SCHEMA-004', 'invoice.buyer.name', 'Buyer name is required'));
   }
   const docType = data.documentTypeCode ?? 380;
-  if (data.totalAmount == null) {
+  if (data.totals?.totalAmount == null) {
     errors.push(createError('SCHEMA-005', 'invoice.totalAmount', 'Total amount is required'));
-  } else if (!Number.isFinite(data.totalAmount)) {
+  } else if (!Number.isFinite(data.totals.totalAmount)) {
     errors.push(
       createError('SCHEMA-005', 'invoice.totalAmount', 'Total amount must be a valid number')
     );
-  } else if (docType !== 381 && data.totalAmount <= 0) {
+  } else if (docType !== 381 && data.totals.totalAmount <= 0) {
     errors.push(
       createError('SCHEMA-005', 'invoice.totalAmount', 'Total amount must be greater than 0')
     );
@@ -57,26 +58,35 @@ function validateSchema(data: XRechnungInvoiceData): ValidationError[] {
 }
 
 /**
- * Run the full validation pipeline for XRechnung 3.0 CII.
- * Returns structured validation result with all errors and warnings.
+ * Run the full validation pipeline for a given profile.
+ * When no profileId is provided, defaults to XRechnung behavior (backward compatible).
+ * 
+ * @param data - Canonical invoice data to validate
+ * @param profileId - Optional profile ID (defaults to xrechnung-cii)
+ * @returns Structured validation result
  */
-export function validateForXRechnung(data: XRechnungInvoiceData): ValidationResult {
+export function validateForProfile(
+  data: CanonicalInvoice,
+  profileId: ProfileId = 'xrechnung-cii'
+): ValidationResult {
   const allEntries: ValidationError[] = [];
 
   // Stage 1: Schema validation
   allEntries.push(...validateSchema(data));
 
-  // Stage 2: Codelist validation (document type, currency, country, tax category, unit codes)
+  // Stage 2: Codelist validation
   allEntries.push(...validateCodelists(data));
 
   // Stage 3: Business rules (BR-CO monetary cross-checks)
-  // Only run if schema basics pass (need line items and totals)
   if (Array.isArray(data.lineItems) && data.lineItems.length > 0) {
     allEntries.push(...validateBusinessRules(data));
   }
 
-  // Stage 4: Profile rules (BR-DE for XRechnung)
-  allEntries.push(...validateXRechnungRules(data));
+  // Stage 4: Profile-specific rules
+  const profileValidator = getProfileValidator(profileId);
+  allEntries.push(...profileValidator.validate(data));
 
-  return buildValidationResult(XRECHNUNG_PROFILE, allEntries);
+  const profileLabel = profileId === 'xrechnung-cii' ? XRECHNUNG_PROFILE : profileId;
+  return buildValidationResult(profileLabel, allEntries);
 }
+

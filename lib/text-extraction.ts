@@ -1,23 +1,23 @@
 /**
  * Phase 6: Unified text extraction interface.
- * Routes to pdf-parse for digital PDFs; OCR for scanned/images.
+ * Routes to unpdf for digital PDFs; Mistral OCR for scanned/images.
  */
 
 import { extractTextFromPdf } from '@/lib/pdf-text-extractor';
-import { extractTextWithOcr } from '@/lib/ocr-extractor';
-import { ENABLE_TEXT_EXTRACTION, ENABLE_OCR } from '@/lib/constants';
+import { extractTextWithMistralOcr } from '@/lib/ocr-extractor';
+import { ENABLE_TEXT_EXTRACTION } from '@/lib/constants';
 import { logger } from '@/lib/logger';
 
 export interface TextExtractionResult {
   hasText: boolean;
   text: string;
   pageCount: number;
-  source: 'pdf-parse' | 'ocr' | 'none';
+  source: 'unpdf' | 'ocr' | 'mistral-ocr' | 'none';
 }
 
 /**
  * Extract text from a file buffer.
- * For PDFs: uses pdf-parse. For images or scanned PDFs: OCR via Tesseract.
+ * For PDFs: uses unpdf. For images or scanned PDFs: Mistral OCR API.
  */
 export async function extractText(
   fileBuffer: Buffer,
@@ -34,30 +34,30 @@ export async function extractText(
     try {
       const result = await extractTextFromPdf(fileBuffer);
       if (result.hasText) {
-        return { ...result, source: 'pdf-parse' };
+        return { ...result, source: 'unpdf' };
       }
-      // PDF had no text (scanned) — fall through to OCR
+      // PDF had no text (scanned) — fall through to Mistral OCR
     } catch (error) {
-      logger.warn('PDF text extraction failed, trying OCR', {
+      logger.warn('PDF text extraction failed, trying Mistral OCR', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  // OCR for images and scanned PDFs
-  if (ENABLE_OCR && (isImage || isPdf)) {
+  // Mistral OCR for images and scanned PDFs
+  if (isImage || isPdf) {
     try {
-      const ocrResult = await extractTextWithOcr(fileBuffer, mimeType);
-      if (ocrResult.text.length > 0) {
+      const ocrText = await extractTextWithMistralOcr(fileBuffer, mimeType);
+      if (ocrText.length > 0) {
         return {
           hasText: true,
-          text: ocrResult.text,
+          text: ocrText,
           pageCount: 1,
-          source: 'ocr',
+          source: 'mistral-ocr',
         };
       }
     } catch (error) {
-      logger.warn('OCR extraction failed', {
+      logger.warn('Mistral OCR extraction failed', {
         error: error instanceof Error ? error.message : String(error),
       });
     }

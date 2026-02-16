@@ -1,0 +1,61 @@
+name: Validate Invoice Formats
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  JAVA_VERSION: '17'
+
+jobs:
+  validate-invoices:
+    name: Generate & Validate Invoices
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install libxml2-utils
+        run: sudo apt-get install -y libxml2-utils
+
+      - run: npm ci
+
+      - name: Cache validator dependencies
+        uses: actions/cache@v4
+        with:
+          path: tmp/validator-cache
+          key: validator-cache-kosit-1.5.0-xrechnung-2024-06-20
+
+      - name: Generate test invoices
+        run: npx tsx scripts/generate-test-invoices.ts
+
+      - name: Validate invoices
+        run: |
+          chmod +x scripts/validate-with-kosit.sh
+          bash scripts/validate-with-kosit.sh
+
+      - name: Upload test invoices
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-invoices
+          path: tmp/test-invoices/
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: tmp/validation-reports/

@@ -4,8 +4,8 @@ import { MAX_PAGES_FOR_BOUNDARY_DETECTION } from '@/lib/constants';
 import { ExtractionError } from '@/lib/errors';
 import { pdfSplitterService } from './pdf-splitter.service';
 import { GeminiAdapter } from '@/adapters/gemini.adapter';
-import { deepseekAdapter } from '@/adapters/deepseek.adapter';
 import { openaiAdapter } from '@/adapters/openai.adapter';
+import { mistralAdapter } from '@/adapters/mistral.adapter';
 
 // Dedicated adapter for boundary detection — uses GEMINI_BOUNDARY_MODEL (defaults to gemini-2.5-flash)
 // so boundary detection stays accurate even when extraction uses a cheaper/faster model.
@@ -72,10 +72,12 @@ export class BoundaryDetectionService {
     let adapter;
     if (aiProvider === 'openai') {
       adapter = openaiAdapter;
+    } else if (aiProvider === 'mistral') {
+      adapter = mistralAdapter;
     } else if (aiProvider === 'gemini') {
       adapter = boundaryGeminiAdapter;
     } else {
-      adapter = deepseekAdapter;
+      adapter = boundaryGeminiAdapter;
     }
 
     try {

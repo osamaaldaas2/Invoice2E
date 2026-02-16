@@ -677,10 +677,13 @@ export class XRechnungBuilder {
                 <ram:CategoryCode>${categoryCode}</ram:CategoryCode>
                 <ram:RateApplicablePercent>${inferredRate.toFixed(2)}</ram:RateApplicablePercent>
             </ram:ApplicableTradeTax>`);
-    } else {
-      // Net pricing: compute tax groups from line items + allowances
-      const taxGroups = this.buildTaxGroups(items, allowanceCharges);
+    }
 
+    // Compute tax groups once for net-priced invoices (used for both XML and totals)
+    const taxGroups = isGrossPriced ? [] : this.buildTaxGroups(items, allowanceCharges);
+
+    if (!isGrossPriced) {
+      // Net pricing: build tax breakdown XML from groups
       for (const group of taxGroups) {
         const taxForGroup = computeTax(group.basisAmount, group.rate);
         const exemptionXml = this.buildExemptionReason(group.categoryCode);
@@ -705,7 +708,6 @@ export class XRechnungBuilder {
       total = this.safeNumber(data.totalAmount);
     } else {
       // Compute from tax breakdowns
-      const taxGroups = this.buildTaxGroups(items, allowanceCharges);
       let computedTaxAmount = 0;
       for (const group of taxGroups) {
         computedTaxAmount = roundMoney(

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 export interface InvoiceReviewFormValues {
   invoiceNumber: string;
@@ -70,6 +71,7 @@ interface UseInvoiceReviewFormProps {
   userId: string;
   initialData: any;
   onSubmitSuccess?: () => void;
+  outputFormat?: OutputFormat;
 }
 
 export const useInvoiceReviewForm = ({
@@ -77,6 +79,7 @@ export const useInvoiceReviewForm = ({
   userId,
   initialData,
   onSubmitSuccess,
+  outputFormat,
 }: UseInvoiceReviewFormProps) => {
   const router = useRouter();
   const [submitError, setSubmitError] = useState('');
@@ -196,7 +199,7 @@ export const useInvoiceReviewForm = ({
       buyerTaxId: initialData?.buyerTaxId || '',
       buyerReference: initialData?.buyerReference || '',
 
-      paymentTerms: initialData?.paymentTerms || 'Net 30',
+      paymentTerms: initialData?.paymentTerms || '',
       paymentDueDate: initialData?.paymentDueDate || '',
       paymentInstructions: initialData?.paymentInstructions || '',
 
@@ -338,7 +341,7 @@ export const useInvoiceReviewForm = ({
         accuracy: responseData.data.accuracy,
       });
 
-      sessionStorage.setItem(`review_${extractionId}`, JSON.stringify(payload));
+      sessionStorage.setItem(`review_${extractionId}`, JSON.stringify({ ...payload, outputFormat: outputFormat || 'xrechnung-cii' }));
 
       if (onSubmitSuccess) {
         onSubmitSuccess();

@@ -14,7 +14,6 @@ import { createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { CreditPackage } from '@/types/credit-package';
 import { handleApiError } from '@/lib/api-helpers';
-import { requireCsrfToken } from '@/lib/csrf';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 type PaymentMethod = 'stripe' | 'paypal';
@@ -31,10 +30,6 @@ import { getAuthenticatedUser } from '@/lib/auth';
  */
 export async function POST(req: NextRequest) {
     try {
-        // CSRF protection
-        const csrfError = await requireCsrfToken(req);
-        if (csrfError) return csrfError as NextResponse;
-
         // Auth: try Supabase first, then fallback to session cookie
         const user = await getAuthenticatedUser(req);
 

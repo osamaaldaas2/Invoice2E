@@ -12,7 +12,45 @@ export interface PdfTextExtractionResult {
   pageCount: number;
 }
 
+export interface PdfPagedTextResult {
+  hasText: boolean;
+  pages: { pageNumber: number; text: string }[];
+  pageCount: number;
+}
+
 const MIN_CHARS_PER_PAGE = 50;
+
+/**
+ * Extract text with page markers — used for boundary detection.
+ * Returns per-page text array so callers can add "--- PAGE N ---" markers.
+ */
+export async function extractPagedTextFromPdf(pdfBuffer: Buffer): Promise<PdfPagedTextResult> {
+  try {
+    const { extractText: extract } = await import('unpdf');
+    const data = new Uint8Array(pdfBuffer);
+    const result = await extract(data);
+
+    const pageCount = result.totalPages || 1;
+    const rawPages = Array.isArray(result.text) ? result.text : [String(result.text || '')];
+    const totalText = rawPages.join('');
+    const avgCharsPerPage = totalText.length / pageCount;
+    const hasText = avgCharsPerPage >= MIN_CHARS_PER_PAGE;
+
+    if (!hasText) return { hasText: false, pages: [], pageCount };
+
+    const pages = rawPages.map((text, i) => ({
+      pageNumber: i + 1,
+      text: typeof text === 'string' ? text : String(text),
+    }));
+
+    return { hasText: true, pages, pageCount };
+  } catch (error) {
+    logger.warn('Paged PDF text extraction failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { hasText: false, pages: [], pageCount: 0 };
+  }
+}
 
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<PdfTextExtractionResult> {
   try {

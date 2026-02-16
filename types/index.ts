@@ -1,3 +1,14 @@
+// Canonical invoice model (multi-format support)
+export type {
+  OutputFormat,
+  CanonicalInvoice,
+  PartyInfo,
+  PaymentInfo,
+  CanonicalLineItem,
+  DocumentTotals,
+  CanonicalAllowanceCharge,
+} from './canonical-invoice';
+
 // Core entity types for Invoice2E database
 
 // User role type for admin system
@@ -57,6 +68,7 @@ export type InvoiceConversion = {
   invoiceNumber?: string;
   buyerName?: string;
   conversionFormat: string;
+  outputFormat?: string;
   validationStatus: string;
   validationErrors?: Record<string, unknown>;
   conversionStatus: string;

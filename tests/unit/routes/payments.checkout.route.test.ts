@@ -55,10 +55,6 @@ vi.mock('@/lib/rate-limiter', () => ({
     getRequestIdentifier: vi.fn().mockReturnValue('test-ip'),
 }));
 
-vi.mock('@/lib/csrf', () => ({
-    requireCsrfToken: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('@/lib/api-helpers', () => ({
     handleApiError: vi.fn((error) => {
         const { NextResponse } = require('next/server');

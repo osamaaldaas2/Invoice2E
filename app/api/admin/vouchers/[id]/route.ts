@@ -7,7 +7,6 @@ import { adminAuditService } from '@/services/admin';
 import { isValidUUID } from '@/lib/database-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
-
 const UpdateVoucherSchema = z.object({
     code: z.string().min(3).max(50),
     description: z.string().max(500).optional().nullable(),

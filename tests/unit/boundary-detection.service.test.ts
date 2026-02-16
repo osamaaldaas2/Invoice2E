@@ -22,17 +22,17 @@ vi.mock('@/adapters/gemini.adapter', () => {
   };
 });
 
-vi.mock('@/adapters/deepseek.adapter', () => ({
-  deepseekAdapter: {
-    sendPrompt: vi.fn(),
-  },
-}));
-
 const mockOpenAISendPrompt = vi.hoisted(() => vi.fn());
 
 vi.mock('@/adapters/openai.adapter', () => ({
   openaiAdapter: {
     sendPrompt: mockOpenAISendPrompt,
+  },
+}));
+
+vi.mock('@/adapters/mistral.adapter', () => ({
+  mistralAdapter: {
+    sendPrompt: vi.fn(),
   },
 }));
 

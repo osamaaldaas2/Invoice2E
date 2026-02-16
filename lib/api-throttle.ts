@@ -1,4 +1,4 @@
-import { GEMINI_RATE_LIMIT, OPENAI_RATE_LIMIT } from '@/lib/constants';
+import { GEMINI_RATE_LIMIT, OPENAI_RATE_LIMIT, MISTRAL_RATE_LIMIT } from '@/lib/constants';
 
 /**
  * Token-bucket rate limiter for AI API calls.
@@ -84,4 +84,10 @@ export const openaiThrottle = new TokenBucketThrottle(
 export const geminiThrottle = new TokenBucketThrottle(
   GEMINI_RATE_LIMIT.MAX_TOKENS,
   GEMINI_RATE_LIMIT.REFILL_PER_SEC
+);
+
+// Mistral throttle: conservative 1/sec (each extraction = 2 calls: OCR + Chat)
+export const mistralThrottle = new TokenBucketThrottle(
+  MISTRAL_RATE_LIMIT.MAX_TOKENS,
+  MISTRAL_RATE_LIMIT.REFILL_PER_SEC
 );

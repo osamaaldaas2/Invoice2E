@@ -1,19 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { invoiceDbService } from '@/services/invoice.db.service';
 import { reviewService } from '@/services/review.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
-import { requireCsrfToken } from '@/lib/csrf';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { createUserScopedClient } from '@/lib/supabase.server';
 
+const ReviewLineItemSchema = z.object({
+    description: z.string().max(500).default(''),
+    quantity: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+    unitPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+    totalPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+    taxRate: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().min(0).max(100)).optional(),
+    unitCode: z.string().max(10).optional(),
+    taxCategoryCode: z.string().max(10).optional(),
+});
+
+const ReviewedDataSchema = z.object({
+    invoiceNumber: z.string().min(1, 'Invoice number is required').max(200),
+    invoiceDate: z.string().max(50).optional(),
+    sellerName: z.string().min(1, 'Seller name is required').max(500),
+    sellerEmail: z.string().max(320).optional(),
+    sellerPhone: z.string().max(50).optional(),
+    sellerAddress: z.string().max(500).optional(),
+    sellerStreet: z.string().max(500).optional(),
+    sellerCity: z.string().max(200).optional(),
+    sellerPostalCode: z.string().max(20).optional(),
+    sellerCountryCode: z.string().max(5).optional(),
+    sellerTaxId: z.string().max(100).optional(),
+    sellerTaxNumber: z.string().max(100).optional(),
+    sellerVatId: z.string().max(100).optional(),
+    sellerIban: z.string().max(50).optional(),
+    sellerBic: z.string().max(20).optional(),
+    sellerContactName: z.string().max(200).optional(),
+    sellerElectronicAddress: z.string().max(200).optional(),
+    sellerElectronicAddressScheme: z.string().max(10).optional(),
+    buyerName: z.string().min(1, 'Buyer name is required').max(500),
+    buyerEmail: z.string().max(320).optional(),
+    buyerAddress: z.string().max(500).optional(),
+    buyerStreet: z.string().max(500).optional(),
+    buyerCity: z.string().max(200).optional(),
+    buyerPostalCode: z.string().max(20).optional(),
+    buyerCountryCode: z.string().max(5).optional(),
+    buyerTaxId: z.string().max(100).optional(),
+    buyerVatId: z.string().max(100).optional(),
+    buyerReference: z.string().max(200).optional(),
+    buyerElectronicAddress: z.string().max(200).optional(),
+    buyerElectronicAddressScheme: z.string().max(10).optional(),
+    lineItems: z.array(ReviewLineItemSchema).min(1, 'At least one line item is required'),
+    subtotal: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
+    taxAmount: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
+    totalAmount: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
+    currency: z.string().max(10).optional(),
+    paymentTerms: z.string().max(500).optional(),
+    dueDate: z.string().max(50).optional(),
+    documentTypeCode: z.string().max(10).optional(),
+    precedingInvoiceReference: z.string().max(200).optional(),
+}).passthrough();
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    // CSRF protection
-    const csrfError = await requireCsrfToken(request);
-    if (csrfError) return csrfError as NextResponse;
-
     // SECURITY FIX (BUG-002): Authenticate user from session, not request body
     const user = await getAuthenticatedUser(request);
     if (!user) {
@@ -44,15 +92,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const userClient = await createUserScopedClient(userId);
 
     const body = await request.json();
-    const { extractionId, reviewedData } = body;
+    const { extractionId, reviewedData: rawReviewedData } = body;
     // REMOVED: userId from body destructuring - Security vulnerability
 
-    if (!extractionId || !reviewedData) {
+    if (!extractionId || !rawReviewedData) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
     }
+
+    const parsedReview = ReviewedDataSchema.safeParse(rawReviewedData);
+    if (!parsedReview.success) {
+      const firstError = parsedReview.error.errors[0]?.message || 'Invalid review data';
+      logger.warn('Review validation failed', { errors: parsedReview.error.errors });
+      return NextResponse.json({ success: false, error: firstError }, { status: 400 });
+    }
+    // Safe cast: Zod validated core fields, .passthrough() preserves all extra fields
+    // needed by ReviewedInvoiceData (notes, sellerContact, etc.)
+    const reviewedData = parsedReview.data as unknown as import('@/services/review.service').ReviewedInvoiceData;
 
     // Get original extraction with user-scoped client (RLS enforced)
     const extraction = await invoiceDbService.getExtractionById(extractionId, userClient);

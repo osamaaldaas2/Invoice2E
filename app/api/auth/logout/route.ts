@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clearSessionCookie } from '@/lib/session';
-import { clearCsrfCookie } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
@@ -19,9 +18,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        // Clear the session cookie and CSRF token
+        // Clear the session cookie
         await clearSessionCookie();
-        await clearCsrfCookie();
 
         logger.info('User logged out');
 

@@ -663,5 +663,43 @@
     "loading": "Loading invoice data...",
     "errorTitle": "Error Loading Invoice",
     "backToDashboard": "Back to Dashboard"
+  },
+  "formats": {
+    "xrechnung-cii": {
+      "name": "XRechnung (CII)",
+      "description": "German e-invoicing standard based on UN/CEFACT Cross-Industry Invoice syntax."
+    },
+    "xrechnung-ubl": {
+      "name": "XRechnung (UBL)",
+      "description": "German e-invoicing standard based on UBL 2.1 syntax."
+    },
+    "peppol-bis": {
+      "name": "PEPPOL BIS 3.0",
+      "description": "Pan-European e-invoicing format for the PEPPOL network."
+    },
+    "facturx-en16931": {
+      "name": "Factur-X EN 16931",
+      "description": "Hybrid PDF/A-3 invoice with embedded CII XML at EN 16931 conformance level."
+    },
+    "facturx-basic": {
+      "name": "Factur-X Basic",
+      "description": "Hybrid PDF/A-3 invoice with embedded CII XML at Basic conformance level."
+    },
+    "fatturapa": {
+      "name": "FatturaPA",
+      "description": "Italian electronic invoicing format mandated by the Agenzia delle Entrate."
+    },
+    "ksef": {
+      "name": "KSeF FA(2)",
+      "description": "Polish structured e-invoice for the Krajowy System e-Faktur."
+    },
+    "nlcius": {
+      "name": "NLCIUS / SI-UBL 2.0",
+      "description": "Dutch CIUS of EN 16931 based on UBL, also known as SI-UBL 2.0."
+    },
+    "cius-ro": {
+      "name": "CIUS-RO",
+      "description": "Romanian CIUS of EN 16931 based on UBL for the RO e-Factura system."
+    }
   }
 }

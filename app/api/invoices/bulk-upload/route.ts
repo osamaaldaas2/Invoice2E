@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createSignedDownloadToken } from '@/lib/session';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
+import { FILE_LIMITS } from '@/lib/constants';
 import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
@@ -93,10 +94,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File must be a ZIP archive' }, { status: 400 });
     }
 
-    // Validate file size (EXP-9: reduced from 500MB to 200MB)
-    const maxSize = 200 * 1024 * 1024; // 200MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size exceeds 200MB limit' }, { status: 400 });
+    // Validate file size
+    if (file.size > FILE_LIMITS.MAX_ZIP_SIZE_BYTES) {
+      return NextResponse.json({ error: `File size exceeds ${FILE_LIMITS.MAX_ZIP_SIZE_MB}MB limit` }, { status: 400 });
     }
 
     // Convert file to buffer
@@ -105,11 +105,10 @@ export async function POST(req: NextRequest) {
     // CREDIT CHECK FIX: Estimate file count BEFORE creating job to avoid orphan jobs
     const estimatedFileCount = await batchService.estimateFileCount(buffer);
 
-    // EXP-9: Reject excessively large batches early
-    if (estimatedFileCount > 50) {
+    if (estimatedFileCount > FILE_LIMITS.MAX_ZIP_FILES) {
       return NextResponse.json(
         {
-          error: `This ZIP contains ${estimatedFileCount} files. Maximum is 50 files per batch. Please split into smaller batches.`,
+          error: `This ZIP contains ${estimatedFileCount} files. Maximum is ${FILE_LIMITS.MAX_ZIP_FILES} files per batch. Please split into smaller batches.`,
         },
         { status: 400 }
       );

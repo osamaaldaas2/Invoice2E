@@ -11,6 +11,7 @@
  */
 
 import { roundMoney, sumMoney, computeTax, moneyEqual } from './monetary';
+import { DEFAULT_VAT_RATE } from './constants';
 
 export interface MonetaryLineItem {
   netAmount: number;
@@ -188,7 +189,7 @@ export function groupByTaxRate(
   // Include document-level allowances/charges in tax groups
   if (allowanceCharges && allowanceCharges.length > 0) {
     for (const ac of allowanceCharges) {
-      const rate = ac.taxRate ?? 0;
+      const rate = ac.taxRate ?? DEFAULT_VAT_RATE;
       const existing = groups.get(rate);
       const adjustment = ac.chargeIndicator ? ac.amount : -ac.amount;
 

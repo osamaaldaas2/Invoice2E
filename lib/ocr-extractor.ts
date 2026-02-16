@@ -1,74 +1,71 @@
 /**
- * Phase 8: OCR via Tesseract.js
- * Extracts text from images using Tesseract OCR with German + English language support.
- * Gated behind ENABLE_OCR feature flag.
+ * Shared Mistral OCR utility.
+ * Extracts text from images/scanned PDFs via Mistral's /v1/ocr endpoint.
+ * Used by ALL AI providers (GPT, Gemini, Mistral) as the universal OCR fallback.
  */
 
-import { ENABLE_OCR } from '@/lib/constants';
+import axios from 'axios';
+import { API_TIMEOUTS } from '@/lib/constants';
 import { logger } from '@/lib/logger';
-
-export interface OcrResult {
-  text: string;
-  confidence: number;
-}
-
-// Tesseract.js worker threads crash on Vercel serverless (MODULE_NOT_FOUND
-// in worker-script/node/index.js). The crash is an Uncaught Exception that
-// kills the entire process before any try/catch can intercept it.
-// Detect Vercel and skip OCR entirely — AI extracts from the visual PDF instead.
-const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV);
-
-let workerPromise: Promise<import('tesseract.js').Worker> | null = null;
-
-async function getWorker(): Promise<import('tesseract.js').Worker> {
-  if (IS_VERCEL) {
-    throw new Error('Tesseract.js not supported on Vercel serverless');
-  }
-  if (!workerPromise) {
-    workerPromise = (async () => {
-      const Tesseract = await import('tesseract.js');
-      const worker = await Tesseract.createWorker('deu+eng');
-      return worker;
-    })();
-  }
-  return workerPromise;
-}
+import { mistralThrottle } from '@/lib/api-throttle';
 
 /**
- * Run OCR on an image buffer.
- * Returns extracted text and confidence score.
- * If confidence < 0.5 or OCR is disabled, returns empty text.
+ * Extract text from a file buffer using Mistral OCR API.
+ * Returns extracted text (markdown) or empty string on failure.
+ * Requires MISTRAL_API_KEY to be set.
  */
-export async function extractTextWithOcr(
-  imageBuffer: Buffer,
-  _mimeType: string
-): Promise<OcrResult> {
-  if (!ENABLE_OCR) {
-    return { text: '', confidence: 0 };
+export async function extractTextWithMistralOcr(
+  fileBuffer: Buffer,
+  mimeType: string
+): Promise<string> {
+  const apiKey = process.env.MISTRAL_API_KEY ?? '';
+  if (!apiKey) {
+    logger.warn('Mistral OCR skipped: MISTRAL_API_KEY not set');
+    return '';
   }
 
+  const baseUrl = process.env.MISTRAL_API_URL ?? 'https://api.mistral.ai';
+  const ocrModel = process.env.MISTRAL_OCR_MODEL ?? 'mistral-ocr-latest';
+
+  await mistralThrottle.acquire();
+
+  const base64Data = fileBuffer.toString('base64');
+  const dataUri = `data:${mimeType};base64,${base64Data}`;
+
+  const payload = {
+    model: ocrModel,
+    document: {
+      type: 'document_url',
+      document_url: dataUri,
+    },
+  };
+
   try {
-    const worker = await getWorker();
-    const result = await worker.recognize(imageBuffer);
-
-    const confidence = result.data.confidence / 100; // Tesseract returns 0-100
-    const text = result.data.text;
-
-    logger.info('OCR extraction complete', {
-      textLength: text.length,
-      confidence: Math.round(confidence * 100) / 100,
+    const response = await axios.post(`${baseUrl}/v1/ocr`, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      timeout: API_TIMEOUTS.MISTRAL_OCR,
     });
 
-    if (confidence < 0.5) {
-      logger.warn('OCR confidence too low, discarding result', { confidence });
-      return { text: '', confidence };
+    const pages = response.data?.pages;
+    if (!Array.isArray(pages) || pages.length === 0) {
+      logger.warn('Mistral OCR returned empty pages');
+      return '';
     }
 
-    return { text, confidence };
+    const fullText = pages.map((p: { markdown: string }) => p.markdown).join('\n\n');
+    logger.info('Mistral OCR completed', {
+      pageCount: pages.length,
+      textLength: fullText.length,
+    });
+
+    return fullText;
   } catch (error) {
-    logger.warn('OCR extraction failed', {
+    logger.warn('Mistral OCR extraction failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return { text: '', confidence: 0 };
+    return '';
   }
 }
