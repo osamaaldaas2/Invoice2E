@@ -1,4 +1,4 @@
-import { PDFDocument, PDFPage, rgb, StandardFonts, PDFFont } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, PDFFont } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 
