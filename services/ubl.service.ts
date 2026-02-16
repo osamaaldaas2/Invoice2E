@@ -173,6 +173,7 @@ export class UBLService {
     <cbc:ProfileID>${this.profileId}</cbc:ProfileID>
     <cbc:ID>${this.escapeXml(data.invoiceNumber)}</cbc:ID>
     <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+    <cbc:DueDate>${dueDate}</cbc:DueDate>
     ${this.buildInvoicePeriod(data)}
     <cbc:CreditNoteTypeCode>381</cbc:CreditNoteTypeCode>
     ${data.notes ? `<cbc:Note>${this.escapeXml(data.notes)}</cbc:Note>` : ''}

@@ -7,7 +7,7 @@
  * @module services/format/facturx/facturx.generator
  */
 
-import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFName, PDFArray, PDFDict, PDFHexString } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFName, PDFArray, PDFDict } from 'pdf-lib';
 import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
