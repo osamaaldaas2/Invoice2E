@@ -30,7 +30,7 @@
 
 | #    | Fix                                                             | File(s)                                                               | Status     |
 | ---- | --------------------------------------------------------------- | --------------------------------------------------------------------- | ---------- |
-| F-21 | Single invoice review: dynamic fields per format                | `components/forms/invoice-review/*`                                   | ⏳ Pending |
+| F-21 | Single invoice review: dynamic fields per format                | `components/forms/invoice-review/*`                                   | ✅ Done    |
 | F-22 | Bulk upload: auto-detect format + global override + per-invoice | `BulkUploadForm.tsx`, `batch-download/route.ts`, `batch.processor.ts` | ⏳ Pending |
 
 ### 🏗️ PHASE 3 — Architecture (Controlled risk)

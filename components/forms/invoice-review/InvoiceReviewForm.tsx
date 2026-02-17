@@ -10,6 +10,7 @@ import { TotalsSection } from './TotalsSection';
 import { AllowancesChargesSection } from './AllowancesChargesSection';
 import { ReadinessPanel } from './ReadinessPanel';
 import { FormatSelector, useFormatPreference } from './FormatSelector';
+import { FORMAT_FIELD_CONFIG } from '@/lib/format-field-config';
 
 interface InvoiceReviewFormProps {
   extractionId: string;
@@ -121,11 +122,21 @@ export default function InvoiceReviewForm({
       <InvoiceDetailsSection register={register} errors={errors} />
 
       <div className="border-t border-white/10 pt-4">
-        <SellerInfoSection register={register} errors={errors} countryCodes={COUNTRY_CODES} />
+        <SellerInfoSection
+          register={register}
+          errors={errors}
+          countryCodes={COUNTRY_CODES}
+          formatConfig={FORMAT_FIELD_CONFIG[outputFormat]}
+        />
       </div>
 
       <div className="border-t border-white/10 pt-4">
-        <BuyerInfoSection register={register} errors={errors} countryCodes={COUNTRY_CODES} />
+        <BuyerInfoSection
+          register={register}
+          errors={errors}
+          countryCodes={COUNTRY_CODES}
+          formatConfig={FORMAT_FIELD_CONFIG[outputFormat]}
+        />
       </div>
 
       <div className="border-t border-white/10 pt-4">
@@ -137,7 +148,11 @@ export default function InvoiceReviewForm({
       </div>
 
       <div className="border-t border-white/10 pt-4">
-        <PaymentSection register={register} errors={errors} />
+        <PaymentSection
+          register={register}
+          errors={errors}
+          formatConfig={FORMAT_FIELD_CONFIG[outputFormat]}
+        />
       </div>
 
       <TotalsSection

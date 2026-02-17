@@ -12,6 +12,7 @@ export interface InvoiceReviewFormValues {
   sellerContactName: string;
   sellerPhone: string;
   sellerEmail: string;
+  sellerElectronicAddress: string; // BT-34 Peppol / NLCIUS / CIUS-RO seller participant ID
   sellerAddress: string;
   sellerParsedAddress: {
     street: string;
@@ -40,6 +41,7 @@ export interface InvoiceReviewFormValues {
   buyerCountryCode: string;
   buyerTaxId: string;
   buyerReference: string;
+  buyerCodiceDestinatario: string; // FatturaPA SDI routing code (7 chars)
   paymentTerms: string;
   paymentDueDate: string;
   paymentInstructions: string;
@@ -183,6 +185,7 @@ export const useInvoiceReviewForm = ({
       },
       // Keep flat fields synced via watch/effects or just use nested -> relying on parsed for now but mapping back for submission
       sellerTaxId: initialData?.sellerTaxId || '',
+      sellerElectronicAddress: initialData?.sellerElectronicAddress || '',
       sellerIban: normalizeIban(initialData?.sellerIban || initialData?.iban || ''),
       sellerBic: initialData?.sellerBic || initialData?.bic || '',
       bankName: initialData?.bankName || '',
@@ -198,6 +201,7 @@ export const useInvoiceReviewForm = ({
       },
       buyerTaxId: initialData?.buyerTaxId || '',
       buyerReference: initialData?.buyerReference || '',
+      buyerCodiceDestinatario: initialData?.buyerCodiceDestinatario || '',
 
       paymentTerms: initialData?.paymentTerms || '',
       paymentDueDate: initialData?.paymentDueDate || '',
@@ -276,12 +280,21 @@ export const useInvoiceReviewForm = ({
         buyerCity: data.buyerParsedAddress.city,
         buyerPostalCode: data.buyerParsedAddress.postalCode,
         buyerCountryCode: data.buyerParsedAddress.country,
-        // Derive electronic addresses (BT-49 / BT-34) with smart scheme detection
+        // Derive electronic addresses (BT-49 / BT-34)
+        // Prefer the explicit sellerElectronicAddress field (Peppol ID); fall back to email.
+        sellerElectronicAddress: (data.sellerElectronicAddress || data.sellerEmail).trim(),
+        sellerElectronicAddressScheme:
+          data.sellerElectronicAddress && !data.sellerElectronicAddress.includes('@')
+            ? undefined // scheme from explicit Peppol ID (embedded like "0088:...")
+            : data.sellerEmail.includes('@')
+              ? 'EM'
+              : undefined,
+        // BT-49: buyer electronic address, or email
         buyerElectronicAddress: data.buyerEmail.trim(),
         buyerElectronicAddressScheme: data.buyerEmail.includes('@') ? 'EM' : undefined,
         buyerEmail: data.buyerEmail.includes('@') ? data.buyerEmail.trim() : '',
-        sellerElectronicAddress: data.sellerEmail.trim(),
-        sellerElectronicAddressScheme: data.sellerEmail.includes('@') ? 'EM' : undefined,
+        // FatturaPA: Codice Destinatario (7-char SDI routing code)
+        buyerCodiceDestinatario: data.buyerCodiceDestinatario?.trim() || undefined,
         // Ensure line items are numbers; omit taxRate if not provided (T3)
         lineItems: data.items.map((item) => ({
           description: item.description,
