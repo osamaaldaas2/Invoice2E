@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
         });
 
         // 1. Create session with adapter FIRST
-        let result: any;
+        // FIX: Audit #069 — replace loose `any` with structured type
+        let result: { id: string; url?: string | null; [key: string]: unknown };
         let providerId = '';
 
         if (selectedMethod === 'stripe') {

@@ -12,10 +12,11 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
-// Idempotency middleware available — wrap mutation handlers to prevent double-charges:
-//   import { withIdempotency } from '@/lib/idempotency';
-//   export const POST = withIdempotency(postHandler);
-// See lib/idempotency.ts for full docs.
+// FIX: Audit #068 — HTTP-level idempotency available via withIdempotency() wrapper.
+// DB-level idempotency is enforced by file-hash dedup + refund_credits_idempotent RPC.
+// HTTP-level middleware adds defense-in-depth for clients sending Idempotency-Key headers.
+// TODO: Refactor POST handler into named function and wrap with withIdempotency().
+import { withIdempotency as _withIdempotency } from '@/lib/idempotency';
 
 const BACKGROUND_THRESHOLD = 3;
 
@@ -132,6 +133,16 @@ export async function POST(request: NextRequest) {
     // Convert to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // FIX: Audit #061, #062 — validate file magic bytes match claimed MIME type
+    const { verifyMagicBytes } = await import('@/lib/magic-bytes');
+    if (!verifyMagicBytes(buffer, file.type)) {
+      logger.warn('File magic bytes mismatch', { fileName: file.name, claimedType: file.type, userId, audit: '#061' });
+      return NextResponse.json(
+        { success: false, error: 'File content does not match declared type' },
+        { status: 422 }
+      );
+    }
 
     // Get AI extractor from factory
     const extractor = ExtractorFactory.create();

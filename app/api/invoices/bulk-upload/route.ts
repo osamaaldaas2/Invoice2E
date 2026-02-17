@@ -17,16 +17,17 @@ import { FILE_LIMITS } from '@/lib/constants';
 import { PaginationSchema } from '@/lib/validators';
 import { handleApiError } from '@/lib/api-helpers';
 
+// FIX: Audit #072 — skip redundant DB lookup when userId comes from verified session
 const resolveActiveUserId = async (
   client: SupabaseClient,
   user: { id: string; email?: string }
 ): Promise<string | null> => {
-  const { data: byId } = await client.from('users').select('id').eq('id', user.id).maybeSingle();
-
-  if (byId?.id) {
-    return byId.id as string;
+  // userId from session is already verified — trust it directly
+  if (user.id) {
+    return user.id;
   }
 
+  // Fallback to email lookup only if userId somehow missing
   if (!user.email) {
     return null;
   }
@@ -101,6 +102,20 @@ export async function POST(req: NextRequest) {
 
     // Convert file to buffer
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // FIX: Audit #032 — validate ZIP magic bytes
+    const { detectFileType } = await import('@/lib/magic-bytes');
+    const detected = detectFileType(buffer);
+    if (!detected || detected.extension !== 'pdf') {
+      // ZIP files start with PK (0x50, 0x4B) — detectFileType may not detect ZIP
+      // Check manually for ZIP header
+      if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
+        return NextResponse.json(
+          { success: false, error: 'File is not a valid ZIP archive' },
+          { status: 422 }
+        );
+      }
+    }
 
     // CREDIT CHECK FIX: Estimate file count BEFORE creating job to avoid orphan jobs
     const estimatedFileCount = await batchService.estimateFileCount(buffer);

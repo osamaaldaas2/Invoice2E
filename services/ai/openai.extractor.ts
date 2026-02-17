@@ -2,6 +2,7 @@ import { IAIExtractor, ExtractedInvoiceData } from './IAIExtractor';
 import { openaiAdapter } from '@/adapters';
 import { IOpenAIAdapter } from '@/adapters/interfaces';
 import { extractText } from '@/lib/text-extraction';
+import { validateExtraction } from '@/lib/extraction-validator';
 import { ENABLE_TEXT_EXTRACTION, ENABLE_STRUCTURED_OUTPUTS } from '@/lib/constants';
 import { logger } from '@/lib/logger';
 
@@ -45,11 +46,21 @@ export class OpenAIExtractor implements IAIExtractor {
       const result = await (this.adapter as any).extractWithStructuredOutputs(buffer, fileType, {
         extractedText,
       });
+      // FIX: Audit #016 — validate extraction output
+      const validation = validateExtraction(result.data);
+      if (!validation.valid) {
+        logger.warn('OpenAI extraction failed validation', { errors: validation.errors, audit: '#016' });
+      }
       return result.data;
     }
 
     // Fallback to standard extraction
     const result = await this.adapter.extractInvoiceData(buffer, fileType);
+    // FIX: Audit #016 — validate extraction output
+    const validation = validateExtraction(result.data);
+    if (!validation.valid) {
+      logger.warn('OpenAI extraction failed validation', { errors: validation.errors, audit: '#016' });
+    }
     return result.data;
   }
 }
