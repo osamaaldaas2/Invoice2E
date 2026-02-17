@@ -17,6 +17,8 @@ import { createUserScopedClient } from '@/lib/supabase.server';
 // HTTP-level middleware adds defense-in-depth for clients sending Idempotency-Key headers.
 // TODO: Refactor POST handler into named function and wrap with withIdempotency().
 import { withIdempotency as _withIdempotency } from '@/lib/idempotency';
+import { resilientExtract } from '@/lib/ai-resilience';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 const BACKGROUND_THRESHOLD = 3;
 
@@ -143,6 +145,11 @@ export async function POST(request: NextRequest) {
         { status: 422 }
       );
     }
+
+    // FIX: Audit #063 — file quarantine placeholder.
+    // Full quarantine lifecycle (store → scan → promote/reject) requires Supabase storage integration.
+    // Currently: magic byte validation above provides the core security check.
+    // Enable USE_FILE_QUARANTINE flag when full quarantine storage is wired up.
 
     // Get AI extractor from factory
     const extractor = ExtractorFactory.create();
@@ -329,7 +336,16 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     let extractedData;
     try {
-      extractedData = await extractor.extractFromFile(buffer, file.name, file.type);
+      // FIX: Audit #017, #060 — use circuit breaker with fallback when enabled
+      const useCircuitBreaker = await isFeatureEnabled(
+        await createUserScopedClient(userId), 'USE_CIRCUIT_BREAKER'
+      ).catch(() => false);
+
+      if (useCircuitBreaker) {
+        extractedData = await resilientExtract(buffer, file.name, file.type);
+      } else {
+        extractedData = await extractor.extractFromFile(buffer, file.name, file.type);
+      }
     } catch (extractionError) {
       // FIX: Audit #014, #100 — idempotent refund on AI failure
       try {
