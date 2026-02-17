@@ -11,7 +11,14 @@ vi.mock('@/lib/api-throttle', () => ({
 }));
 
 vi.mock('@/lib/text-extraction', () => ({
-  extractText: vi.fn().mockResolvedValue({ hasText: true, text: 'Extracted text from PDF', pageCount: 1, source: 'unpdf' }),
+  extractText: vi
+    .fn()
+    .mockResolvedValue({
+      hasText: true,
+      text: 'Extracted text from PDF',
+      pageCount: 1,
+      source: 'unpdf',
+    }),
 }));
 
 vi.mock('@/lib/ocr-extractor', () => ({
@@ -27,7 +34,6 @@ describe('MistralAdapter', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -53,15 +59,17 @@ describe('MistralAdapter', () => {
     it('should perform two-step extraction (OCR + Chat)', async () => {
       const chatResponse = {
         data: {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                invoiceNumber: 'INV-001',
-                totalAmount: 100.0,
-                currency: 'EUR',
-              }),
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  invoiceNumber: 'INV-001',
+                  totalAmount: 100.0,
+                  currency: 'EUR',
+                }),
+              },
             },
-          }],
+          ],
         },
       };
 
@@ -78,11 +86,15 @@ describe('MistralAdapter', () => {
     it('should throw when API key is missing', async () => {
       vi.stubEnv('MISTRAL_API_KEY', '');
       const a = new MistralAdapter();
-      await expect(a.extractInvoiceData(Buffer.from('test'), 'application/pdf')).rejects.toThrow('Mistral API not configured');
+      await expect(a.extractInvoiceData(Buffer.from('test'), 'application/pdf')).rejects.toThrow(
+        'Mistral API not configured'
+      );
     });
 
     it('should throw on empty buffer', async () => {
-      await expect(adapter.extractInvoiceData(Buffer.alloc(0), 'application/pdf')).rejects.toThrow('Empty file buffer');
+      await expect(adapter.extractInvoiceData(Buffer.alloc(0), 'application/pdf')).rejects.toThrow(
+        'Empty file buffer'
+      );
     });
   });
 
@@ -90,15 +102,17 @@ describe('MistralAdapter', () => {
     it('should skip OCR when text is provided', async () => {
       const chatResponse = {
         data: {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                invoiceNumber: 'INV-002',
-                totalAmount: 200.0,
-                currency: 'EUR',
-              }),
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  invoiceNumber: 'INV-002',
+                  totalAmount: 200.0,
+                  currency: 'EUR',
+                }),
+              },
             },
-          }],
+          ],
         },
       };
 
@@ -118,15 +132,17 @@ describe('MistralAdapter', () => {
     it('should send retry prompt to chat', async () => {
       const chatResponse = {
         data: {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                invoiceNumber: 'INV-003',
-                totalAmount: 300.0,
-                currency: 'EUR',
-              }),
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  invoiceNumber: 'INV-003',
+                  totalAmount: 300.0,
+                  currency: 'EUR',
+                }),
+              },
             },
-          }],
+          ],
         },
       };
 
@@ -146,9 +162,11 @@ describe('MistralAdapter', () => {
     it('should use local text extraction then send prompt to chat', async () => {
       const chatResponse = {
         data: {
-          choices: [{
-            message: { content: '{"boundaries": [1]}' },
-          }],
+          choices: [
+            {
+              message: { content: '{"boundaries": [1]}' },
+            },
+          ],
         },
       };
 

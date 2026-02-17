@@ -14,23 +14,15 @@ function safeCompare(a: string, b: string): boolean {
 
 function isWorkerAuthorized(request: NextRequest): boolean {
   const configuredSecret = process.env.BATCH_WORKER_SECRET;
-  const provided = request.headers.get('x-internal-worker-key');
 
-  if (configuredSecret) {
-    if (!provided) return false;
-    return safeCompare(provided, configuredSecret);
-  }
-
-  // In production, require the secret — never fall back to open access
-  if (process.env.NODE_ENV === 'production') {
-    logger.error(
-      'BATCH_WORKER_SECRET is not configured in production — rejecting all worker requests'
-    );
+  if (!configuredSecret) {
+    logger.error('BATCH_WORKER_SECRET is not configured — rejecting all worker requests');
     return false;
   }
 
-  // Development fallback
-  return true;
+  const provided = request.headers.get('x-internal-worker-key');
+  if (!provided) return false;
+  return safeCompare(provided, configuredSecret);
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

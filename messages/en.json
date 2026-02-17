@@ -608,7 +608,8 @@
     "acAmount": "Amount",
     "acTaxRate": "VAT %",
     "allowance": "Discount (-)",
-    "charge": "Surcharge (+)"
+    "charge": "Surcharge (+)",
+    "extractionWarningsTitle": "AI extraction has math inconsistencies — please verify the highlighted values"
   },
   "errorPages": {
     "notFound": {

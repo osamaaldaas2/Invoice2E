@@ -102,8 +102,21 @@ export default function InvoiceReviewForm({
         );
       })()}
 
+      {/* F-05: Extraction validation warnings banner */}
+      {Array.isArray(initialData?.validationWarnings) &&
+        initialData.validationWarnings.length > 0 && (
+          <div className="p-4 rounded-2xl border bg-amber-500/15 border-amber-400/30">
+            <p className="text-amber-200 font-medium">{t('extractionWarningsTitle')}</p>
+            <ul className="text-sm text-slate-400 mt-2 space-y-1">
+              {initialData.validationWarnings.map((warning: string, idx: number) => (
+                <li key={idx}>&bull; {warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
       {/* D1: Live XRechnung Readiness Panel */}
-      <ReadinessPanel control={control} />
+      <ReadinessPanel control={control} outputFormat={outputFormat} />
 
       <InvoiceDetailsSection register={register} errors={errors} />
 

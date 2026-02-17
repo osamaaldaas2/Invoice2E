@@ -3,58 +3,66 @@ import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, SUPPORTED_LOCALES } from './lib/con
 import { getCorsHeaders, isOriginAllowed } from './lib/cors';
 
 export default function middleware(request: NextRequest) {
-    // Handle CORS for API routes
-    if (request.nextUrl.pathname.startsWith('/api')) {
-        const origin = request.headers.get('origin');
+  // F-08: Generate request ID for tracing (propagated via header)
+  const requestId = crypto.randomUUID();
 
-        // Handle preflight requests
-        if (request.method === 'OPTIONS') {
-            return new NextResponse(null, {
-                status: 204,
-                headers: getCorsHeaders(origin),
-            });
-        }
+  // Handle CORS for API routes
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    const origin = request.headers.get('origin');
 
-        // Check origin for non-preflight requests
-        // Allow same-origin: if Origin host matches the request host, it's same-origin
-        const requestHost = request.headers.get('host');
-        const originHost = origin ? new URL(origin).host : null;
-        const isSameOrigin = !!originHost && originHost === requestHost;
-
-        if (origin && !isSameOrigin && !isOriginAllowed(origin)) {
-            return new NextResponse(
-                JSON.stringify({ error: 'CORS origin not allowed' }),
-                { status: 403, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // Add CORS headers to actual API responses
-        const response = NextResponse.next();
-        const corsHeaders = getCorsHeaders(origin);
-        for (const [key, value] of Object.entries(corsHeaders)) {
-            response.headers.set(key, value);
-        }
-        return response;
+    // Handle preflight requests
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: getCorsHeaders(origin),
+      });
     }
 
-    // For non-API routes: ensure locale cookie exists
-    const localeCookie = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
-    const isValidLocale = SUPPORTED_LOCALES.includes(localeCookie as 'en' | 'de');
+    // Check origin for non-preflight requests
+    // Allow same-origin: if Origin host matches the request host, it's same-origin
+    const requestHost = request.headers.get('host');
+    const originHost = origin ? new URL(origin).host : null;
+    const isSameOrigin = !!originHost && originHost === requestHost;
 
-    if (!isValidLocale) {
-        const response = NextResponse.next();
-        response.cookies.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
-            path: '/',
-            maxAge: 60 * 60 * 24 * 365, // 1 year
-            sameSite: 'lax',
-        });
-        return response;
+    if (origin && !isSameOrigin && !isOriginAllowed(origin)) {
+      return new NextResponse(JSON.stringify({ error: 'CORS origin not allowed' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    return NextResponse.next();
+    // Add CORS headers and request ID to API responses
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-request-id', requestId);
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    response.headers.set('x-request-id', requestId);
+    const corsHeaders = getCorsHeaders(origin);
+    for (const [key, value] of Object.entries(corsHeaders)) {
+      response.headers.set(key, value);
+    }
+    return response;
+  }
+
+  // For non-API routes: ensure locale cookie exists
+  const localeCookie = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  const isValidLocale = SUPPORTED_LOCALES.includes(localeCookie as 'en' | 'de');
+
+  if (!isValidLocale) {
+    const response = NextResponse.next();
+    response.cookies.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      sameSite: 'lax',
+    });
+    return response;
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-    // Match all paths except static files
-    matcher: ['/((?!_next|_vercel|.*\\..*).*)'],
+  // Match all paths except static files
+  matcher: ['/((?!_next|_vercel|.*\\..*).*)'],
 };

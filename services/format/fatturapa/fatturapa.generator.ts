@@ -20,14 +20,18 @@ function mapTipoDocumento(code?: string | number): string {
   }
 }
 
-/** Split a VAT ID like "IT12345678901" into country + code */
-function splitVatId(vatId: string | null | undefined, fallbackCountry?: string): { paese: string; codice: string } {
+/** Split a VAT ID like "IT12345678901" into country + code. Returns null if missing/invalid. */
+function splitVatId(
+  vatId: string | null | undefined,
+  fallbackCountry?: string
+): { paese: string; codice: string } | null {
   const id = (vatId || '').replace(/\s/g, '');
-  if (id.length >= 3 && /^[A-Za-z]{2}/.test(id)) {
+  if (!id || id.length < 2) return null;
+  if (/^[A-Za-z]{2}/.test(id)) {
     return { paese: id.substring(0, 2).toUpperCase(), codice: id.substring(2) };
   }
   // No country prefix — use fallback country or 'IT', treat entire string as code
-  return { paese: fallbackCountry || 'IT', codice: id || '00000000000' };
+  return { paese: fallbackCountry || 'IT', codice: id };
 }
 
 /** Format date as YYYY-MM-DD for FatturaPA */
@@ -39,13 +43,20 @@ function fpaDate(date: string): string {
 function mapNaturaCode(taxCategoryCode: string | undefined, taxRate: number): string | null {
   if (taxRate > 0) return null; // Natura only for 0% VAT
   switch (taxCategoryCode) {
-    case 'E': return 'N4';     // esente art.10
-    case 'Z': return 'N4';     // esente
-    case 'AE': return 'N6';    // inversione contabile (reverse charge)
-    case 'K': return 'N3.2';   // cessioni intracomunitarie
-    case 'G': return 'N3.1';   // esportazioni
-    case 'O': return 'N2.2';   // non soggette — fuori campo IVA
-    default: return 'N2.2';    // default for unspecified 0% VAT
+    case 'E':
+      return 'N4'; // esente art.10
+    case 'Z':
+      return 'N2.1'; // non soggette — zero-rated
+    case 'AE':
+      return 'N6'; // inversione contabile (reverse charge)
+    case 'K':
+      return 'N3.2'; // cessioni intracomunitarie
+    case 'G':
+      return 'N3.1'; // esportazioni
+    case 'O':
+      return 'N2.2'; // non soggette — fuori campo IVA
+    default:
+      return 'N2.2'; // default for unspecified 0% VAT
   }
 }
 
@@ -54,6 +65,22 @@ export class FatturapaGenerator implements IFormatGenerator {
   readonly formatName = 'FatturaPA 1.2 (Italy)';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
+    // Pre-generation validation: seller VAT ID is mandatory for FatturaPA
+    const sellerVat = splitVatId(
+      invoice.seller.vatId || invoice.seller.taxId,
+      invoice.seller.countryCode || undefined
+    );
+    if (!sellerVat) {
+      return {
+        xmlContent: '',
+        fileName: '',
+        fileSize: 0,
+        validationStatus: 'invalid',
+        validationErrors: ['FatturaPA requires seller VAT ID (Italian format: IT + 11 digits)'],
+        validationWarnings: [],
+      };
+    }
+
     const xml = this.buildXml(invoice);
     const validation = await this.validate(xml);
 
@@ -88,10 +115,17 @@ export class FatturapaGenerator implements IFormatGenerator {
   }
 
   private buildXml(inv: CanonicalInvoice): string {
-    const sellerVat = splitVatId(inv.seller.vatId, inv.seller.countryCode || undefined);
+    // Seller VAT is pre-validated in generate() — fallback to taxId
+    const sellerVat = splitVatId(
+      inv.seller.vatId || inv.seller.taxId,
+      inv.seller.countryCode || undefined
+    )!;
     const buyerVat = splitVatId(inv.buyer.vatId, inv.buyer.countryCode || undefined);
     const tipoDoc = mapTipoDocumento(inv.documentTypeCode);
-    const progressivo = (inv.invoiceNumber || '00001').replace(/[^A-Za-z0-9]/g, '').substring(0, 10).padStart(5, '0');
+    const progressivo = (inv.invoiceNumber || '00001')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .substring(0, 10)
+      .padStart(5, '0');
 
     // Compute document-level allowance/charge adjustments per tax rate
     const allowanceChargeByRate = new Map<number, number>();
@@ -125,7 +159,9 @@ export class FatturapaGenerator implements IFormatGenerator {
 
     const lines: string[] = [];
     lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-    lines.push(`<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">`);
+    lines.push(
+      `<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">`
+    );
 
     // === Header ===
     lines.push(`  <FatturaElettronicaHeader>`);
@@ -138,7 +174,9 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`      </IdTrasmittente>`);
     lines.push(`      <ProgressivoInvio>${escapeXml(progressivo)}</ProgressivoInvio>`);
     lines.push(`      <FormatoTrasmissione>FPR12</FormatoTrasmissione>`);
-    lines.push(`      <CodiceDestinatario>${/^[A-Z0-9]{7}$/.test(inv.buyer.electronicAddress || '') ? inv.buyer.electronicAddress : '0000000'}</CodiceDestinatario>`);
+    lines.push(
+      `      <CodiceDestinatario>${/^[A-Z0-9]{7}$/.test(inv.buyer.electronicAddress || '') ? inv.buyer.electronicAddress : '0000000'}</CodiceDestinatario>`
+    );
     lines.push(`    </DatiTrasmissione>`);
 
     // CedentePrestatore (seller)
@@ -154,20 +192,24 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`        <Anagrafica>`);
     lines.push(`          <Denominazione>${escapeXml(inv.seller.name)}</Denominazione>`);
     lines.push(`        </Anagrafica>`);
-    lines.push(`        <RegimeFiscale>${escapeXml(inv.seller.taxRegime || 'RF01')}</RegimeFiscale>`);
+    lines.push(
+      `        <RegimeFiscale>${escapeXml(inv.seller.taxRegime || 'RF01')}</RegimeFiscale>`
+    );
     lines.push(`      </DatiAnagrafici>`);
     lines.push(`      <Sede>`);
     lines.push(`        <Indirizzo>${escapeXml(inv.seller.address || 'N/A')}</Indirizzo>`);
     lines.push(`        <CAP>${escapeXml(inv.seller.postalCode || '00000')}</CAP>`);
     lines.push(`        <Comune>${escapeXml(inv.seller.city || 'N/A')}</Comune>`);
-    lines.push(`        <Nazione>${escapeXml(inv.seller.countryCode || sellerVat.paese)}</Nazione>`);
+    lines.push(
+      `        <Nazione>${escapeXml(inv.seller.countryCode || sellerVat.paese)}</Nazione>`
+    );
     lines.push(`      </Sede>`);
     lines.push(`    </CedentePrestatore>`);
 
     // CessionarioCommittente (buyer)
     lines.push(`    <CessionarioCommittente>`);
     lines.push(`      <DatiAnagrafici>`);
-    if (inv.buyer.vatId) {
+    if (buyerVat) {
       lines.push(`        <IdFiscaleIVA>`);
       lines.push(`          <IdPaese>${escapeXml(buyerVat.paese)}</IdPaese>`);
       lines.push(`          <IdCodice>${escapeXml(buyerVat.codice)}</IdCodice>`);
@@ -186,7 +228,9 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`        <Indirizzo>${escapeXml(inv.buyer.address || 'N/A')}</Indirizzo>`);
     lines.push(`        <CAP>${escapeXml(inv.buyer.postalCode || '00000')}</CAP>`);
     lines.push(`        <Comune>${escapeXml(inv.buyer.city || 'N/A')}</Comune>`);
-    lines.push(`        <Nazione>${escapeXml(inv.buyer.countryCode || buyerVat.paese)}</Nazione>`);
+    lines.push(
+      `        <Nazione>${escapeXml(inv.buyer.countryCode || buyerVat?.paese || 'IT')}</Nazione>`
+    );
     lines.push(`      </Sede>`);
     lines.push(`    </CessionarioCommittente>`);
 
@@ -215,7 +259,9 @@ export class FatturapaGenerator implements IFormatGenerator {
       }
     }
     if (inv.totals.totalAmount != null) {
-      lines.push(`        <ImportoTotaleDocumento>${formatAmount(inv.totals.totalAmount)}</ImportoTotaleDocumento>`);
+      lines.push(
+        `        <ImportoTotaleDocumento>${formatAmount(inv.totals.totalAmount)}</ImportoTotaleDocumento>`
+      );
     }
     lines.push(`      </DatiGeneraliDocumento>`);
     // Credit note: link to preceding invoice
@@ -262,13 +308,26 @@ export class FatturapaGenerator implements IFormatGenerator {
 
     // DatiPagamento
     if (inv.payment.iban || inv.totals.totalAmount) {
+      // TP02 = complete payment in single installment (standard B2B default)
       lines.push(`    <DatiPagamento>`);
       lines.push(`      <CondizioniPagamento>TP02</CondizioniPagamento>`);
       lines.push(`      <DettaglioPagamento>`);
-      lines.push(`        <ModalitaPagamento>MP05</ModalitaPagamento>`);
-      lines.push(`        <ImportoPagamento>${formatAmount(inv.totals.totalAmount)}</ImportoPagamento>`);
+      // MP05 = bank transfer (when IBAN present), MP01 = cash (generic fallback)
+      const modalitaPagamento = inv.payment.iban ? 'MP05' : 'MP01';
+      lines.push(`        <ModalitaPagamento>${modalitaPagamento}</ModalitaPagamento>`);
+      lines.push(
+        `        <ImportoPagamento>${formatAmount(inv.totals.totalAmount)}</ImportoPagamento>`
+      );
+      if (inv.payment.dueDate) {
+        lines.push(
+          `        <DataScadenzaPagamento>${fpaDate(inv.payment.dueDate)}</DataScadenzaPagamento>`
+        );
+      }
       if (inv.payment.iban) {
         lines.push(`        <IBAN>${escapeXml(inv.payment.iban.replace(/\s/g, ''))}</IBAN>`);
+      }
+      if (inv.payment.bic) {
+        lines.push(`        <BIC>${escapeXml(inv.payment.bic)}</BIC>`);
       }
       lines.push(`      </DettaglioPagamento>`);
       lines.push(`    </DatiPagamento>`);

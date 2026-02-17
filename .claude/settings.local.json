@@ -70,7 +70,13 @@
       "Bash(Stop-Process -Force)",
       "Bash(/tmp/test_stripe_body.js << 'EOF'\n// Test to demonstrate the fix\nconst URLSearchParams = require\\('url'\\).URLSearchParams;\n\nconsole.log\\(\"=== BEFORE FIX \\(Simulated\\) ===\"\\);\nconst bodyBefore = new URLSearchParams\\(\\);\nbodyBefore.append\\('mode', 'payment'\\);\nbodyBefore.append\\('line_items[0][quantity]', '1'\\);\nbodyBefore.append\\('line_items[0][quantity]', '1'\\); // DUPLICATE\nconsole.log\\(bodyBefore.toString\\(\\)\\);\nconst matchesBefore = bodyBefore.toString\\(\\).match\\(/line_items%5B0%5D%5Bquantity%5D=1/g\\);\nconsole.log\\('Quantity parameter count:', matchesBefore ? matchesBefore.length : 0\\);\n\nconsole.log\\(\"\\\\n=== AFTER FIX ===\"\\);\nconst bodyAfter = new URLSearchParams\\(\\);\nbodyAfter.append\\('mode', 'payment'\\);\nbodyAfter.append\\('line_items[0][quantity]', '1'\\); // FIXED - only one\nconsole.log\\(bodyAfter.toString\\(\\)\\);\nconst matchesAfter = bodyAfter.toString\\(\\).match\\(/line_items%5B0%5D%5Bquantity%5D=1/g\\);\nconsole.log\\('Quantity parameter count:', matchesAfter ? matchesAfter.length : 0\\);\nEOF)",
       "Bash(node:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(npm run lint:*)",
+      "Bash(echo:*)",
+      "Bash(npm run build:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   }
 }

@@ -304,14 +304,9 @@ export const useInvoiceReviewForm = ({
             chargeIndicator: ac.chargeIndicator,
             amount: Number(ac.amount),
             percentage:
-              ac.percentage !== '' && ac.percentage != null
-                ? Number(ac.percentage)
-                : null,
+              ac.percentage !== '' && ac.percentage != null ? Number(ac.percentage) : null,
             reason: ac.reason || null,
-            taxRate:
-              ac.taxRate !== '' && ac.taxRate != null
-                ? Number(ac.taxRate)
-                : null,
+            taxRate: ac.taxRate !== '' && ac.taxRate != null ? Number(ac.taxRate) : null,
           })),
       };
 
@@ -322,6 +317,7 @@ export const useInvoiceReviewForm = ({
           extractionId,
           userId,
           reviewedData: payload,
+          outputFormat: outputFormat || 'xrechnung-cii',
         }),
       });
 
@@ -341,7 +337,10 @@ export const useInvoiceReviewForm = ({
         accuracy: responseData.data.accuracy,
       });
 
-      sessionStorage.setItem(`review_${extractionId}`, JSON.stringify({ ...payload, outputFormat: outputFormat || 'xrechnung-cii' }));
+      sessionStorage.setItem(
+        `review_${extractionId}`,
+        JSON.stringify({ ...payload, outputFormat: outputFormat || 'xrechnung-cii' })
+      );
 
       if (onSubmitSuccess) {
         onSubmitSuccess();

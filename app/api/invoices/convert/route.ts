@@ -9,53 +9,11 @@ import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
 import { validateForProfile } from '@/validation/validation-pipeline';
 import { getFormatMetadata } from '@/lib/format-registry';
-import type { ProfileId } from '@/validation/profiles/IProfileValidator';
+import { formatToProfileId, resolveOutputFormat, toLegacyFormat } from '@/lib/format-utils';
 import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
 import { GeneratorFactory } from '@/services/format/GeneratorFactory';
 import type { OutputFormat } from '@/types/canonical-invoice';
 export type ConversionFormat = 'CII' | 'UBL' | OutputFormat;
-
-/** Explicit mapping from OutputFormat to ProfileId for validation. */
-function formatToProfileId(format: OutputFormat): ProfileId {
-  switch (format) {
-    case 'xrechnung-cii': return 'xrechnung-cii';
-    case 'xrechnung-ubl': return 'xrechnung-ubl';
-    case 'peppol-bis':    return 'peppol-bis';
-    case 'facturx-en16931':
-    case 'facturx-basic': return 'en16931-base';
-    case 'fatturapa':     return 'fatturapa';
-    case 'ksef':          return 'ksef';
-    case 'nlcius':        return 'nlcius';
-    case 'cius-ro':       return 'cius-ro';
-    default:
-      return format satisfies never;
-  }
-}
-
-/** Map legacy format strings to OutputFormat */
-function resolveOutputFormat(format: string): OutputFormat {
-  switch (format) {
-    case 'CII': return 'xrechnung-cii';
-    case 'UBL': return 'xrechnung-ubl';
-    default: return format as OutputFormat;
-  }
-}
-
-/** Map OutputFormat back to legacy DB format string */
-function toLegacyFormat(format: OutputFormat): string {
-  switch (format) {
-    case 'xrechnung-cii': return 'XRechnung';
-    case 'xrechnung-ubl': return 'UBL';
-    case 'peppol-bis':    return 'PEPPOL BIS';
-    case 'facturx-en16931': return 'Factur-X EN16931';
-    case 'facturx-basic': return 'Factur-X Basic';
-    case 'fatturapa':     return 'FatturaPA';
-    case 'ksef':          return 'KSeF';
-    case 'nlcius':        return 'NLCIUS';
-    case 'cius-ro':       return 'CIUS-RO';
-    default: return format;
-  }
-}
 
 const ConvertRequestSchema = z.object({
   conversionId: z.string().min(1, 'Extraction ID is required'),
@@ -74,7 +32,21 @@ const ConvertRequestSchema = z.object({
     .refine((data) => Array.isArray(data.lineItems) && data.lineItems.length > 0, {
       message: 'At least one line item is required',
     }),
-  format: z.enum(['CII', 'UBL', 'xrechnung-cii', 'xrechnung-ubl', 'peppol-bis', 'facturx-en16931', 'facturx-basic', 'fatturapa', 'ksef', 'nlcius', 'cius-ro']).default('CII'),
+  format: z
+    .enum([
+      'CII',
+      'UBL',
+      'xrechnung-cii',
+      'xrechnung-ubl',
+      'peppol-bis',
+      'facturx-en16931',
+      'facturx-basic',
+      'fatturapa',
+      'ksef',
+      'nlcius',
+      'cius-ro',
+    ])
+    .default('CII'),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -153,9 +125,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Pre-generation validation: pass canonical directly to the validation pipeline
       const preValidation = validateForProfile(canonical, formatToProfileId(resolvedFormat));
       if (!preValidation.valid) {
-        const errorMessages = preValidation.errors.map((e: { ruleId: string; message: string }) => `[${e.ruleId}] ${e.message}`);
+        const errorMessages = preValidation.errors.map(
+          (e: { ruleId: string; message: string }) => `[${e.ruleId}] ${e.message}`
+        );
         throw new ValidationError(
-          `${resolvedFormat === 'xrechnung-ubl' ? 'UBL' : 'XRechnung'} validation failed:\n` + errorMessages.join('\n'),
+          `${resolvedFormat === 'xrechnung-ubl' ? 'UBL' : 'XRechnung'} validation failed:\n` +
+            errorMessages.join('\n'),
           { structuredErrors: preValidation.errors as unknown as Record<string, unknown> }
         );
       }
@@ -174,33 +149,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Still update DB before returning
         try {
-          let conversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
+          let conversion = await invoiceDbService.getConversionByExtractionId(
+            extractionId,
+            userClient
+          );
           if (!conversion) {
-            conversion = await invoiceDbService.createConversion({
-              userId,
-              extractionId,
-              invoiceNumber: String(invoiceData.invoiceNumber || ''),
-              buyerName: String(invoiceData.buyerName || ''),
-              conversionFormat: toLegacyFormat(resolvedFormat),
-              outputFormat: resolvedFormat,
-              conversionStatus: 'completed',
-            }, userClient);
+            conversion = await invoiceDbService.createConversion(
+              {
+                userId,
+                extractionId,
+                invoiceNumber: String(invoiceData.invoiceNumber || ''),
+                buyerName: String(invoiceData.buyerName || ''),
+                conversionFormat: toLegacyFormat(resolvedFormat),
+                outputFormat: resolvedFormat,
+                conversionStatus: 'completed',
+              },
+              userClient
+            );
           }
           if (conversion.userId !== userId) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
           }
-          await invoiceDbService.updateConversion(conversion.id, {
-            validationStatus: genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
-            validationErrors: genResult.validationErrors.length > 0
-              ? ({ errors: genResult.validationErrors } as Record<string, unknown>)
-              : undefined,
-            conversionStatus: 'completed',
-            xmlContent: genResult.xmlContent,
-            xmlFileName: genResult.fileName,
-          }, userClient);
-          await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
+          await invoiceDbService.updateConversion(
+            conversion.id,
+            {
+              validationStatus:
+                genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
+              validationErrors:
+                genResult.validationErrors.length > 0
+                  ? ({ errors: genResult.validationErrors } as Record<string, unknown>)
+                  : undefined,
+              conversionStatus: 'completed',
+              xmlContent: genResult.xmlContent,
+              xmlFileName: genResult.fileName,
+            },
+            userClient
+          );
+          await invoiceDbService.updateExtraction(
+            extractionId,
+            { status: 'completed' },
+            userClient
+          );
         } catch (dbErr) {
-          logger.error('Failed to update DB for PDF conversion', { error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
+          logger.error('Failed to update DB for PDF conversion', {
+            error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+          });
         }
 
         return new NextResponse(new Uint8Array(genResult.pdfContent), {
@@ -217,7 +210,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         xmlContent: genResult.xmlContent,
         fileName: genResult.fileName,
         fileSize: genResult.fileSize,
-        validationStatus: genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
+        validationStatus:
+          genResult.validationStatus === 'warnings' ? 'valid' : genResult.validationStatus,
         validationErrors: genResult.validationErrors,
         validationWarnings: genResult.validationWarnings,
       };
@@ -242,7 +236,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       if (generationError instanceof ValidationError) {
         // Return structured validation errors with actionable suggestions
-        const structuredErrors = (generationError as ValidationError & { structuredErrors?: Record<string, unknown> }).structuredErrors;
+        const structuredErrors = (generationError as ValidationError).details?.structuredErrors;
+        // F-08: Log individual ruleIds for failure rate monitoring
+        if (Array.isArray(structuredErrors)) {
+          const ruleIds = (structuredErrors as { ruleId?: string }[])
+            .map((e) => e.ruleId)
+            .filter(Boolean);
+          logger.warn('Validation rule failures', {
+            extractionId,
+            format: resolvedFormat,
+            ruleIds,
+            ruleCount: ruleIds.length,
+          });
+        }
         return NextResponse.json(
           {
             success: false,
@@ -279,16 +285,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // If no conversion record exists (e.g. batch-created extraction never individually reviewed),
       // create one on-the-fly so the download can proceed
       if (!conversion) {
-        logger.info('No conversion record found, creating one on-the-fly', { extractionId, userId });
-        conversion = await invoiceDbService.createConversion({
-          userId,
+        logger.info('No conversion record found, creating one on-the-fly', {
           extractionId,
-          invoiceNumber: String(invoiceData.invoiceNumber || ''),
-          buyerName: String(invoiceData.buyerName || ''),
-          conversionFormat: toLegacyFormat(resolvedFormat),
-          outputFormat: resolvedFormat,
-          conversionStatus: 'completed',
-        }, userClient);
+          userId,
+        });
+        conversion = await invoiceDbService.createConversion(
+          {
+            userId,
+            extractionId,
+            invoiceNumber: String(invoiceData.invoiceNumber || ''),
+            buyerName: String(invoiceData.buyerName || ''),
+            conversionFormat: toLegacyFormat(resolvedFormat),
+            outputFormat: resolvedFormat,
+            conversionStatus: 'completed',
+          },
+          userClient
+        );
       }
 
       // Ownership check: verify the conversion belongs to this user
@@ -309,16 +321,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
 
       // Update validation status, cache XML, and mark conversion as completed (PERF-2, RLS enforced)
-      await invoiceDbService.updateConversion(actualConversionId, {
-        validationStatus: result.validationStatus,
-        validationErrors:
-          result.validationErrors.length > 0
-            ? ({ errors: result.validationErrors } as Record<string, unknown>)
-            : undefined,
-        conversionStatus: 'completed',
-        xmlContent: result.xmlContent,
-        xmlFileName: result.fileName,
-      }, userClient);
+      await invoiceDbService.updateConversion(
+        actualConversionId,
+        {
+          validationStatus: result.validationStatus,
+          validationErrors:
+            result.validationErrors.length > 0
+              ? ({ errors: result.validationErrors } as Record<string, unknown>)
+              : undefined,
+          conversionStatus: 'completed',
+          xmlContent: result.xmlContent,
+          xmlFileName: result.fileName,
+        },
+        userClient
+      );
 
       // Mark extraction as completed (RLS enforced)
       await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);

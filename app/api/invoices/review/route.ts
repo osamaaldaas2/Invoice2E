@@ -7,18 +7,25 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { createUserScopedClient } from '@/lib/supabase.server';
+import { toLegacyFormat } from '@/lib/format-utils';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 const ReviewLineItemSchema = z.object({
-    description: z.string().max(500).default(''),
-    quantity: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
-    unitPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
-    totalPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
-    taxRate: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().min(0).max(100)).optional(),
-    unitCode: z.string().max(10).optional(),
-    taxCategoryCode: z.string().max(10).optional(),
+  description: z.string().max(500).default(''),
+  quantity: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+  unitPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+  totalPrice: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()),
+  taxRate: z
+    .union([z.number(), z.string()])
+    .transform(Number)
+    .pipe(z.number().min(0).max(100))
+    .optional(),
+  unitCode: z.string().max(10).optional(),
+  taxCategoryCode: z.string().max(10).optional(),
 });
 
-const ReviewedDataSchema = z.object({
+const ReviewedDataSchema = z
+  .object({
     invoiceNumber: z.string().min(1, 'Invoice number is required').max(200),
     invoiceDate: z.string().max(50).optional(),
     sellerName: z.string().min(1, 'Seller name is required').max(500),
@@ -50,15 +57,28 @@ const ReviewedDataSchema = z.object({
     buyerElectronicAddress: z.string().max(200).optional(),
     buyerElectronicAddressScheme: z.string().max(10).optional(),
     lineItems: z.array(ReviewLineItemSchema).min(1, 'At least one line item is required'),
-    subtotal: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
-    taxAmount: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
-    totalAmount: z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite()).optional(),
+    subtotal: z
+      .union([z.number(), z.string()])
+      .transform(Number)
+      .pipe(z.number().finite())
+      .optional(),
+    taxAmount: z
+      .union([z.number(), z.string()])
+      .transform(Number)
+      .pipe(z.number().finite())
+      .optional(),
+    totalAmount: z
+      .union([z.number(), z.string()])
+      .transform(Number)
+      .pipe(z.number().finite())
+      .optional(),
     currency: z.string().max(10).optional(),
     paymentTerms: z.string().max(500).optional(),
     dueDate: z.string().max(50).optional(),
     documentTypeCode: z.string().max(10).optional(),
     precedingInvoiceReference: z.string().max(200).optional(),
-}).passthrough();
+  })
+  .passthrough();
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -92,7 +112,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const userClient = await createUserScopedClient(userId);
 
     const body = await request.json();
-    const { extractionId, reviewedData: rawReviewedData } = body;
+    const { extractionId, reviewedData: rawReviewedData, outputFormat: rawOutputFormat } = body;
     // REMOVED: userId from body destructuring - Security vulnerability
 
     if (!extractionId || !rawReviewedData) {
@@ -102,6 +122,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Validate and resolve output format (defaults to xrechnung-cii for backward compat)
+    const validFormats: OutputFormat[] = [
+      'xrechnung-cii',
+      'xrechnung-ubl',
+      'peppol-bis',
+      'facturx-en16931',
+      'facturx-basic',
+      'fatturapa',
+      'ksef',
+      'nlcius',
+      'cius-ro',
+    ];
+    const outputFormat: OutputFormat = validFormats.includes(rawOutputFormat)
+      ? rawOutputFormat
+      : 'xrechnung-cii';
+
     const parsedReview = ReviewedDataSchema.safeParse(rawReviewedData);
     if (!parsedReview.success) {
       const firstError = parsedReview.error.errors[0]?.message || 'Invalid review data';
@@ -110,7 +146,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     // Safe cast: Zod validated core fields, .passthrough() preserves all extra fields
     // needed by ReviewedInvoiceData (notes, sellerContact, etc.)
-    const reviewedData = parsedReview.data as unknown as import('@/services/review.service').ReviewedInvoiceData;
+    const reviewedData =
+      parsedReview.data as unknown as import('@/services/review.service').ReviewedInvoiceData;
 
     // Get original extraction with user-scoped client (RLS enforced)
     const extraction = await invoiceDbService.getExtractionById(extractionId, userClient);
@@ -120,8 +157,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Validate reviewed data
-    reviewService.validateReviewedData(reviewedData);
+    // Validate reviewed data (format-aware: only enforces rules for the selected format)
+    reviewService.validateReviewedData(reviewedData, outputFormat);
 
     // Track changes and calculate accuracy
     const extractionData = extraction.extractionData as Record<string, unknown>;
@@ -132,33 +169,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cleanedData = reviewService.normalizeForPersistence(reviewedData);
 
     // T6: Preserve original AI extraction as snapshot before overwrite
+    // B-04 fix: Include outputFormat so DB fallback in convert page recovers the correct format
     const persistData: Record<string, unknown> = {
       ...cleanedData,
+      outputFormat,
       _originalExtraction: extractionData,
     };
 
     // Persist reviewed data back to extraction for resume/download flow (RLS enforced)
-    await invoiceDbService.updateExtraction(extractionId, {
-      extractionData: persistData,
-    }, userClient);
+    await invoiceDbService.updateExtraction(
+      extractionId,
+      {
+        extractionData: persistData,
+      },
+      userClient
+    );
 
     // Create or update conversion record (RLS enforced)
-    const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
+    const existingConversion = await invoiceDbService.getConversionByExtractionId(
+      extractionId,
+      userClient
+    );
     const conversion = existingConversion
-      ? await invoiceDbService.updateConversion(existingConversion.id, {
-          invoiceNumber: reviewedData.invoiceNumber,
-          buyerName: reviewedData.buyerName,
-          conversionFormat: 'XRechnung',
-          conversionStatus: 'draft',
-        }, userClient)
-      : await invoiceDbService.createConversion({
-          userId,
-          extractionId,
-          invoiceNumber: reviewedData.invoiceNumber,
-          buyerName: reviewedData.buyerName,
-          conversionFormat: 'XRechnung',
-          conversionStatus: 'draft',
-        }, userClient);
+      ? await invoiceDbService.updateConversion(
+          existingConversion.id,
+          {
+            invoiceNumber: reviewedData.invoiceNumber,
+            buyerName: reviewedData.buyerName,
+            conversionFormat: toLegacyFormat(outputFormat),
+            outputFormat,
+            conversionStatus: 'draft',
+          },
+          userClient
+        )
+      : await invoiceDbService.createConversion(
+          {
+            userId,
+            extractionId,
+            invoiceNumber: reviewedData.invoiceNumber,
+            buyerName: reviewedData.buyerName,
+            conversionFormat: toLegacyFormat(outputFormat),
+            outputFormat,
+            conversionStatus: 'draft',
+          },
+          userClient
+        );
 
     logger.info('Invoice review completed', {
       extractionId,

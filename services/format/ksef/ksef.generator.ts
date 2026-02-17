@@ -13,7 +13,11 @@ import { escapeXml, formatDateISO, formatAmount } from '@/lib/xml-utils';
 const KSEF_NAMESPACE = 'http://crd.gov.pl/wzor/2023/06/29/12648/';
 
 /** Extract 10-digit Polish NIP from vatId or taxNumber */
-function extractNIP(party: { vatId?: string | null; taxNumber?: string | null; taxId?: string | null }): string {
+function extractNIP(party: {
+  vatId?: string | null;
+  taxNumber?: string | null;
+  taxId?: string | null;
+}): string {
   const raw = party.taxNumber || party.vatId || party.taxId || '';
   // Strip 'PL' prefix and non-digits
   const digits = raw.replace(/^PL/i, '').replace(/\D/g, '');
@@ -25,13 +29,20 @@ function formatTaxRate(rate?: number, taxCategoryCode?: TaxCategoryCode): string
   if (rate === undefined || rate === null) return '23';
   if (rate === 0 && taxCategoryCode) {
     switch (taxCategoryCode) {
-      case 'E': return 'zw';   // zwolniony — exempt
-      case 'O': return 'np';   // nie podlega — not subject to tax
-      case 'AE': return 'oo';  // odwrotne obciążenie — reverse charge
-      case 'K': return 'np';   // intra-community
-      case 'G': return 'np';   // export
-      case 'Z': return '0';    // zero-rated
-      default: return '0';
+      case 'E':
+        return 'zw'; // zwolniony — exempt
+      case 'O':
+        return 'np'; // nie podlega — not subject to tax
+      case 'AE':
+        return 'oo'; // odwrotne obciążenie — reverse charge
+      case 'K':
+        return 'np'; // intra-community
+      case 'G':
+        return 'np'; // export
+      case 'Z':
+        return '0'; // zero-rated
+      default:
+        return '0';
     }
   }
   if (rate === 0) return '0';
@@ -49,8 +60,9 @@ function sumByTaxRate(items: CanonicalLineItem[]): Map<number, number> {
 }
 
 /** Map payment method to KSeF FormaPlatnosci */
-function mapPaymentMethod(): string {
-  return '6'; // przelew (bank transfer) — default
+function mapPaymentMethod(hasIban: boolean): string {
+  // 6 = przelew (bank transfer), 1 = gotówka (cash)
+  return hasIban ? '6' : '1';
 }
 
 export class KsefGenerator implements IFormatGenerator {
@@ -64,6 +76,17 @@ export class KsefGenerator implements IFormatGenerator {
 
     const errors: string[] = [];
     const warnings: string[] = [];
+
+    // Warn about unsupported tax rates (KSeF only has fields for 23%, 8%, 5%, 22%, 7%, 0%)
+    const supportedRates = new Set([23, 8, 5, 22, 7, 0]);
+    for (const item of invoice.lineItems) {
+      const rate = item.taxRate ?? 23;
+      if (!supportedRates.has(rate)) {
+        warnings.push(
+          `Line "${item.description}": tax rate ${rate}% is not a standard Polish VAT rate. KSeF may reject this invoice.`
+        );
+      }
+    }
 
     // Basic structural validation
     const validation = await this.validate(xml);
@@ -124,7 +147,9 @@ export class KsefGenerator implements IFormatGenerator {
     w('    <Adres>');
     w(`      <KodKraju>${escapeXml(inv.seller.countryCode || 'PL')}</KodKraju>`);
     w(`      <AdresL1>${escapeXml(inv.seller.address || '')}</AdresL1>`);
-    w(`      <AdresL2>${escapeXml([inv.seller.postalCode, inv.seller.city].filter(Boolean).join(' '))}</AdresL2>`);
+    w(
+      `      <AdresL2>${escapeXml([inv.seller.postalCode, inv.seller.city].filter(Boolean).join(' '))}</AdresL2>`
+    );
     w('    </Adres>');
     if (inv.seller.name) {
       w(`    <NazwaHandlowa>${escapeXml(inv.seller.name)}</NazwaHandlowa>`);
@@ -143,7 +168,9 @@ export class KsefGenerator implements IFormatGenerator {
     w('    <Adres>');
     w(`      <KodKraju>${escapeXml(inv.buyer.countryCode || 'PL')}</KodKraju>`);
     w(`      <AdresL1>${escapeXml(inv.buyer.address || '')}</AdresL1>`);
-    w(`      <AdresL2>${escapeXml([inv.buyer.postalCode, inv.buyer.city].filter(Boolean).join(' '))}</AdresL2>`);
+    w(
+      `      <AdresL2>${escapeXml([inv.buyer.postalCode, inv.buyer.city].filter(Boolean).join(' '))}</AdresL2>`
+    );
     w('    </Adres>');
     w('  </Podmiot2>');
 
@@ -206,7 +233,7 @@ export class KsefGenerator implements IFormatGenerator {
       if (inv.payment.dueDate) {
         w(`      <TerminPlatnosci>${formatDateISO(inv.payment.dueDate)}</TerminPlatnosci>`);
       }
-      w(`      <FormaPlatnosci>${mapPaymentMethod()}</FormaPlatnosci>`);
+      w(`      <FormaPlatnosci>${mapPaymentMethod(!!inv.payment.iban)}</FormaPlatnosci>`);
       if (inv.payment.iban) {
         w('      <RachunekBankowy>');
         w(`        <NrRB>${escapeXml(inv.payment.iban.replace(/\s/g, ''))}</NrRB>`);

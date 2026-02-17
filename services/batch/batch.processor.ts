@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase.server';
+import { createAdminClient, createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { creditsDbService } from '@/services/credits.db.service';
@@ -79,7 +79,8 @@ export class BatchProcessor {
     userId: string,
     jobId: string,
     results: BatchResult[],
-    supabase: ReturnType<typeof createAdminClient>
+    supabase: ReturnType<typeof createAdminClient>, // ADMIN: job management only
+    userClient: Awaited<ReturnType<typeof createUserScopedClient>> // RLS-scoped: extraction data
   ): Promise<void> {
     const startedAt = new Date().toISOString();
     results[index] = {
@@ -128,13 +129,16 @@ export class BatchProcessor {
                   segmentName,
                   jobId
                 );
-                const adminClient = createAdminClient();
-                const extraction = await invoiceDbService.createExtraction({
-                  userId,
-                  extractionData: extractedData as unknown as Record<string, unknown>,
-                  confidenceScore: extractedData.confidence,
-                  status: 'completed',
-                }, adminClient);
+                // RLS: use user-scoped client so extraction is isolated to this tenant
+                const extraction = await invoiceDbService.createExtraction(
+                  {
+                    userId,
+                    extractionData: extractedData as unknown as Record<string, unknown>,
+                    confidenceScore: extractedData.confidence,
+                    status: 'completed',
+                  },
+                  userClient
+                );
                 const segmentResult: BatchResult = {
                   filename: segmentName,
                   status: 'success' as const,
@@ -228,13 +232,16 @@ export class BatchProcessor {
           jobId
         );
 
-        const adminClient = createAdminClient();
-        const extraction = await invoiceDbService.createExtraction({
-          userId,
-          extractionData: extractedData as unknown as Record<string, unknown>,
-          confidenceScore: extractedData.confidence,
-          status: 'completed',
-        }, adminClient);
+        // RLS: use user-scoped client so extraction is isolated to this tenant
+        const extraction = await invoiceDbService.createExtraction(
+          {
+            userId,
+            extractionData: extractedData as unknown as Record<string, unknown>,
+            confidenceScore: extractedData.confidence,
+            status: 'completed',
+          },
+          userClient
+        );
 
         results[index] = {
           filename: file.name,
@@ -286,11 +293,10 @@ export class BatchProcessor {
    */
   async processBatch(
     jobId: string,
-    files: { name: string; content: Buffer }[],
-    format: 'CII' | 'UBL' = 'CII'
+    files: { name: string; content: Buffer }[]
   ): Promise<BatchResult[]> {
     const concurrency = BATCH_EXTRACTION.CONCURRENCY;
-    logger.info('Processing batch', { jobId, fileCount: files.length, format, concurrency });
+    logger.info('Processing batch', { jobId, fileCount: files.length, concurrency });
 
     const supabase = createAdminClient();
     const results: BatchResult[] = new Array(files.length);
@@ -310,6 +316,9 @@ export class BatchProcessor {
       }
 
       const userId = job.user_id as string;
+
+      // RLS: create user-scoped client for all extraction DB operations
+      const userClient = await createUserScopedClient(userId);
 
       // Update status to processing
       const { error: updateError } = await supabase
@@ -348,23 +357,38 @@ export class BatchProcessor {
       await supabase.from('batch_jobs').update({ results }).eq('id', jobId);
 
       // Deduct credits upfront for all files (prevents extraction without payment)
+      // R-1/R-5 fix: Atomically claim deduction right to prevent double-deduction
+      // when recoverStuckJobs() resets a crashed job back to 'pending'
       const totalFiles = files.filter((f) => !!f).length;
-      const creditsDeducted = await creditsDbService.deductCredits(
-        userId,
-        totalFiles,
-        `batch:${jobId}`
-      );
-      if (!creditsDeducted) {
-        logger.warn('Insufficient credits for batch', { jobId, userId, totalFiles });
-        await supabase
-          .from('batch_jobs')
-          .update({
-            status: 'failed',
-            completed_at: new Date().toISOString(),
-            error_message: 'Insufficient credits',
-          })
-          .eq('id', jobId);
-        throw new Error('Insufficient credits for batch processing');
+      const { data: deductionClaimed, error: claimErr } = await supabase
+        .from('batch_jobs')
+        .update({ credits_deducted: true })
+        .eq('id', jobId)
+        .eq('credits_deducted', false)
+        .select('id')
+        .single();
+
+      if (claimErr || !deductionClaimed) {
+        // Credits were already deducted in a previous run — skip deduction
+        logger.info('Credits already deducted for batch job (recovery re-run)', { jobId, userId });
+      } else {
+        const creditsDeducted = await creditsDbService.deductCredits(
+          userId,
+          totalFiles,
+          `batch:deduct:${jobId}`
+        );
+        if (!creditsDeducted) {
+          logger.warn('Insufficient credits for batch', { jobId, userId, totalFiles });
+          await supabase
+            .from('batch_jobs')
+            .update({
+              status: 'failed',
+              completed_at: new Date().toISOString(),
+              error_message: 'Insufficient credits',
+            })
+            .eq('id', jobId);
+          throw new Error('Insufficient credits for batch processing');
+        }
       }
 
       // Process files concurrently with a pool of `concurrency` workers
@@ -388,7 +412,7 @@ export class BatchProcessor {
 
         await Promise.all(
           chunk.map(({ file, index }) =>
-            this.processFile(file, index, extractor, userId, jobId, results, supabase)
+            this.processFile(file, index, extractor, userId, jobId, results, supabase, userClient)
           )
         );
       }
@@ -402,7 +426,7 @@ export class BatchProcessor {
         const extraDeducted = await creditsDbService.deductCredits(
           userId,
           extraInvoices,
-          `batch_multi:${jobId}`
+          `batch:expansion:${jobId}`
         );
         if (!extraDeducted) {
           // Deduct whatever credits remain
@@ -413,7 +437,7 @@ export class BatchProcessor {
             .single();
           const available = credits?.available_credits || 0;
           if (available > 0) {
-            await creditsDbService.deductCredits(userId, available, `batch_multi:${jobId}`);
+            await creditsDbService.deductCredits(userId, available, `batch:expansion:${jobId}`);
           }
           logger.warn('Insufficient credits for all multi-invoice extras', {
             jobId,
@@ -433,7 +457,7 @@ export class BatchProcessor {
       let refundSucceeded = false;
       if (failCount > 0) {
         try {
-          await creditsDbService.addCredits(userId, failCount, 'batch_refund', jobId);
+          await creditsDbService.addCredits(userId, failCount, `batch:refund:${jobId}`, jobId);
           refundSucceeded = true;
           logger.info('Refunded credits for failed batch files', { jobId, userId, failCount });
         } catch (refundErr) {

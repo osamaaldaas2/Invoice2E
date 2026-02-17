@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         const deducted = await creditsDbService.deductCredits(
           userId,
           requiredCredits,
-          `extraction:multi`
+          'extraction:deduct:multi'
         );
         if (!deducted) {
           return NextResponse.json(
@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
       const failCount = extractions.filter((e) => !e.extractionId).length;
       if (failCount > 0) {
         try {
-          await creditsDbService.addCredits(userId, failCount, 'extraction_refund:multi');
+          await creditsDbService.addCredits(userId, failCount, 'extraction:refund:multi');
         } catch (refundErr) {
           logger.error(
             'CRITICAL: Failed to refund credits for failed multi-invoice segments — MANUAL RECOVERY NEEDED',
@@ -292,8 +292,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Single invoice flow — deduct credit BEFORE AI call to prevent double-spend
-    const deducted = await creditsDbService.deductCredits(userId, 1, 'extraction');
+    // Single invoice flow — deduct credit BEFORE AI call to prevent double-spend.
+    // Idempotency key = userId + SHA-256(file content) + hour bucket.
+    // Same file re-uploaded within the same hour by the same user won't double-deduct.
+    const { createHash } = await import('crypto');
+    const fileHash = createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+    const idempotencyKey = `extraction:deduct:${userId}:${fileHash}:${hourBucket}`;
+
+    const deducted = await creditsDbService.deductCredits(userId, 1, idempotencyKey);
     if (!deducted) {
       return NextResponse.json(
         { success: false, error: 'Insufficient credits. Please purchase more credits.' },
@@ -308,7 +315,7 @@ export async function POST(request: NextRequest) {
     } catch (extractionError) {
       // Refund the pre-deducted credit on AI failure
       try {
-        await creditsDbService.addCredits(userId, 1, 'extraction_refund');
+        await creditsDbService.addCredits(userId, 1, `extraction:refund:${idempotencyKey}`);
       } catch (refundErr) {
         logger.error(
           'CRITICAL: Failed to refund credit after extraction failure — MANUAL RECOVERY NEEDED',

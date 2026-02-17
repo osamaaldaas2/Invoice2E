@@ -256,4 +256,6 @@ export interface ExtractedInvoiceData {
   billingPeriodStart?: string | null;
   /** Billing period end date (BT-74) — YYYY-MM-DD format */
   billingPeriodEnd?: string | null;
+  /** Validation warnings from extraction (math errors that survived retries) */
+  validationWarnings?: string[];
 }

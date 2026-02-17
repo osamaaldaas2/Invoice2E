@@ -7,7 +7,16 @@
  * @module services/format/facturx/facturx.generator
  */
 
-import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage, PDFName, PDFArray, PDFDict } from 'pdf-lib';
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  PDFFont,
+  PDFPage,
+  PDFName,
+  PDFArray,
+  PDFDict,
+} from 'pdf-lib';
 import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
@@ -17,7 +26,10 @@ import { escapeXml } from '@/lib/xml-utils';
 import { logger } from '@/lib/logger';
 
 /** Factur-X profile specification IDs */
-const FACTURX_SPECS: Record<string, { specId: string; profileName: string; conformanceLevel: string }> = {
+const FACTURX_SPECS: Record<
+  string,
+  { specId: string; profileName: string; conformanceLevel: string }
+> = {
   'facturx-en16931': {
     specId: 'urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931',
     profileName: 'Factur-X EN 16931 (Comfort)',
@@ -31,8 +43,7 @@ const FACTURX_SPECS: Record<string, { specId: string; profileName: string; confo
 };
 
 /** XRechnung specification ID to replace in generated XML */
-const XRECHNUNG_SPEC_ID =
-  'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+const XRECHNUNG_SPEC_ID = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
 
 /**
  * Convert CanonicalInvoice to XRechnungInvoiceData (same mapping as CII generator).
@@ -119,8 +130,8 @@ function buildFacturXXml(invoice: CanonicalInvoice, format: OutputFormat): strin
 
   // Remove XRechnung/PEPPOL business process (Factur-X doesn't use it)
   xml = xml.replace(
-    /\s*<ram:BusinessProcessSpecifiedDocumentContextParameter>\s*<ram:ID>[^<]*<\/ram:ID>\s*<\/ram:BusinessProcessSpecifiedDocumentContextParameter>/,
-    '',
+    /\s*<ram:BusinessProcessSpecifiedDocumentContextParameter>[\s\S]*?<\/ram:BusinessProcessSpecifiedDocumentContextParameter>/,
+    ''
   );
 
   return xml;
@@ -133,15 +144,25 @@ function escapeText(s: string | undefined | null): string {
 }
 
 function drawLabelValue(
-  page: PDFPage, font: PDFFont, boldFont: PDFFont,
-  label: string, value: string, x: number, y: number, fontSize = 9
+  page: PDFPage,
+  font: PDFFont,
+  boldFont: PDFFont,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  fontSize = 9
 ): number {
   page.drawText(label, { x, y, font: boldFont, size: fontSize, color: rgb(0.2, 0.2, 0.2) });
   page.drawText(value, { x: x + 100, y, font, size: fontSize, color: rgb(0, 0, 0) });
   return y - fontSize - 4;
 }
 
-async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanceLevel: string): Promise<Buffer> {
+async function buildPdf(
+  invoice: CanonicalInvoice,
+  xmlString: string,
+  conformanceLevel: string
+): Promise<Buffer> {
   const doc = await PDFDocument.create();
 
   // Set PDF metadata
@@ -165,7 +186,15 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
   y -= 30;
 
   // Invoice metadata
-  y = drawLabelValue(page, font, boldFont, 'Invoice No:', escapeText(invoice.invoiceNumber), margin, y);
+  y = drawLabelValue(
+    page,
+    font,
+    boldFont,
+    'Invoice No:',
+    escapeText(invoice.invoiceNumber),
+    margin,
+    y
+  );
   y = drawLabelValue(page, font, boldFont, 'Date:', escapeText(invoice.invoiceDate), margin, y);
   if (invoice.payment.dueDate) {
     y = drawLabelValue(page, font, boldFont, 'Due Date:', invoice.payment.dueDate, margin, y);
@@ -178,8 +207,20 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
   const sellerX = margin;
   const buyerX = margin + colWidth;
 
-  page.drawText('From (Seller)', { x: sellerX, y, font: boldFont, size: 11, color: rgb(0.2, 0.2, 0.2) });
-  page.drawText('To (Buyer)', { x: buyerX, y, font: boldFont, size: 11, color: rgb(0.2, 0.2, 0.2) });
+  page.drawText('From (Seller)', {
+    x: sellerX,
+    y,
+    font: boldFont,
+    size: 11,
+    color: rgb(0.2, 0.2, 0.2),
+  });
+  page.drawText('To (Buyer)', {
+    x: buyerX,
+    y,
+    font: boldFont,
+    size: 11,
+    color: rgb(0.2, 0.2, 0.2),
+  });
   y -= 16;
 
   const sellerLines: string[] = [
@@ -216,7 +257,12 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
   page.drawText('Total', { x: cols.total, y, font: boldFont, size: 9 });
   page.drawText('Tax %', { x: cols.tax, y, font: boldFont, size: 9 });
   y -= 4;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: rgb(0.6, 0.6, 0.6) });
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: width - margin, y },
+    thickness: 0.5,
+    color: rgb(0.6, 0.6, 0.6),
+  });
   y -= 13;
 
   // Line items
@@ -236,16 +282,43 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
   }
 
   y -= 10;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: rgb(0.6, 0.6, 0.6) });
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: width - margin, y },
+    thickness: 0.5,
+    color: rgb(0.6, 0.6, 0.6),
+  });
   y -= 15;
 
   // Totals
   const totalsX = 400;
-  y = drawLabelValue(page, font, boldFont, 'Subtotal:', invoice.totals.subtotal.toFixed(2), totalsX, y);
+  y = drawLabelValue(
+    page,
+    font,
+    boldFont,
+    'Subtotal:',
+    invoice.totals.subtotal.toFixed(2),
+    totalsX,
+    y
+  );
   y = drawLabelValue(page, font, boldFont, 'Tax:', invoice.totals.taxAmount.toFixed(2), totalsX, y);
   y -= 3;
-  page.drawLine({ start: { x: totalsX, y: y + 10 }, end: { x: width - margin, y: y + 10 }, thickness: 1, color: rgb(0.1, 0.1, 0.4) });
-  y = drawLabelValue(page, font, boldFont, 'Total:', invoice.totals.totalAmount.toFixed(2), totalsX, y, 11);
+  page.drawLine({
+    start: { x: totalsX, y: y + 10 },
+    end: { x: width - margin, y: y + 10 },
+    thickness: 1,
+    color: rgb(0.1, 0.1, 0.4),
+  });
+  y = drawLabelValue(
+    page,
+    font,
+    boldFont,
+    'Total:',
+    invoice.totals.totalAmount.toFixed(2),
+    totalsX,
+    y,
+    11
+  );
   y -= 20;
 
   // Payment info
@@ -258,13 +331,18 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
 
   // Footer
   page.drawText(`Factur-X ${conformanceLevel} — generated by Invoice2E`, {
-    x: margin, y: 30, font, size: 7, color: rgb(0.5, 0.5, 0.5),
+    x: margin,
+    y: 30,
+    font,
+    size: 7,
+    color: rgb(0.5, 0.5, 0.5),
   });
 
   // Embed CII XML as attachment — use base64 string for compatibility
-  const xmlBase64 = (typeof btoa === 'function')
-    ? btoa(unescape(encodeURIComponent(xmlString)))
-    : Buffer.from(xmlString, 'utf-8').toString('base64');
+  const xmlBase64 =
+    typeof btoa === 'function'
+      ? btoa(unescape(encodeURIComponent(xmlString)))
+      : Buffer.from(xmlString, 'utf-8').toString('base64');
   await doc.attach(xmlBase64, 'factur-x.xml', {
     mimeType: 'text/xml',
     description: 'Factur-X CII XML Invoice',
@@ -297,7 +375,9 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
     const outputIntentsArray = context.obj([outputIntentRef]);
     catalog.set(PDFName.of('OutputIntents'), outputIntentsArray);
   } catch (e) {
-    logger.warn('Could not embed OutputIntent/ICC profile', { error: e instanceof Error ? e.message : String(e) });
+    logger.warn('Could not embed OutputIntent/ICC profile', {
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
   // 2. Set XMP metadata for Factur-X / PDF/A-3 conformance
@@ -312,7 +392,9 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
     const metadataRef = context.register(metadataStream);
     catalog.set(PDFName.of('Metadata'), metadataRef);
   } catch (e) {
-    logger.warn('Could not embed XMP metadata in PDF', { error: e instanceof Error ? e.message : String(e) });
+    logger.warn('Could not embed XMP metadata in PDF', {
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
   // 3. Ensure AF (Associated Files) array exists in catalog for PDF/A-3
@@ -336,7 +418,9 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
       }
     }
   } catch (e) {
-    logger.warn('Could not set AF array in catalog', { error: e instanceof Error ? e.message : String(e) });
+    logger.warn('Could not set AF array in catalog', {
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
   // 4. Mark document as tagged PDF (PDF/A requirement)
@@ -360,7 +444,7 @@ async function buildPdf(invoice: CanonicalInvoice, xmlString: string, conformanc
 function getMinimalSRGBProfile(): Uint8Array {
   // Minimal ICC profile header + required tags for sRGB identification
   // Based on ICC.1:2001-04 spec, profile version 2.1.0
-  const base64 = 
+  const base64 =
     'AAIQQEXPRF0AAAAAAAAAACBtbnRyUkdCIFhZWiAAAAAAAAAAAAAAAABhY3Nw' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPQAAQAAAADTQ0RMAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
@@ -371,12 +455,8 @@ function getMinimalSRGBProfile(): Uint8Array {
     'dAAAAABDQwAAWFlaIAAAAAAAAG+gAAA49QAAAz1YWVogAAAAAAAAJJ8AABF/' +
     'AAAHwFhZWiAAAAAAAABilAAAtLQAAAmaWFlaIAAAAAAAAPKcAAEBhAAAAh5j' +
     'dXJ2AAAAAAAAAAEgAAAA';
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
+  const buf = Buffer.from(base64, 'base64');
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
 function buildXmpMetadata(invoice: CanonicalInvoice, conformanceLevel: string): string {
@@ -421,7 +501,10 @@ export class FacturXGenerator implements IFormatGenerator {
   }
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
-    logger.info('Generating Factur-X invoice', { format: this.formatId, invoiceNumber: invoice.invoiceNumber });
+    logger.info('Generating Factur-X invoice', {
+      format: this.formatId,
+      invoiceNumber: invoice.invoiceNumber,
+    });
 
     // 1. Generate CII XML with Factur-X specification ID
     const xml = buildFacturXXml(invoice, this.formatId);

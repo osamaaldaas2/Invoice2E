@@ -1,5 +1,20 @@
 import { ValidationError } from '@/lib/errors';
 import { roundMoney, sumMoney, computeTax, moneyEqual } from '@/lib/monetary';
+import type { OutputFormat } from '@/types/canonical-invoice';
+
+/** Formats that enforce XRechnung-specific address rules (BR-DE-3, BR-DE-4, BR-DE-5). */
+const XRECHNUNG_FORMATS: OutputFormat[] = ['xrechnung-cii', 'xrechnung-ubl'];
+
+/** Formats that require electronic addresses (BT-34 seller, BT-49 buyer). */
+const ELECTRONIC_ADDRESS_FORMATS: OutputFormat[] = [
+  'xrechnung-cii',
+  'xrechnung-ubl',
+  'peppol-bis',
+  'nlcius',
+  'cius-ro',
+  'facturx-en16931',
+  'facturx-basic',
+];
 
 export type LineItem = {
   description: string;
@@ -71,21 +86,32 @@ export type ReviewedInvoiceData = {
  */
 export class ReviewService {
   /**
-   * Validate reviewed invoice data
+   * Validate reviewed invoice data.
+   * @param outputFormat — when provided, only enforces rules relevant to that format.
+   *   Defaults to 'xrechnung-cii' for backward compatibility.
    */
-  validateReviewedData(data: ReviewedInvoiceData): boolean {
-    // Validate required string fields
+  validateReviewedData(
+    data: ReviewedInvoiceData,
+    outputFormat: OutputFormat = 'xrechnung-cii'
+  ): boolean {
+    // Validate required string fields (universal — all formats)
     if (!data.invoiceNumber?.trim()) throw new ValidationError('Invoice number is required');
     if (!data.invoiceDate?.trim()) throw new ValidationError('Invoice date is required');
     if (!data.buyerName?.trim()) throw new ValidationError('Buyer name is required');
     if (!data.sellerName?.trim()) throw new ValidationError('Seller name is required');
 
-    // Validate new required fields for XRechnung
-    if (!data.sellerCountryCode?.trim())
-      throw new ValidationError('Seller country code is required');
-    if (!data.buyerCountryCode?.trim()) throw new ValidationError('Buyer country code is required');
-    if (!data.sellerCity?.trim()) throw new ValidationError('Seller city is required');
-    if (!data.sellerPostalCode?.trim()) throw new ValidationError('Seller postal code is required');
+    // XRechnung-specific address requirements (BR-DE-3, BR-DE-4, BR-DE-5/9)
+    // Only enforced for XRechnung formats; other formats have their own rules at convert time
+    const isXRechnung = XRECHNUNG_FORMATS.includes(outputFormat);
+    if (isXRechnung) {
+      if (!data.sellerCountryCode?.trim())
+        throw new ValidationError('Seller country code is required');
+      if (!data.buyerCountryCode?.trim())
+        throw new ValidationError('Buyer country code is required');
+      if (!data.sellerCity?.trim()) throw new ValidationError('Seller city is required');
+      if (!data.sellerPostalCode?.trim())
+        throw new ValidationError('Seller postal code is required');
+    }
 
     // Validate amounts are non-negative
     if (data.totalAmount < 0 || data.subtotal < 0 || data.taxAmount < 0) {
@@ -101,7 +127,7 @@ export class ReviewService {
       if (!item.description?.trim())
         throw new ValidationError('Each line item must have a description');
       if (item.quantity <= 0) throw new ValidationError('Quantity must be greater than 0');
-      if (item.unitPrice < 0) throw new ValidationError('Unit price cannot be negative'); // Allow 0 for free items? Test expects rejection of 0
+      if (item.unitPrice < 0) throw new ValidationError('Unit price cannot be negative');
       if (item.unitPrice === 0) throw new ValidationError('Unit price must be greater than 0');
       if (item.totalPrice < 0) throw new ValidationError('Total price cannot be negative');
     }
@@ -118,14 +144,18 @@ export class ReviewService {
     if (data.sellerEmail && !this.isValidEmail(data.sellerEmail))
       throw new ValidationError('Invalid seller email format');
 
-    // Validate electronic addresses (BT-49 buyer, BT-34 seller) — early XRechnung enforcement
-    const buyerEAddr = data.buyerElectronicAddress?.trim() || data.buyerEmail?.trim();
-    if (!buyerEAddr) {
-      throw new ValidationError('Buyer electronic address is required for XRechnung');
-    }
-    const sellerEAddr = data.sellerElectronicAddress?.trim() || data.sellerEmail?.trim();
-    if (!sellerEAddr) {
-      throw new ValidationError('Seller electronic address is required for XRechnung');
+    // Electronic address requirements — format-dependent
+    // XRechnung, PEPPOL, NLCIUS, CIUS-RO, Factur-X all require BT-34/BT-49
+    // FatturaPA and KSeF use their own addressing systems (CodiceDestinatario, NIP)
+    if (ELECTRONIC_ADDRESS_FORMATS.includes(outputFormat)) {
+      const buyerEAddr = data.buyerElectronicAddress?.trim() || data.buyerEmail?.trim();
+      if (!buyerEAddr) {
+        throw new ValidationError('Buyer electronic address is required');
+      }
+      const sellerEAddr = data.sellerElectronicAddress?.trim() || data.sellerEmail?.trim();
+      if (!sellerEAddr) {
+        throw new ValidationError('Seller electronic address is required');
+      }
     }
 
     // P1-8: Server-side monetary consistency check

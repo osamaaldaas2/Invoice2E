@@ -85,7 +85,9 @@
       <DettaglioPagamento>
         <ModalitaPagamento>MP05</ModalitaPagamento>
         <ImportoPagamento>2380.00</ImportoPagamento>
+        <DataScadenzaPagamento>2024-08-14</DataScadenzaPagamento>
         <IBAN>DE89370400440532013000</IBAN>
+        <BIC>COBADEFFXXX</BIC>
       </DettaglioPagamento>
     </DatiPagamento>
   </FatturaElettronicaBody>

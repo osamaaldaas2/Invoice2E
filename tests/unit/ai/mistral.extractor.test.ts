@@ -7,7 +7,9 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/text-extraction', () => ({
-  extractText: vi.fn().mockResolvedValue({ hasText: false, text: '', pageCount: 0, source: 'none' }),
+  extractText: vi
+    .fn()
+    .mockResolvedValue({ hasText: false, text: '', pageCount: 0, source: 'none' }),
 }));
 
 vi.mock('@/lib/extraction-validator', () => ({
@@ -52,7 +54,7 @@ describe('MistralExtractor', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should validate configuration', () => {

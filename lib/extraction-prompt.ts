@@ -36,6 +36,23 @@ For BOTH seller AND buyer, you MUST extract ALL address components separately:
 Addresses are often formatted as "Street 1, 12345 City" or across multiple lines. ALWAYS split them into separate fields.
 Self-check: if buyerCity or sellerPostalCode is null but you see an address block, re-read it and split properly.
 
+⚠️ PAYMENT TERMS ARE MANDATORY (BR-CO-25 — validation will fail without one of these):
+At least ONE of paymentTerms OR dueDate MUST be extracted. Search the ENTIRE document.
+- paymentTerms: Look for any of these phrases and copy them EXACTLY as printed:
+  "Zahlungsbedingungen", "Zahlungsziel", "Zahlbar innerhalb X Tagen", "Netto X Tage",
+  "Fällig sofort", "Sofort fällig", "Zahlbar netto", "30 Tage 2% Skonto",
+  "Due within X days", "Net 30", "Payment terms", "Payable within",
+  "Zu zahlen bis", "Bitte überweisen Sie bis", "Skonto", "Zahlungskonditionen"
+  Example output: "Zahlbar innerhalb 14 Tagen netto" or "30 Tage netto, 14 Tage 2% Skonto"
+- dueDate: Look for: "Fälligkeitsdatum", "Fällig am", "Due date", "Zahlungsdatum",
+  "Zu zahlen bis", "Bitte bis", "Valutadatum". Format: YYYY-MM-DD.
+- FALLBACK — if neither is printed: derive dueDate from invoiceDate + 30 days.
+  Set paymentTerms = "30 Tage netto" as the standard German payment term.
+  This is better than leaving both null and failing validation.
+- notes: Look for sections labelled: "Hinweis", "Hinweise", "Bemerkung", "Anmerkung",
+  "Note", "Notiz", "Remarks". Extract invoice-specific content ONLY — skip generic greetings
+  like "Vielen Dank für Ihren Auftrag". Include: bank references, delivery notes, special conditions.
+
 ⚠️ NET PRICES ONLY (CRITICAL):
 - "unitPrice" MUST be NET (before VAT)
 - "totalPrice" MUST be NET line total (quantity × unitPrice, before VAT)
@@ -169,6 +186,12 @@ RULES:
 14. confidence: 0-1 float.
 15. taxRate on EVERY line item is REQUIRED — extract the VAT percentage (e.g. 19, 7, 0). Look for "MwSt", "USt", "%", "Mehrwertsteuer".
 16. totalAmount MUST be a number — the gross total payable. Never null, never a string.
+17. PAYMENT TERMS ARE MANDATORY (BR-CO-25) — at least ONE of paymentTerms or dueDate must be extracted:
+    - paymentTerms: look for "Zahlungsbedingungen", "Zahlungsziel", "Netto X Tage", "Fällig sofort",
+      "Due within X days", "Net 30", "Skonto", "Zahlbar innerhalb". Copy EXACTLY as printed.
+    - dueDate: look for "Fällig am", "Due date", "Zu zahlen bis". Format YYYY-MM-DD.
+    - FALLBACK: if neither found, set paymentTerms = "30 Tage netto" (standard German term).
+18. notes: look for "Hinweis", "Bemerkung", "Anmerkung", "Note", "Remarks". Extract invoice-specific content only.
 
 OUTPUT JSON SCHEMA (return ONLY this structure):
 {
@@ -221,5 +244,8 @@ CRITICAL RULES:
 - allowanceCharges: false=discount, true=surcharge. amount positive. [] if none.
 - sellerIban: EXACT copy. German IBANs = 22 chars.
 - confidence: 0-1 float.
+- PAYMENT TERMS MANDATORY: extract paymentTerms ("Zahlungsziel", "Netto X Tage", "Due within X days")
+  OR dueDate ("Fällig am", "Due date"). If neither visible, set paymentTerms = "30 Tage netto".
+- notes: extract "Hinweis", "Bemerkung", "Note" sections (skip generic greetings).
 
 Return ONLY valid JSON. Extract the data now.`;

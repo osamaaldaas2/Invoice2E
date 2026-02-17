@@ -608,7 +608,8 @@
     "acAmount": "Betrag",
     "acTaxRate": "MwSt %",
     "allowance": "Nachlass (-)",
-    "charge": "Zuschlag (+)"
+    "charge": "Zuschlag (+)",
+    "extractionWarningsTitle": "KI-Extraktion hat mathematische Inkonsistenzen — bitte die markierten Werte prüfen"
   },
   "errorPages": {
     "notFound": {

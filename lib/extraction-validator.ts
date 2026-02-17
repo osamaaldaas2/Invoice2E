@@ -89,8 +89,32 @@ export function validateExtraction(data: ExtractedInvoiceData): ExtractionValida
     });
   }
 
-  // taxAmount ≈ subtotal × taxRate / 100
-  if (typeof data.taxRate === 'number' && data.taxRate > 0 && typeof data.subtotal === 'number') {
+  // taxAmount validation — per-line-item approach for multi-rate invoices (F-04)
+  const itemsWithRates = data.lineItems.filter(
+    (li) => typeof li.taxRate === 'number' && li.taxRate > 0
+  );
+  if (itemsWithRates.length > 0) {
+    // Per-line-item tax: sum each item's tax contribution
+    const expectedTax = itemsWithRates.reduce(
+      (sum, li) => sum + (li.totalPrice * li.taxRate!) / 100,
+      0
+    );
+    // Scale tolerance for many line items (IEEE-754 accumulation)
+    const scaledTolerance = tol.TAX * Math.max(1, itemsWithRates.length);
+    if (!approxEqual(expectedTax, data.taxAmount, scaledTolerance)) {
+      errors.push({
+        field: 'taxAmount',
+        message: 'taxAmount ≠ sum(lineItem taxes)',
+        expected: Math.round(expectedTax * 100) / 100,
+        actual: data.taxAmount,
+      });
+    }
+  } else if (
+    typeof data.taxRate === 'number' &&
+    data.taxRate > 0 &&
+    typeof data.subtotal === 'number'
+  ) {
+    // Fallback: document-level single rate (no per-item rates available)
     const expectedTax = (data.subtotal * data.taxRate) / 100;
     if (!approxEqual(expectedTax, data.taxAmount, tol.TAX)) {
       errors.push({

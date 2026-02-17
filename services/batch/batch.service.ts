@@ -365,12 +365,15 @@ export class BatchService {
             );
 
             const adminClient = createAdminClient();
-            const extraction = await invoiceDbService.createExtraction({
-              userId,
-              extractionData: extractedData as unknown as Record<string, unknown>,
-              confidenceScore: extractedData.confidence,
-              status: 'completed',
-            }, adminClient);
+            const extraction = await invoiceDbService.createExtraction(
+              {
+                userId,
+                extractionData: extractedData as unknown as Record<string, unknown>,
+                confidenceScore: extractedData.confidence,
+                status: 'completed',
+              },
+              adminClient
+            );
 
             results.push({
               filename: segmentName,
@@ -422,14 +425,18 @@ export class BatchService {
     let refundSucceeded = false;
     if (failedFiles > 0) {
       try {
-        await creditsDbService.addCredits(userId, failedFiles, 'batch_refund:multi', jobId);
+        await creditsDbService.addCredits(userId, failedFiles, `batch:refund:${jobId}`, jobId);
         refundSucceeded = true;
         logger.info('Refunded credits for failed multi-invoice extractions', {
-          jobId, userId, refunded: failedFiles,
+          jobId,
+          userId,
+          refunded: failedFiles,
         });
       } catch (refundErr) {
         logger.error('CRITICAL: Failed to refund credits for failed multi-invoice extractions', {
-          jobId, userId, failedFiles,
+          jobId,
+          userId,
+          failedFiles,
           error: refundErr instanceof Error ? refundErr.message : String(refundErr),
         });
       }
@@ -520,10 +527,9 @@ export class BatchService {
    */
   async processBatch(
     jobId: string,
-    files: { name: string; content: Buffer }[],
-    format: 'CII' | 'UBL' = 'CII'
+    files: { name: string; content: Buffer }[]
   ): Promise<BatchResult[]> {
-    return batchProcessor.processBatch(jobId, files, format);
+    return batchProcessor.processBatch(jobId, files);
   }
 
   /**
@@ -661,7 +667,7 @@ export class BatchService {
 
     const jobId = claimed.id as string;
     const sourceType = (claimed.source_type as string) || 'zip_upload';
-    const jobOutputFormat = (claimed.output_format as string) || 'xrechnung-cii';
+    // output_format is available in claimed.output_format for future batch-level format use
     try {
       if (sourceType === 'multi_invoice_split') {
         await this.processMultiInvoiceJob(jobId);
@@ -676,7 +682,7 @@ export class BatchService {
 
       const zipBuffer = await this.downloadInputZip(inputPath);
       const parsed = await this.parseZip(zipBuffer);
-      await this.processBatch(jobId, parsed.files, jobOutputFormat === 'xrechnung-ubl' ? 'UBL' : 'CII');
+      await this.processBatch(jobId, parsed.files);
 
       logger.info('Worker processed batch job', {
         jobId,

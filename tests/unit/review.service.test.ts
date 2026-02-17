@@ -160,6 +160,68 @@ describe('ReviewService', () => {
       };
       expect(service.validateReviewedData(data)).toBe(true);
     });
+
+    // ── Format-aware validation (F-01, F-02, F-03) ──
+
+    it('should NOT require sellerCity/sellerPostalCode for FatturaPA', () => {
+      const data = { ...validData, sellerCity: '', sellerPostalCode: '' };
+      // XRechnung (default) should reject
+      expect(() => service.validateReviewedData(data)).toThrow('Seller city is required');
+      // FatturaPA should accept — has its own rules at convert time
+      expect(service.validateReviewedData(data, 'fatturapa')).toBe(true);
+    });
+
+    it('should NOT require sellerCity/sellerPostalCode for KSeF', () => {
+      const data = { ...validData, sellerCity: '', sellerPostalCode: '' };
+      expect(service.validateReviewedData(data, 'ksef')).toBe(true);
+    });
+
+    it('should still require sellerCity for xrechnung-ubl', () => {
+      const data = { ...validData, sellerCity: '' };
+      expect(() => service.validateReviewedData(data, 'xrechnung-ubl')).toThrow(
+        'Seller city is required'
+      );
+    });
+
+    it('should NOT require electronic addresses for FatturaPA', () => {
+      const data = {
+        ...validData,
+        buyerEmail: '',
+        sellerEmail: '',
+        buyerElectronicAddress: '',
+        sellerElectronicAddress: '',
+      };
+      // FatturaPA uses CodiceDestinatario, not electronic addresses
+      expect(service.validateReviewedData(data, 'fatturapa')).toBe(true);
+    });
+
+    it('should NOT require electronic addresses for KSeF', () => {
+      const data = {
+        ...validData,
+        buyerEmail: '',
+        sellerEmail: '',
+        buyerElectronicAddress: '',
+        sellerElectronicAddress: '',
+      };
+      expect(service.validateReviewedData(data, 'ksef')).toBe(true);
+    });
+
+    it('should require electronic addresses for PEPPOL BIS', () => {
+      const data = {
+        ...validData,
+        buyerEmail: '',
+        buyerElectronicAddress: '',
+      };
+      expect(() => service.validateReviewedData(data, 'peppol-bis')).toThrow(
+        'Buyer electronic address is required'
+      );
+    });
+
+    it('should NOT require XRechnung address rules for peppol-bis', () => {
+      const data = { ...validData, sellerCity: '', sellerPostalCode: '' };
+      // PEPPOL is NOT XRechnung — should not enforce BR-DE address rules
+      expect(service.validateReviewedData(data, 'peppol-bis')).toBe(true);
+    });
   });
 
   describe('trackChanges', () => {

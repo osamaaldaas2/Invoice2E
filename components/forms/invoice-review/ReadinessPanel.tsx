@@ -5,9 +5,11 @@ import { Control, useWatch } from 'react-hook-form';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { InvoiceReviewFormValues } from './useInvoiceReviewForm';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 interface ReadinessPanelProps {
   control: Control<InvoiceReviewFormValues>;
+  outputFormat?: OutputFormat;
 }
 
 const IBAN_PATTERN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/;
@@ -38,7 +40,140 @@ interface Check {
   level: CheckLevel;
 }
 
-export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control }) => {
+/**
+ * Per-format check requirements.
+ * Keys listed under a format are enforced as errors; unlisted ones are hidden.
+ * 'checkBuyerReference' is always a warning for XRechnung only.
+ */
+const FORMAT_CHECKS: Record<string, CheckKey[]> = {
+  // XRechnung requires the most fields (BR-DE rules)
+  'xrechnung-cii': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerEmail',
+    'checkSellerPhone',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerEmail',
+    'checkBuyerCountry',
+    'checkIban',
+    'checkPaymentTerms',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  'xrechnung-ubl': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerEmail',
+    'checkSellerPhone',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerEmail',
+    'checkBuyerCountry',
+    'checkIban',
+    'checkPaymentTerms',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  // PEPPOL/NLCIUS/CIUS-RO: address + buyer electronic address, no IBAN/phone
+  'peppol-bis': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerEmail',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  nlcius: [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerEmail',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  'cius-ro': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerEmail',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  // Factur-X: seller address + buyer country, no IBAN/phone/email required
+  'facturx-en16931': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  'facturx-basic': [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  // FatturaPA: seller address + buyer country
+  fatturapa: [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkBuyerCountry',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+  // KSeF: minimal — basics + seller address + line items
+  ksef: [
+    'checkInvoiceNumber',
+    'checkInvoiceDate',
+    'checkSellerName',
+    'checkSellerStreet',
+    'checkSellerCity',
+    'checkSellerPostal',
+    'checkLineItems',
+    'checkMonetary',
+  ],
+};
+
+// Fallback: universal checks only
+const UNIVERSAL_CHECKS: CheckKey[] = [
+  'checkInvoiceNumber',
+  'checkInvoiceDate',
+  'checkSellerName',
+  'checkLineItems',
+  'checkMonetary',
+];
+
+export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control, outputFormat }) => {
   const t = useTranslations('invoiceReview');
   const [expanded, setExpanded] = useState(false);
 
@@ -66,29 +201,44 @@ export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control }) => {
       Math.abs((Number(subtotal) || 0) + (Number(taxAmount) || 0) - (Number(totalAmount) || 0)) <=
       0.02;
 
-    const result: Check[] = [
-      // Errors — block XRechnung conversion
-      { key: 'checkInvoiceNumber', pass: !!invoiceNumber?.trim(), level: 'error' },
-      {
-        key: 'checkInvoiceDate',
-        pass: !!invoiceDate?.trim() && DATE_PATTERN.test(invoiceDate),
-        level: 'error',
-      },
-      { key: 'checkSellerName', pass: !!sellerName?.trim(), level: 'error' },
-      { key: 'checkSellerEmail', pass: !!sellerEmail?.trim(), level: 'error' },
-      { key: 'checkSellerPhone', pass: !!sellerPhone?.trim(), level: 'error' },
-      { key: 'checkSellerStreet', pass: !!sellerStreet?.trim(), level: 'error' },
-      { key: 'checkSellerCity', pass: !!sellerCity?.trim(), level: 'error' },
-      { key: 'checkSellerPostal', pass: !!sellerPostal?.trim(), level: 'error' },
-      { key: 'checkBuyerEmail', pass: !!buyerEmail?.trim(), level: 'error' },
-      { key: 'checkBuyerCountry', pass: !!buyerCountry?.trim(), level: 'error' },
-      { key: 'checkIban', pass: !!ibanClean && IBAN_PATTERN.test(ibanClean), level: 'error' },
-      { key: 'checkPaymentTerms', pass: !!paymentTerms?.trim(), level: 'error' },
-      { key: 'checkLineItems', pass: Array.isArray(items) && items.length > 0, level: 'error' },
-      { key: 'checkMonetary', pass: monetaryOk, level: 'error' },
-      // Warnings — recommended but non-blocking (matches BR-DE-15 severity)
-      { key: 'checkBuyerReference', pass: !!buyerReference?.trim(), level: 'warning' },
-    ];
+    // B-03 fix: Only enforce checks relevant to the selected format
+    const activeFormat = outputFormat || 'xrechnung-cii';
+    const requiredKeys = FORMAT_CHECKS[activeFormat] || UNIVERSAL_CHECKS;
+    const isXRechnung = activeFormat === 'xrechnung-cii' || activeFormat === 'xrechnung-ubl';
+
+    const allChecks: Record<CheckKey, boolean> = {
+      checkInvoiceNumber: !!invoiceNumber?.trim(),
+      checkInvoiceDate: !!invoiceDate?.trim() && DATE_PATTERN.test(invoiceDate),
+      checkSellerName: !!sellerName?.trim(),
+      checkSellerEmail: !!sellerEmail?.trim(),
+      checkSellerPhone: !!sellerPhone?.trim(),
+      checkSellerStreet: !!sellerStreet?.trim(),
+      checkSellerCity: !!sellerCity?.trim(),
+      checkSellerPostal: !!sellerPostal?.trim(),
+      checkBuyerEmail: !!buyerEmail?.trim(),
+      checkBuyerCountry: !!buyerCountry?.trim(),
+      checkIban: !!ibanClean && IBAN_PATTERN.test(ibanClean),
+      checkPaymentTerms: !!paymentTerms?.trim(),
+      checkLineItems: Array.isArray(items) && items.length > 0,
+      checkMonetary: monetaryOk,
+      checkBuyerReference: !!buyerReference?.trim(),
+    };
+
+    const result: Check[] = requiredKeys.map((key) => ({
+      key,
+      pass: allChecks[key],
+      level: 'error' as CheckLevel,
+    }));
+
+    // buyerReference is a warning for XRechnung only (BR-DE-15)
+    if (isXRechnung) {
+      result.push({
+        key: 'checkBuyerReference',
+        pass: allChecks.checkBuyerReference,
+        level: 'warning',
+      });
+    }
+
     return result;
   }, [
     invoiceNumber,
@@ -108,6 +258,7 @@ export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control }) => {
     subtotal,
     taxAmount,
     totalAmount,
+    outputFormat,
   ]);
 
   const errorChecks = checks.filter((c) => c.level === 'error');

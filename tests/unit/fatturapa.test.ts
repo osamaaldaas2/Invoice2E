@@ -101,7 +101,9 @@ describe('FatturaPA Generator', () => {
     const invoice = makeFatturapaInvoice();
     const result = await generator.generate(invoice);
     expect(result.xmlContent).toContain('FatturaElettronica');
-    expect(result.xmlContent).toContain('xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"');
+    expect(result.xmlContent).toContain(
+      'xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"'
+    );
   });
 
   it('has versione="FPR12" for B2B', async () => {
@@ -173,6 +175,27 @@ describe('FatturaPA Generator', () => {
     const xml = result.xmlContent;
     expect(xml).toContain('<IdPaese>IT</IdPaese>');
     expect(xml).toContain('<IdCodice>01234567890</IdCodice>');
+  });
+
+  it('returns invalid status when seller VAT ID is missing', async () => {
+    const invoice = makeFatturapaInvoice({
+      seller: { ...makeFatturapaInvoice().seller, vatId: null, taxId: null },
+    });
+    const result = await generator.generate(invoice);
+    expect(result.validationStatus).toBe('invalid');
+    expect(result.validationErrors).toContain(
+      'FatturaPA requires seller VAT ID (Italian format: IT + 11 digits)'
+    );
+    expect(result.xmlContent).toBe('');
+  });
+
+  it('falls back to taxId when vatId is missing', async () => {
+    const invoice = makeFatturapaInvoice({
+      seller: { ...makeFatturapaInvoice().seller, vatId: null, taxId: 'IT99887766554' },
+    });
+    const result = await generator.generate(invoice);
+    expect(result.validationStatus).toBe('valid');
+    expect(result.xmlContent).toContain('<IdCodice>99887766554</IdCodice>');
   });
 });
 

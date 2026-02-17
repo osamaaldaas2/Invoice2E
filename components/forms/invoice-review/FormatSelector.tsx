@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getAllFormats, type FormatMetadata } from '@/lib/format-registry';
 import type { OutputFormat } from '@/types/canonical-invoice';
 
@@ -37,10 +37,7 @@ export function FormatSelector({ value, onChange }: FormatSelectorProps) {
 
   return (
     <div className="border-t border-white/10 pt-4">
-      <label
-        htmlFor="outputFormat"
-        className="block text-sm font-medium text-slate-300 mb-1"
-      >
+      <label htmlFor="outputFormat" className="block text-sm font-medium text-slate-300 mb-1">
         Output Format / Ausgabeformat
       </label>
       <select
@@ -71,14 +68,13 @@ export function FormatSelector({ value, onChange }: FormatSelectorProps) {
 }
 
 export function useFormatPreference(): [OutputFormat, (f: OutputFormat) => void] {
-  const [format, setFormat] = useState<OutputFormat>('xrechnung-cii');
-
-  useEffect(() => {
+  const [format, setFormat] = useState<OutputFormat>(() => {
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
-      if (saved) setFormat(saved as OutputFormat);
+      if (saved) return saved as OutputFormat;
     } catch {}
-  }, []);
+    return 'xrechnung-cii';
+  });
 
   const setAndPersist = (f: OutputFormat) => {
     setFormat(f);

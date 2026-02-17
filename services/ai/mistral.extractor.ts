@@ -78,6 +78,10 @@ export class MistralExtractor implements IAIExtractor {
 
         if (!validation.valid) {
           data.confidence = Math.max(0.3, (data.confidence ?? 0.7) - 0.2);
+          data.validationWarnings = validation.errors.map(
+            (e) =>
+              `${e.field}: ${e.message}${e.expected != null ? ` (expected ${e.expected}, got ${e.actual})` : ''}`
+          );
           logger.warn('Mistral extraction still has validation errors after retries', {
             errors: validation.errors,
           });

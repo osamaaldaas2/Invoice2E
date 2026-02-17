@@ -70,9 +70,7 @@ function ApplyToAllPanel({
 
   const handleApply = async () => {
     if (isApplyingRef.current) return;
-    const filledFields = Object.fromEntries(
-      Object.entries(fields).filter(([, v]) => v.trim())
-    );
+    const filledFields = Object.fromEntries(Object.entries(fields).filter(([, v]) => v.trim()));
     if (Object.keys(filledFields).length === 0) return;
 
     isApplyingRef.current = true;
@@ -90,8 +88,12 @@ function ApplyToAllPanel({
       }
       const data = await res.json();
       if (data.success) {
-        setResult(`✅ ${data.data.updated} Rechnungen aktualisiert (${data.data.skipped} hatten bereits Werte)`);
-        setTimeout(() => { onApplied(); }, 1500);
+        setResult(
+          `✅ ${data.data.updated} Rechnungen aktualisiert (${data.data.skipped} hatten bereits Werte)`
+        );
+        setTimeout(() => {
+          onApplied();
+        }, 1500);
       } else {
         setResult(`Fehler: ${data.error}`);
       }
@@ -106,8 +108,12 @@ function ApplyToAllPanel({
   return (
     <div className="p-4 glass-panel border border-sky-400/20 rounded-xl">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-sky-200">Auf alle Rechnungen anwenden (füllt nur leere Felder)</h4>
-        <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">Schließen</button>
+        <h4 className="text-sm font-semibold text-sky-200">
+          Auf alle Rechnungen anwenden (füllt nur leere Felder)
+        </h4>
+        <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">
+          Schließen
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {APPLYABLE_FIELDS.map(({ key, label }) => (
@@ -446,12 +452,14 @@ export default function BulkUploadForm() {
     let rc = 0;
     for (const id of extractionIds) {
       const cached = extractionCache[id];
-      if (!cached) { wc++; continue; } // not loaded yet = treat as warning
+      if (!cached) {
+        wc++;
+        continue;
+      } // not loaded yet = treat as warning
       if (computeReadiness(cached) === 'warning') wc++;
       else rc++;
     }
     return { warningCount: wc, readyCount: rc };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extractionIds, extractionCache]);
 
   // Callback when Apply to All succeeds — refresh extraction cache
@@ -629,7 +637,9 @@ export default function BulkUploadForm() {
                       <div className="flex items-center gap-2">
                         <span className="text-amber-400">⚠</span>
                         <span className="text-sm text-amber-200">
-                          <strong>{warningCount}</strong> von {extractionIds.length} Rechnungen haben fehlende Felder — einzeln korrigieren oder „Auf alle anwenden" nutzen.
+                          <strong>{warningCount}</strong> von {extractionIds.length} Rechnungen
+                          haben fehlende Felder — einzeln korrigieren oder „Auf alle anwenden"
+                          nutzen.
                         </span>
                       </div>
                       <button
@@ -675,11 +685,17 @@ export default function BulkUploadForm() {
                   return (
                     <div key={`${row.filename}-${idx}`}>
                       {/* Compact row */}
-                      <div className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
-                        readiness === 'warning' ? 'border border-amber-400/20' :
-                        readiness === 'ready' ? 'border border-emerald-400/20' :
-                        row.status === 'failed' ? 'border border-rose-400/20' : ''
-                      }`}>
+                      <div
+                        className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
+                          readiness === 'warning'
+                            ? 'border border-amber-400/20'
+                            : readiness === 'ready'
+                              ? 'border border-emerald-400/20'
+                              : row.status === 'failed'
+                                ? 'border border-rose-400/20'
+                                : ''
+                        }`}
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           {row.extractionId && reviewedIds.has(row.extractionId) ? (
                             <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
@@ -687,7 +703,9 @@ export default function BulkUploadForm() {
                             readiness === 'warning' ? (
                               <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
                             ) : (
-                              <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
+                              <span className="text-emerald-400 text-sm flex-shrink-0">
+                                &#10003;
+                              </span>
                             )
                           ) : row.status === 'failed' ? (
                             <span className="text-rose-400 text-sm flex-shrink-0">&#10007;</span>
@@ -772,10 +790,14 @@ export default function BulkUploadForm() {
                       {missing.length > 0 && expandedId !== row.extractionId && (
                         <div className="ml-6 mt-1 space-y-0.5">
                           {missing.slice(0, 3).map((f, i) => (
-                            <p key={i} className="text-[11px] text-amber-400/70 truncate">• {f}</p>
+                            <p key={i} className="text-[11px] text-amber-400/70 truncate">
+                              • {f}
+                            </p>
                           ))}
                           {missing.length > 3 && (
-                            <p className="text-[11px] text-amber-400/50">+{missing.length - 3} weitere</p>
+                            <p className="text-[11px] text-amber-400/50">
+                              +{missing.length - 3} weitere
+                            </p>
                           )}
                         </div>
                       )}
