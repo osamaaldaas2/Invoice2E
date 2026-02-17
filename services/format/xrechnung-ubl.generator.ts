@@ -1,7 +1,7 @@
 /**
  * XRechnung UBL format generator — wraps the existing UBLService.
  * This is a thin adapter that delegates all work to the existing implementation.
- * 
+ *
  * @module services/format/xrechnung-ubl.generator
  */
 
@@ -84,6 +84,8 @@ function toUBLData(invoice: CanonicalInvoice): UBLInvoiceData {
 export class XRechnungUBLGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'xrechnung-ubl';
   readonly formatName = 'XRechnung 3.0 (UBL)';
+  readonly specVersion = '3.0';
+  readonly specDate = '2023-07-07';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
     const data = toUBLData(invoice);

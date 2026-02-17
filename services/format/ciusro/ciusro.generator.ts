@@ -17,6 +17,8 @@ const PEPPOL_CUSTOMIZATION_ID =
 export class CIUSROGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'cius-ro';
   readonly formatName = 'CIUS-RO (Romania)';
+  readonly specVersion = '1.0.1';
+  readonly specDate = '2023-03-01';
 
   private peppolGenerator = new PeppolBISGenerator();
 
@@ -41,7 +43,7 @@ export class CIUSROGenerator implements IFormatGenerator {
   async validate(xml: string): Promise<{ valid: boolean; errors: string[] }> {
     const peppolResult = await this.peppolGenerator.validate(xml);
     const errors = peppolResult.errors.filter(
-      (e) => !e.includes('PEPPOL BIS 3.0 customization ID'),
+      (e) => !e.includes('PEPPOL BIS 3.0 customization ID')
     );
 
     if (!xml.includes(CIUSRO_CUSTOMIZATION_ID)) {

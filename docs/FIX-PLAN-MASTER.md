@@ -15,7 +15,7 @@
 | F-19 | FORMAT_FIELD_CONFIG — central format requirements config   | `lib/format-field-config.ts`                 | ✅ Done |
 | F-02 | Batch processor RLS (admin→user-scoped for extractions)    | `services/batch/batch.processor.ts`          | ✅ Done |
 | F-01 | Credit deduction idempotency (single-invoice route)        | `app/api/invoices/extract/route.ts`          | ✅ Done |
-| F-04 | Peppol v3.0.20 compliance verification + specVersion field | `validation/peppol-rules.ts`, generators     | ⏳ Next |
+| F-04 | Peppol v3.0.20 compliance verification + specVersion field | `validation/peppol-rules.ts`, generators     | ✅ Done |
 
 ### 🟠 PHASE 1 — Foundation (Additive, no behavior change)
 

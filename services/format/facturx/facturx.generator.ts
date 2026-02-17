@@ -489,6 +489,9 @@ function buildXmpMetadata(invoice: CanonicalInvoice, conformanceLevel: string): 
 export class FacturXGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat;
   readonly formatName: string;
+  /** Factur-X / Order-X specification version */
+  readonly specVersion = '1.0.07';
+  readonly specDate = '2024-09-30';
 
   private readonly spec: { specId: string; profileName: string; conformanceLevel: string };
 

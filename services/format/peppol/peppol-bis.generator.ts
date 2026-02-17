@@ -12,8 +12,7 @@ import { ublService } from '@/services/ubl.service';
 
 const PEPPOL_CUSTOMIZATION_ID =
   'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
-const PEPPOL_PROFILE_ID =
-  'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
+const PEPPOL_PROFILE_ID = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
 const XRECHNUNG_CUSTOMIZATION_ID =
   'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
 
@@ -83,13 +82,16 @@ function toUBLData(invoice: CanonicalInvoice): UBLInvoiceData {
 function replaceCustomizationId(xml: string): string {
   return xml.replace(
     `<cbc:CustomizationID>${XRECHNUNG_CUSTOMIZATION_ID}</cbc:CustomizationID>`,
-    `<cbc:CustomizationID>${PEPPOL_CUSTOMIZATION_ID}</cbc:CustomizationID>`,
+    `<cbc:CustomizationID>${PEPPOL_CUSTOMIZATION_ID}</cbc:CustomizationID>`
   );
 }
 
 export class PeppolBISGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'peppol-bis';
   readonly formatName = 'PEPPOL BIS Billing 3.0';
+  /** Peppol BIS Billing 3.0 — version 3.0.20 (mandatory from 2026-02-23) */
+  readonly specVersion = '3.0.20';
+  readonly specDate = '2024-10-09';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
     const data = toUBLData(invoice);

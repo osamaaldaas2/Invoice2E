@@ -63,6 +63,8 @@ function mapNaturaCode(taxCategoryCode: string | undefined, taxRate: number): st
 export class FatturapaGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'fatturapa';
   readonly formatName = 'FatturaPA 1.2 (Italy)';
+  readonly specVersion = '1.3.1';
+  readonly specDate = '2022-09-29';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
     // Pre-generation validation: seller VAT ID is mandatory for FatturaPA

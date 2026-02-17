@@ -9,14 +9,15 @@ import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import { PeppolBISGenerator } from '../peppol/peppol-bis.generator';
 
-const NLCIUS_CUSTOMIZATION_ID =
-  'urn:cen.eu:en16931:2017#compliant#urn:fdc:nen.nl:nlcius:v1.0';
+const NLCIUS_CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:nen.nl:nlcius:v1.0';
 const PEPPOL_CUSTOMIZATION_ID =
   'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
 
 export class NLCIUSGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'nlcius';
   readonly formatName = 'NLCIUS / SI-UBL 2.0 (Netherlands)';
+  readonly specVersion = '1.0';
+  readonly specDate = '2019-10-01';
 
   private peppolGenerator = new PeppolBISGenerator();
 
@@ -43,7 +44,7 @@ export class NLCIUSGenerator implements IFormatGenerator {
     // Run base PEPPOL validation first
     const peppolResult = await this.peppolGenerator.validate(xml);
     const errors = peppolResult.errors.filter(
-      (e) => !e.includes('PEPPOL BIS 3.0 customization ID'),
+      (e) => !e.includes('PEPPOL BIS 3.0 customization ID')
     );
 
     // Check NLCIUS customization ID

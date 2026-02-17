@@ -3,6 +3,13 @@ import { logger } from '@/lib/logger';
 import { APP_VERSION } from '@/lib/constants';
 import { createServerClient } from '@/lib/supabase.server';
 import { isUsingRedis } from '@/lib/rate-limiter';
+import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+
+interface FormatSpecInfo {
+  formatName: string;
+  specVersion: string;
+  specDate: string;
+}
 
 interface HealthCheckResponse {
   status: 'ok' | 'degraded' | 'error';
@@ -17,6 +24,7 @@ interface HealthCheckResponse {
     };
     uptime: number;
   };
+  formats: Record<string, FormatSpecInfo>;
 }
 
 const startTime = Date.now();
@@ -61,6 +69,33 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const allHealthy = checks.database === 'ok';
 
+    // Collect spec version metadata from all registered format generators
+    const allFormats = [
+      'xrechnung-cii',
+      'xrechnung-ubl',
+      'peppol-bis',
+      'facturx-en16931',
+      'facturx-basic',
+      'fatturapa',
+      'ksef',
+      'nlcius',
+      'cius-ro',
+    ] as const;
+
+    const formats: Record<string, FormatSpecInfo> = {};
+    for (const formatId of allFormats) {
+      try {
+        const gen = GeneratorFactory.create(formatId);
+        formats[formatId] = {
+          formatName: gen.formatName,
+          specVersion: gen.specVersion,
+          specDate: gen.specDate,
+        };
+      } catch {
+        // Generator not available — skip rather than break health check
+      }
+    }
+
     const response: HealthCheckResponse = {
       status: allHealthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
@@ -69,6 +104,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         ...checks,
         uptime: Math.floor((Date.now() - startTime) / 1000),
       },
+      formats,
     };
 
     logger.info('Health check completed', { status: response.status, checks });
@@ -86,6 +122,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         ...checks,
         uptime: Math.floor((Date.now() - startTime) / 1000),
       },
+      formats: {},
     };
 
     return NextResponse.json(errorResponse, { status: 500 });

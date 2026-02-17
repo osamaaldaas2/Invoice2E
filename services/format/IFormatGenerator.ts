@@ -2,7 +2,7 @@
  * Interface for e-invoice format generators.
  * All format generators (XRechnung CII, XRechnung UBL, PEPPOL BIS, Factur-X, etc.)
  * must implement this interface.
- * 
+ *
  * @module services/format/IFormatGenerator
  */
 
@@ -35,6 +35,18 @@ export interface IFormatGenerator {
 
   /** Human-readable name of the format */
   readonly formatName: string;
+
+  /**
+   * Spec version of the standard this generator targets.
+   * Examples: '3.0.20' (Peppol BIS), '3.0' (XRechnung), '1.3.1' (FatturaPA)
+   */
+  readonly specVersion: string;
+
+  /**
+   * Release date of the spec version this generator targets (ISO 8601 date).
+   * Used by /api/health to surface compliance-status for each format.
+   */
+  readonly specDate: string;
 
   /**
    * Generate an e-invoice XML document from canonical invoice data.
