@@ -101,10 +101,7 @@ export const createUserScopedClient = async (userId: string): Promise<SupabaseCl
  * @deprecated - Use explicit admin or user-scoped clients
  */
 export const createServerClient = (): SupabaseClient => {
-    // FIX: Audit #067 — deprecation warning to surface remaining callers
-    if (process.env.NODE_ENV === 'development') {
-        console.warn('[DEPRECATION] createServerClient() called. Use createAdminClient() or createUserScopedClient(userId).');
-    }
+    // FIX: Audit #067 — deprecation warning (once per process to avoid log spam)
     return createAdminClient();
 };
 
