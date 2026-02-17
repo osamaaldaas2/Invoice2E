@@ -17,7 +17,9 @@ const PEPPOL_CUSTOMIZATION_ID =
 export class CIUSROGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'cius-ro';
   readonly formatName = 'CIUS-RO (Romania)';
-  readonly specVersion = '1.0.1';
+  /** @inheritdoc */
+  readonly version = '1.0.0';
+  readonly specVersion = '1.0';
   readonly specDate = '2023-03-01';
 
   private peppolGenerator = new PeppolBISGenerator();

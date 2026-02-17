@@ -544,7 +544,7 @@ export class BatchService {
     const { data: stuckJobs, error } = await supabase
       .from('batch_jobs')
       .select(
-        'id, created_at, processing_started_at, total_files, completed_files, failed_files, results'
+        'id, user_id, created_at, processing_started_at, total_files, completed_files, failed_files, credits_deducted, results'
       )
       .eq('status', 'processing')
       .lt('processing_started_at', cutoff);
@@ -586,16 +586,35 @@ export class BatchService {
         });
       } else if (ageMs > thresholdMs * 3) {
         // Job has been around too long — give up
+        const unprocessed = totalFiles - completedFiles - failedFiles;
         await supabase
           .from('batch_jobs')
           .update({
             status: 'failed',
+            failed_files: failedFiles + unprocessed,
             error_message: 'Job stuck in processing — exceeded maximum recovery attempts',
             completed_at: new Date().toISOString(),
           })
           .eq('id', job.id)
           .eq('status', 'processing');
-        logger.warn('Stuck batch job marked as failed', { jobId: job.id, ageMs });
+
+        // Refund credits for files that were never processed
+        if (unprocessed > 0 && job.credits_deducted) {
+          try {
+            await creditsDbService.addCredits(
+              job.user_id, unprocessed, `batch:refund:stuck:${job.id}`, job.id
+            );
+            logger.info('Refunded credits for unprocessed files in stuck batch', {
+              jobId: job.id, refunded: unprocessed, completedFiles, totalFiles,
+            });
+          } catch (refundErr) {
+            logger.error('CRITICAL: Failed to refund credits for stuck batch', {
+              jobId: job.id, unprocessed,
+              error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+            });
+          }
+        }
+        logger.warn('Stuck batch job marked as failed', { jobId: job.id, ageMs, unprocessed });
       } else {
         // Reset for another attempt
         await supabase

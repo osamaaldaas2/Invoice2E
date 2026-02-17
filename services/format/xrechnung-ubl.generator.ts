@@ -84,7 +84,9 @@ function toUBLData(invoice: CanonicalInvoice): UBLInvoiceData {
 export class XRechnungUBLGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'xrechnung-ubl';
   readonly formatName = 'XRechnung 3.0 (UBL)';
-  readonly specVersion = '3.0';
+  /** @inheritdoc */
+  readonly version = '1.0.0';
+  readonly specVersion = '3.0.2';
   readonly specDate = '2023-07-07';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {

@@ -25,6 +25,19 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
+  architecture:
+    name: Architecture Boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Dependency cruiser
+        run: npm run lint:deps
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -61,6 +74,42 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           SUPABASE_JWT_SECRET: placeholder-jwt-secret-for-build
 
+  schematron:
+    name: Schematron Validation
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
+      - name: Pull KoSIT validator
+        run: docker pull itplr/kosit-validator:latest
+      - name: Generate test invoices
+        run: npx tsx scripts/generate-test-invoices.ts
+      - name: Run Schematron validation
+        run: |
+          chmod +x scripts/validate-formats.sh
+          ./scripts/validate-formats.sh
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schematron-validation-reports
+          path: tmp/validation-reports/
+          retention-days: 14
+      - name: Upload generated test invoices
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-invoices
+          path: tmp/test-invoices/
+          retention-days: 14
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -73,9 +122,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
+      # FIX: Audit #080 — fail CI on critical vulnerabilities
       - name: npm audit
         run: npm audit --audit-level=critical
-        continue-on-error: true
+        continue-on-error: false
       - name: Gitleaks (secret scanning)
         uses: gitleaks/gitleaks-action@v2
         env:

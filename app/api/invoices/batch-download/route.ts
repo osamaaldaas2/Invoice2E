@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { xrechnungService, type XRechnungInvoiceData } from '@/services/xrechnung.service';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
 import { recomputeTotals, type MonetaryLineItem, type MonetaryAllowanceCharge } from '@/lib/monetary-validator';
 import { roundMoney, moneyEqual } from '@/lib/monetary';
+import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
+import { detectFormatFromData } from '@/lib/format-field-config';
+import { toLegacyFormat } from '@/lib/format-utils';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 export const maxDuration = 60;
 
@@ -43,7 +47,6 @@ export async function POST(request: NextRequest) {
       count: extractionIds.length,
     });
 
-    // P0-2: Create user-scoped client for RLS-based data isolation
     const userClient = await createUserScopedClient(user.id);
 
     const zip = new JSZip();
@@ -55,7 +58,6 @@ export async function POST(request: NextRequest) {
       try {
         const extraction = await invoiceDbService.getExtractionById(extractionId, userClient);
 
-        // Security: verify ownership
         if (extraction.userId !== user.id) {
           errors.push({ extractionId, error: 'Access denied' });
           continue;
@@ -66,15 +68,21 @@ export async function POST(request: NextRequest) {
           unknown
         >;
 
-        // DIAGNOSTIC: Log what we read from DB
+        // Determine output format: DB column > extractionData > auto-detect > default
+        const outputFormat: OutputFormat =
+          (extraction.outputFormat as OutputFormat) ||
+          (data.outputFormat as OutputFormat) ||
+          detectFormatFromData(data as any) ||
+          'xrechnung-cii';
+
         logger.info('Batch download - reading extraction', {
           extractionId,
+          outputFormat,
           buyerEmail: data.buyerEmail,
           sellerEmail: data.sellerEmail,
-          dataKeys: Object.keys(data).sort(),
         });
 
-        // Map extracted data to XRechnung service format (match batch-validate logic)
+        // Build service data with defaults for missing required fields
         const serviceData = {
           ...data,
           invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
@@ -83,7 +91,6 @@ export async function POST(request: NextRequest) {
           sellerCountryCode: data.sellerCountryCode || 'DE',
           buyerCountryCode: data.buyerCountryCode || 'DE',
           totalAmount: Number(data.totalAmount) || 0,
-          // CRITICAL: XRechnung requires electronic addresses with fallback to email
           buyerEmail: data.buyerEmail || null,
           buyerElectronicAddress: data.buyerElectronicAddress || data.buyerEmail || null,
           buyerElectronicAddressScheme: data.buyerElectronicAddressScheme || (data.buyerEmail ? 'EM' : null),
@@ -99,6 +106,7 @@ export async function POST(request: NextRequest) {
             ? serviceData.line_items as any[]
             : [];
         if (rawLineItems.length > 0) {
+          serviceData.lineItems = rawLineItems;
           const monetaryLines: MonetaryLineItem[] = rawLineItems.map((item: any) => ({
             netAmount: roundMoney(Number(item.totalPrice ?? item.lineTotal ?? 0) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
             taxRate: Number(item.taxRate ?? item.vatRate ?? serviceData.taxRate ?? 19),
@@ -131,32 +139,38 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // DIAGNOSTIC: Log what we're passing to generateXRechnung
-        logger.info('Batch download - serviceData prepared', {
-          extractionId,
-          buyerEmail: serviceData.buyerEmail,
-          sellerEmail: serviceData.sellerEmail,
-        });
+        // Map to canonical invoice model and generate via format-specific generator
+        const canonical = toCanonicalInvoice(serviceData, outputFormat);
+        const generator = GeneratorFactory.create(outputFormat);
+        const result = await generator.generate(canonical);
 
-        const result = await xrechnungService.generateXRechnung(
-          serviceData as unknown as XRechnungInvoiceData
-        );
+        // Handle file naming and deduplication
         let fileName = result.fileName.replace(/[<>:"/\\|?*]/g, '_');
-        // Deduplicate filenames to prevent ZIP overwrite
         if (usedFileNames.has(fileName)) {
-          const base = fileName.replace(/\.xml$/i, '');
+          const extMatch = fileName.match(/\.[^.]+$/);
+          const ext = extMatch ? extMatch[0] : '.xml';
+          const base = fileName.slice(0, fileName.length - ext.length);
           let counter = 2;
-          while (usedFileNames.has(`${base}_${counter}.xml`)) counter++;
-          fileName = `${base}_${counter}.xml`;
+          while (usedFileNames.has(`${base}_${counter}${ext}`)) counter++;
+          fileName = `${base}_${counter}${ext}`;
         }
         usedFileNames.add(fileName);
-        zip.file(fileName, result.xmlContent);
+
+        // Add to ZIP — handle PDF content for hybrid formats (Factur-X)
+        if (result.pdfContent) {
+          zip.file(fileName.replace(/\.xml$/i, '.pdf'), result.pdfContent);
+        } else {
+          zip.file(fileName, result.xmlContent);
+        }
         successCount++;
 
-        // Create conversion record if one doesn't exist, then mark both as completed
+        // Create/update conversion record with correct format
+        const legacyFormat = toLegacyFormat(outputFormat);
         const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
         if (existingConversion) {
           await invoiceDbService.updateConversion(existingConversion.id, {
+            conversionFormat: legacyFormat,
+            outputFormat,
             conversionStatus: 'completed',
             validationStatus: result.validationStatus,
             validationErrors:
@@ -170,7 +184,8 @@ export async function POST(request: NextRequest) {
             extractionId,
             invoiceNumber: String(data.invoiceNumber || data.invoice_number || ''),
             buyerName: String(data.buyerName || data.buyer_name || ''),
-            conversionFormat: 'XRechnung',
+            conversionFormat: legacyFormat,
+            outputFormat,
             conversionStatus: 'completed',
           }, userClient);
           await invoiceDbService.updateConversion(conversion.id, {
@@ -185,7 +200,7 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Generation failed';
         errors.push({ extractionId, error: msg });
-        logger.warn('Failed to generate XML for extraction', {
+        logger.warn('Failed to generate invoice for extraction', {
           extractionId,
           error: msg,
         });
@@ -196,19 +211,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'No invoices could be converted to XRechnung XML',
+          error: 'No invoices could be converted',
           details: errors,
         },
         { status: 422 }
       );
     }
 
-    // Block download if any invoices failed — user must fix all before downloading
     if (errors.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: `${errors.length} of ${extractionIds.length} invoices failed validation. Fix all errors before downloading.`,
+          error: `${errors.length} of ${extractionIds.length} invoices failed. Fix all errors before downloading.`,
           code: 'VALIDATION_ERRORS',
           details: errors,
           successCount,
@@ -230,7 +244,7 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="invoices_xrechnung.zip"`,
+        'Content-Disposition': `attachment; filename="invoices_batch.zip"`,
         'Content-Length': String(zipBuffer.length),
       },
     });

@@ -8,7 +8,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { getSessionFromCookie, UserRole } from '@/lib/session';
+import { getSessionFromCookie, fetchSessionProfile, UserRole } from '@/lib/session';
 import { createServerClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
@@ -107,11 +107,22 @@ export async function requireAdmin(request: NextRequest): Promise<AuthorizedUser
         path: request.nextUrl.pathname,
     });
 
+    // FIX: Audit #011 — fetch PII from DB if not in token
+    let email = session.email;
+    let firstName = session.firstName;
+    let lastName = session.lastName;
+    if (!email) {
+        const profile = await fetchSessionProfile(session.userId);
+        email = profile.email;
+        firstName = profile.firstName;
+        lastName = profile.lastName;
+    }
+
     return {
         id: session.userId,
-        email: session.email,
-        firstName: session.firstName,
-        lastName: session.lastName,
+        email,
+        firstName,
+        lastName,
         role: liveState.role,
     };
 }
@@ -166,13 +177,24 @@ async function checkAdminAuthInternal(): Promise<AuthorizationResult> {
         return { authorized: false, user: null, error: 'Not an admin' };
     }
 
+    // FIX: Audit #011 — fetch PII from DB if not in token
+    let email2 = session.email;
+    let firstName2 = session.firstName;
+    let lastName2 = session.lastName;
+    if (!email2) {
+        const profile = await fetchSessionProfile(session.userId);
+        email2 = profile.email;
+        firstName2 = profile.firstName;
+        lastName2 = profile.lastName;
+    }
+
     return {
         authorized: true,
         user: {
             id: session.userId,
-            email: session.email,
-            firstName: session.firstName,
-            lastName: session.lastName,
+            email: email2,
+            firstName: firstName2,
+            lastName: lastName2,
             role: liveState.role,
         },
     };

@@ -4,6 +4,7 @@ import { AppError, NotFoundError } from '@/lib/errors';
 import type { InvoiceExtraction, InvoiceConversion } from '@/types';
 import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { createAdminClient } from '@/lib/supabase.server';
+import { withOptimisticLock, OptimisticLockError } from '@/lib/optimistic-lock';
 
 export type CreateExtractionData = {
     userId: string;
@@ -137,8 +138,62 @@ export class InvoiceDatabaseService {
         return snakeToCamelKeys(extraction) as InvoiceExtraction;
     }
 
+    /**
+     * Bulk-update output_format for multiple extractions (RLS-scoped).
+     * Returns the number of rows actually updated.
+     */
+    async updateExtractionFormats(
+        extractionIds: string[],
+        outputFormat: string,
+        client?: SupabaseClient
+    ): Promise<number> {
+        this.assertClientProvided(client, 'updateExtractionFormats');
+
+        const { data, error } = await client!
+            .from('invoice_extractions')
+            .update({ output_format: outputFormat })
+            .in('id', extractionIds)
+            .select('id');
+
+        if (error) {
+            logger.error('Failed to bulk-update extraction formats', {
+                count: extractionIds.length,
+                outputFormat,
+                error: error.message,
+            });
+            throw new AppError('DB_ERROR', 'Failed to update extraction formats', 500);
+        }
+
+        return data?.length ?? 0;
+    }
+
+    // FIX: Audit #009 — statuses that cannot be deleted (compliance retention)
+    private static readonly IMMUTABLE_STATUSES = ['completed', 'converted', 'validated', 'stored', 'archived'];
+
     async deleteExtraction(extractionId: string, client?: SupabaseClient): Promise<void> {
         this.assertClientProvided(client, 'deleteExtraction');
+
+        // FIX: Audit #009 — prevent deletion of completed/stored extractions
+        const { data: existing, error: fetchError } = await client!
+            .from('invoice_extractions')
+            .select('status')
+            .eq('id', extractionId)
+            .single();
+
+        if (fetchError) {
+            logger.error('Failed to check extraction status before delete', { extractionId, error: fetchError.message });
+            throw new NotFoundError('Extraction not found');
+        }
+
+        const status = (existing?.status as string) ?? '';
+        if (InvoiceDatabaseService.IMMUTABLE_STATUSES.includes(status)) {
+            logger.warn('Blocked deletion of immutable extraction', { extractionId, status, audit: '#009' });
+            throw new AppError(
+                'IMMUTABLE',
+                `Cannot delete extraction in '${status}' state — compliance retention policy requires preservation`,
+                403
+            );
+        }
 
         const { error } = await client!
             .from('invoice_extractions')
@@ -198,6 +253,37 @@ export class InvoiceDatabaseService {
         }
 
         return snakeToCamelKeys(conversion) as InvoiceConversion;
+    }
+
+    /**
+     * Update a conversion with optimistic locking.
+     *
+     * The caller must supply the `expectedVersion` they last read.
+     * If another request modified the row in the meantime, an
+     * {@link OptimisticLockError} (HTTP 409) is thrown so the client
+     * can reload and retry.
+     *
+     * @throws {OptimisticLockError} When the row was modified concurrently.
+     * @throws {AppError}            On any other database error.
+     */
+    async updateConversionVersioned(
+        conversionId: string,
+        expectedVersion: number,
+        data: UpdateConversionData,
+        client?: SupabaseClient,
+    ): Promise<InvoiceConversion> {
+        this.assertClientProvided(client, 'updateConversionVersioned');
+        const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
+
+        const row = await withOptimisticLock({
+            client: client!,
+            table: 'invoice_conversions',
+            id: conversionId,
+            expectedVersion,
+            data: snakeData,
+        });
+
+        return snakeToCamelKeys(row) as InvoiceConversion;
     }
 
     async getConversionById(conversionId: string, client?: SupabaseClient): Promise<InvoiceConversion> {

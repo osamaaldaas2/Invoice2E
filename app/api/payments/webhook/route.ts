@@ -29,17 +29,9 @@ export async function POST(req: NextRequest) {
             logger.warn('Invalid provider parameter', { provided: providerParam });
         }
 
-        const rateLimitId = `${getRequestIdentifier(req)}:payments-webhook:${provider}`;
-        const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
-        if (!rateLimit.allowed) {
-            return NextResponse.json(
-                { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
-                {
-                    status: 429,
-                    headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
-                }
-            );
-        }
+        // FIX: Audit #052 — removed rate limiting from payment webhooks.
+        // Payment providers (Stripe/PayPal) send bursts of webhooks during
+        // subscription renewals. Signature verification is the security mechanism.
 
         const body = await req.text();
 

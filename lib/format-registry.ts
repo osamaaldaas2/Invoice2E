@@ -14,6 +14,8 @@ export interface FormatMetadata {
   mimeType: string;
   fileExtension: string;
   isEU: boolean;
+  /** Version of the specification this format targets (e.g. '3.0.2' for XRechnung) */
+  specVersion: string;
 }
 
 const EU_PEPPOL_COUNTRIES = [
@@ -34,6 +36,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '3.0.2',
   }],
   ['xrechnung-ubl', {
     id: 'xrechnung-ubl',
@@ -44,6 +47,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '3.0.2',
   }],
   ['peppol-bis', {
     id: 'peppol-bis',
@@ -54,6 +58,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '3.0',
   }],
   ['facturx-en16931', {
     id: 'facturx-en16931',
@@ -64,6 +69,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/pdf',
     fileExtension: '.pdf',
     isEU: true,
+    specVersion: '1.0.07',
   }],
   ['facturx-basic', {
     id: 'facturx-basic',
@@ -74,6 +80,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/pdf',
     fileExtension: '.pdf',
     isEU: true,
+    specVersion: '1.0.07',
   }],
   ['fatturapa', {
     id: 'fatturapa',
@@ -84,6 +91,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '1.2.2',
   }],
   ['ksef', {
     id: 'ksef',
@@ -94,6 +102,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: 'FA(2)',
   }],
   ['nlcius', {
     id: 'nlcius',
@@ -104,6 +113,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '2.0',
   }],
   ['cius-ro', {
     id: 'cius-ro',
@@ -114,6 +124,7 @@ const FORMAT_REGISTRY: ReadonlyMap<OutputFormat, FormatMetadata> = new Map<Outpu
     mimeType: 'application/xml',
     fileExtension: '.xml',
     isEU: true,
+    specVersion: '1.0',
   }],
 ]);
 

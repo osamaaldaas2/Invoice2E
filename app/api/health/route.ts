@@ -1,130 +1,141 @@
+/**
+ * GET /api/health — Comprehensive health check endpoint.
+ *
+ * Reports overall status, component health, format engine versions,
+ * memory usage, uptime, and app version. Never exposes secrets.
+ *
+ * @module app/api/health/route
+ */
+
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { APP_VERSION } from '@/lib/constants';
-import { createServerClient } from '@/lib/supabase.server';
-import { isUsingRedis } from '@/lib/rate-limiter';
 import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+import {
+  checkDatabase,
+  checkRedis,
+  checkAIProviders,
+  aggregateHealth,
+  type HealthStatus,
+  type ComponentHealth,
+} from '@/lib/health-check';
 
-interface FormatSpecInfo {
-  formatName: string;
-  specVersion: string;
-  specDate: string;
-}
+/** Timestamp (ms) when the module was first loaded — used to calculate uptime. */
+const START_TIME = Date.now();
 
-interface HealthCheckResponse {
-  status: 'ok' | 'degraded' | 'error';
+/** No-cache headers applied to all health responses. */
+const HEALTH_HEADERS = {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+} as const;
+
+interface HealthResponse {
+  status: HealthStatus;
   timestamp: string;
   version: string;
-  checks: {
-    database: 'ok' | 'error';
-    redis: 'ok' | 'not_configured' | 'error';
-    ai: {
-      gemini: 'configured' | 'not_configured';
-      openai: 'configured' | 'not_configured';
-    };
-    uptime: number;
+  uptimeSeconds: number;
+  memory: {
+    heapUsedMB: number;
+    heapTotalMB: number;
+    rssMB: number;
+    externalMB: number;
   };
-  formats: Record<string, FormatSpecInfo>;
+  components: {
+    database: ComponentHealth;
+    redis: ComponentHealth;
+    ai: Record<string, ComponentHealth>;
+  };
+  formatEngines: Array<{
+    formatId: string;
+    formatName: string;
+    version: string;
+    specVersion: string;
+    specDate: string;
+    deprecated: boolean;
+  }>;
 }
 
-const startTime = Date.now();
-
 /**
- * GET /api/health — Liveness + readiness check
+ * GET /api/health — Detailed health check.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  const url = new URL(request.url);
-  const probe = url.searchParams.get('probe');
-
-  // Liveness probe — just confirms the process is running
-  if (probe === 'live') {
-    return NextResponse.json({ status: 'ok', timestamp: new Date().toISOString() });
-  }
-
-  const checks = {
-    database: 'error' as 'ok' | 'error',
-    redis: 'not_configured' as 'ok' | 'not_configured' | 'error',
-    ai: {
-      gemini: (process.env.GEMINI_API_KEY ? 'configured' : 'not_configured') as
-        | 'configured'
-        | 'not_configured',
-      openai: (process.env.OPENAI_API_KEY ? 'configured' : 'not_configured') as
-        | 'configured'
-        | 'not_configured',
-    },
-  };
-
+export async function GET(): Promise<NextResponse<HealthResponse>> {
   try {
-    // Database connectivity
-    const supabase = createServerClient();
-    const { error: dbError } = await supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .limit(1);
+    const [database, redis] = await Promise.allSettled([
+      checkDatabase(),
+      checkRedis(),
+    ]);
 
-    checks.database = dbError ? 'error' : 'ok';
+    const dbHealth: ComponentHealth =
+      database.status === 'fulfilled'
+        ? database.value
+        : { status: 'down', message: database.reason?.message ?? 'Check failed' };
 
-    // Redis status
-    checks.redis = isUsingRedis() ? 'ok' : 'not_configured';
+    const redisHealth: ComponentHealth =
+      redis.status === 'fulfilled'
+        ? redis.value
+        : { status: 'down', message: redis.reason?.message ?? 'Check failed' };
 
-    const allHealthy = checks.database === 'ok';
+    const ai = checkAIProviders();
 
-    // Collect spec version metadata from all registered format generators
-    const allFormats = [
-      'xrechnung-cii',
-      'xrechnung-ubl',
-      'peppol-bis',
-      'facturx-en16931',
-      'facturx-basic',
-      'fatturapa',
-      'ksef',
-      'nlcius',
-      'cius-ro',
-    ] as const;
+    const components = { database: dbHealth, redis: redisHealth, ai };
+    const status = aggregateHealth(components);
 
-    const formats: Record<string, FormatSpecInfo> = {};
-    for (const formatId of allFormats) {
-      try {
-        const gen = GeneratorFactory.create(formatId);
-        formats[formatId] = {
-          formatName: gen.formatName,
-          specVersion: gen.specVersion,
-          specDate: gen.specDate,
-        };
-      } catch {
-        // Generator not available — skip rather than break health check
-      }
+    let formatEngines: HealthResponse['formatEngines'] = [];
+    try {
+      formatEngines = GeneratorFactory.getEngineVersions();
+    } catch {
+      logger.warn('Health: failed to retrieve format engine versions');
     }
 
-    const response: HealthCheckResponse = {
-      status: allHealthy ? 'ok' : 'degraded',
+    const mem = process.memoryUsage();
+    const toMB = (bytes: number): number => Math.round((bytes / 1024 / 1024) * 100) / 100;
+
+    const response: HealthResponse = {
+      status,
       timestamp: new Date().toISOString(),
       version: APP_VERSION,
-      checks: {
-        ...checks,
-        uptime: Math.floor((Date.now() - startTime) / 1000),
+      uptimeSeconds: Math.floor((Date.now() - START_TIME) / 1000),
+      memory: {
+        heapUsedMB: toMB(mem.heapUsed),
+        heapTotalMB: toMB(mem.heapTotal),
+        rssMB: toMB(mem.rss),
+        externalMB: toMB(mem.external),
       },
-      formats,
+      components,
+      formatEngines,
     };
 
-    logger.info('Health check completed', { status: response.status, checks });
+    logger.info('Health check completed', { status });
 
-    return NextResponse.json(response, {
-      status: allHealthy ? 200 : 503,
-    });
-  } catch (error) {
-    logger.error('Health check failed', error);
-    const errorResponse: HealthCheckResponse = {
-      status: 'error',
+    const httpStatus = status === 'healthy' ? 200 : status === 'degraded' ? 200 : 503;
+    return NextResponse.json(response, { status: httpStatus, headers: HEALTH_HEADERS });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Health check failed', { error: message });
+
+    const mem = process.memoryUsage();
+    const toMB = (bytes: number): number => Math.round((bytes / 1024 / 1024) * 100) / 100;
+
+    const errorResponse: HealthResponse = {
+      status: 'unhealthy',
       timestamp: new Date().toISOString(),
       version: APP_VERSION,
-      checks: {
-        ...checks,
-        uptime: Math.floor((Date.now() - startTime) / 1000),
+      uptimeSeconds: Math.floor((Date.now() - START_TIME) / 1000),
+      memory: {
+        heapUsedMB: toMB(mem.heapUsed),
+        heapTotalMB: toMB(mem.heapTotal),
+        rssMB: toMB(mem.rss),
+        externalMB: toMB(mem.external),
       },
-      formats: {},
+      components: {
+        database: { status: 'down', message: 'Check could not run' },
+        redis: { status: 'down', message: 'Check could not run' },
+        ai: {},
+      },
+      formatEngines: [],
     };
 
-    return NextResponse.json(errorResponse, { status: 500 });
+    return NextResponse.json(errorResponse, { status: 500, headers: HEALTH_HEADERS });
   }
 }

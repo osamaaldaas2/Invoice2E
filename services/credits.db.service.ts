@@ -1,15 +1,22 @@
-import { createServerClient } from '@/lib/supabase.server';
+import { createServerClient, createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError, ValidationError } from '@/lib/errors';
 import type { UserCredits } from '@/types';
 import { snakeToCamelKeys } from '@/lib/database-helpers';
 
 export class CreditsDatabaseService {
+    // FIX: Audit #001, #006, #031 — use user-scoped client for direct queries (RLS-protected)
+    // RPCs are SECURITY DEFINER and bypass RLS by design, so admin client is fine for those.
     private getSupabase() {
         return createServerClient();
     }
 
+    private async getUserScopedSupabase(userId: string) {
+        return createUserScopedClient(userId);
+    }
+
     async createCredits(userId: string, initialCredits: number = 0): Promise<UserCredits> {
+        // createCredits is called during signup (no user session yet) — use admin client
         const supabase = this.getSupabase();
 
         const { data, error } = await supabase
@@ -27,7 +34,8 @@ export class CreditsDatabaseService {
     }
 
     async getUserCredits(userId: string): Promise<UserCredits> {
-        const supabase = this.getSupabase();
+        // FIX: Audit #001 — use user-scoped client for direct queries
+        const supabase = await this.getUserScopedSupabase(userId);
 
         const { data, error } = await supabase
             .from('user_credits')
@@ -186,6 +194,46 @@ export class CreditsDatabaseService {
             alreadyProcessed: result.already_processed,
             newBalance: result.new_balance,
         };
+    }
+
+    /**
+     * FIX: Audit #014, #015 — idempotent credit refund.
+     * Uses refund_credits_idempotent RPC to prevent double-refunds.
+     */
+    async refundCreditsIdempotent(
+        userId: string,
+        amount: number,
+        reason: string,
+        idempotencyKey: string
+    ): Promise<{ status: string; amount?: number }> {
+        if (amount <= 0) {
+            throw new ValidationError('Refund amount must be positive');
+        }
+
+        const supabase = this.getSupabase();
+
+        const { data, error } = await supabase.rpc('refund_credits_idempotent', {
+            p_user_id: userId,
+            p_amount: amount,
+            p_reason: reason,
+            p_idempotency_key: idempotencyKey,
+        });
+
+        if (error) {
+            logger.error('refund_credits_idempotent failed', {
+                userId, amount, reason, idempotencyKey, error: error.message,
+            });
+            throw new AppError('DB_ERROR', 'Failed to refund credits', 500);
+        }
+
+        const result = data as { status: string; amount?: number };
+        if (result.status === 'already_refunded') {
+            logger.info('Refund already processed (idempotent)', { userId, idempotencyKey });
+        } else {
+            logger.info('Credits refunded', { userId, amount, reason, idempotencyKey });
+        }
+
+        return result;
     }
 }
 

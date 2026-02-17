@@ -1,0 +1,264 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Extraction Rate (Success / Failure)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "spanNulls": false,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*failure.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*success.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "rate(extraction_total{status=\"success\"}[5m])",
+          "legendFormat": "success ({{provider}})",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(extraction_total{status=\"failure\"}[5m])",
+          "legendFormat": "failure ({{provider}})",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Conversion Rate by Format",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(conversion_total{status=\"success\"}[5m])",
+          "legendFormat": "{{format}} (success)",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(conversion_total{status=\"failure\"}[5m])",
+          "legendFormat": "{{format}} (failure)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "AI Provider Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 5, "lineWidth": 2 },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(ai_provider_latency_seconds_bucket[5m]))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(ai_provider_latency_seconds_bucket[5m]))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(ai_provider_latency_seconds_bucket[5m]))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Active Jobs per Queue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 30, "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "active_jobs",
+          "legendFormat": "{{queue}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Credit Balance Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "credit_balance_total",
+          "legendFormat": "Total credits",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(extraction_total{status=\"failure\"}[5m]) / rate(extraction_total[5m])",
+          "legendFormat": "Extraction error rate",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(conversion_total{status=\"failure\"}[5m]) / rate(conversion_total[5m])",
+          "legendFormat": "Conversion error rate",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(extraction_total[5m])",
+          "legendFormat": "Extractions/s",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(conversion_total[5m])",
+          "legendFormat": "Conversions/s",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(batch_total[5m])",
+          "legendFormat": "Batches/s",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["invoice2e", "overview"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": true,
+        "label": "Provider",
+        "multi": true,
+        "name": "provider",
+        "options": [],
+        "query": "label_values(extraction_total, provider)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": true,
+        "label": "Format",
+        "multi": true,
+        "name": "format",
+        "options": [],
+        "query": "label_values(conversion_total, format)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Invoice2E — Overview",
+  "uid": "invoice2e-overview",
+  "version": 1
+}

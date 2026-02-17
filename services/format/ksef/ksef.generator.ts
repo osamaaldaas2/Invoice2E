@@ -68,7 +68,9 @@ function mapPaymentMethod(hasIban: boolean): string {
 export class KsefGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'ksef';
   readonly formatName = 'KSeF FA(2) — Poland';
-  readonly specVersion = '2.0';
+  /** @inheritdoc */
+  readonly version = '1.0.0';
+  readonly specVersion = 'FA(2)';
   readonly specDate = '2022-09-01';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {

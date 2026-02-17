@@ -38,7 +38,12 @@ export function handleApiError(
     context: string,
     options?: ApiErrorOptions
 ): NextResponse {
-    logger.error(context, error instanceof Error ? error : undefined);
+    // FIX: Audit #039 — sanitize error details in production
+    if (process.env.NODE_ENV === 'production' && error instanceof Error) {
+        logger.error(context, { message: error.message, name: error.name });
+    } else {
+        logger.error(context, error instanceof Error ? error : undefined);
+    }
 
     const includeSuccess = options?.includeSuccess ?? true;
     const extra = options?.extra;

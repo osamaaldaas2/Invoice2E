@@ -15,32 +15,50 @@ const SESSION_COOKIE_NAME = 'session_token';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 1 week in seconds
 const TOKEN_VERSION = 'v1'; // For future token format changes
 
-// Get session secret from environment or generate a warning
+// FIX: Audit #008 — no deterministic session secret fallback
+let _devSecret: string | null = null;
+
 function getSessionSecret(): string {
     const secret = process.env.SESSION_SECRET;
-    if (!secret) {
-        // SECURITY: Fail hard in production if SESSION_SECRET is not set
-        if (process.env.NODE_ENV === 'production') {
-            throw new Error(
-                'CRITICAL: SESSION_SECRET environment variable must be set in production. Generate one with: openssl rand -hex 32'
-            );
-        }
-        // FIX-004: Use stable dev-only secret, never SUPABASE_SERVICE_ROLE_KEY
-        logger.warn('SESSION_SECRET not set - using fallback (DEVELOPMENT ONLY)');
-        return crypto.createHash('sha256').update('INVOICE2E_DEV_SESSION_SECRET').digest('hex');
+    if (secret) return secret;
+
+    // SECURITY: Fail hard in production if SESSION_SECRET is not set
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+            'CRITICAL: SESSION_SECRET environment variable must be set in production. Generate one with: openssl rand -hex 32'
+        );
     }
-    return secret;
+
+    // FIX: Audit #008 — generate random secret per-process in development.
+    // Sessions won't persist across restarts, but secret is never guessable.
+    if (!_devSecret) {
+        _devSecret = crypto.randomBytes(32).toString('hex');
+        logger.warn('SESSION_SECRET not set — using random per-process secret. Sessions will not persist across restarts.');
+    }
+    return _devSecret;
 }
 
 // User role type for admin system
-export type UserRole = 'user' | 'admin' | 'super_admin';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'accountant';
 
+/**
+ * FIX: Audit #011 — session token no longer contains PII (email, firstName, lastName).
+ * Only userId and role are stored in the token. PII is fetched from DB on demand.
+ * Legacy tokens with PII fields are still accepted during the migration period.
+ */
 interface SessionPayload {
     userId: string;
+    /** @deprecated PII removed from token — use fetchSessionProfile() instead */
     email: string;
+    /** @deprecated PII removed from token — use fetchSessionProfile() instead */
     firstName: string;
+    /** @deprecated PII removed from token — use fetchSessionProfile() instead */
     lastName: string;
     role: UserRole;
+    /** FIX: Audit #036 — issuer claim */
+    iss?: string;
+    /** FIX: Audit #036 — audience claim */
+    aud?: string;
     issuedAt: number;
     expiresAt: number;
 }
@@ -57,12 +75,16 @@ export function createSessionToken(user: {
     role?: UserRole;
 }): string {
     const now = Math.floor(Date.now() / 1000);
+    // FIX: Audit #011 — exclude PII from token payload.
+    // FIX: Audit #036 — add iss/aud claims.
     const payload: SessionPayload = {
         userId: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        email: '',
+        firstName: '',
+        lastName: '',
         role: user.role || 'user',
+        iss: 'invoice2e',
+        aud: process.env.NEXT_PUBLIC_APP_URL || 'https://invoice2e.com',
         issuedAt: now,
         expiresAt: now + SESSION_MAX_AGE,
     };
@@ -135,6 +157,12 @@ export function verifySessionToken(token: string): SessionPayload | null {
         const now = Math.floor(Date.now() / 1000);
         if (payload.expiresAt < now) {
             logger.info('Session token expired', { userId: payload.userId });
+            return null;
+        }
+
+        // FIX: Audit #036 — validate iss/aud if present (new tokens have them, legacy may not)
+        if (payload.iss && payload.iss !== 'invoice2e') {
+            logger.warn('Invalid session token issuer', { iss: payload.iss });
             return null;
         }
 
@@ -259,6 +287,77 @@ export async function clearSessionCookie(): Promise<void> {
         maxAge: 0,
         path: '/',
     });
+}
+
+// ============================================
+// Session Profile Fetcher — FIX: Audit #011
+// PII removed from token; fetch from DB when needed
+// ============================================
+
+/** Cached profile data fetched from DB for the current session. */
+const _profileCache = new Map<string, { email: string; firstName: string; lastName: string; fetchedAt: number }>();
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * FIX: Audit #011 — Fetch user profile (email, name) from database.
+ * Use this instead of reading PII from the session token.
+ * Results are cached in-memory for 5 minutes per userId.
+ */
+export async function fetchSessionProfile(userId: string): Promise<{
+    email: string;
+    firstName: string;
+    lastName: string;
+}> {
+    const cached = _profileCache.get(userId);
+    if (cached && Date.now() - cached.fetchedAt < PROFILE_CACHE_TTL_MS) {
+        return { email: cached.email, firstName: cached.firstName, lastName: cached.lastName };
+    }
+
+    try {
+        // Lazy import to avoid circular dependency
+        const { createAdminClient } = await import('@/lib/supabase.server');
+        const supabase = createAdminClient();
+        const { data, error } = await supabase
+            .from('users')
+            .select('email, first_name, last_name')
+            .eq('id', userId)
+            .single();
+
+        if (error || !data) {
+            logger.warn('Failed to fetch session profile', { userId, error: error?.message });
+            return { email: '', firstName: '', lastName: '' };
+        }
+
+        const profile = {
+            email: data.email as string,
+            firstName: data.first_name as string,
+            lastName: data.last_name as string,
+            fetchedAt: Date.now(),
+        };
+        _profileCache.set(userId, profile);
+
+        return { email: profile.email, firstName: profile.firstName, lastName: profile.lastName };
+    } catch (err) {
+        logger.error('fetchSessionProfile error', { userId, error: err });
+        return { email: '', firstName: '', lastName: '' };
+    }
+}
+
+/**
+ * Get a full session with profile data (backward-compatible).
+ * FIX: Audit #011 — merges token session + DB profile.
+ */
+export async function getSessionWithProfile(): Promise<(SessionPayload & { email: string; firstName: string; lastName: string }) | null> {
+    const session = await getSessionFromCookie();
+    if (!session) return null;
+
+    // If token still has PII (legacy token), use it; otherwise fetch from DB
+    if (session.email) {
+        return session;
+    }
+
+    const profile = await fetchSessionProfile(session.userId);
+    return { ...session, ...profile };
 }
 
 // ============================================

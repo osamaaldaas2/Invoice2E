@@ -79,6 +79,32 @@ export class GeneratorFactory {
   }
 
   /**
+   * Get version information for all implemented format engines.
+   * Useful for health checks, debugging, and admin dashboards.
+   * @returns Array of objects containing format id, name, generator version, spec version, and deprecation status.
+   */
+  static getEngineVersions(): Array<{
+    formatId: OutputFormat;
+    formatName: string;
+    version: string;
+    specVersion: string;
+    specDate: string;
+    deprecated: boolean;
+  }> {
+    return this.implementedFormats.map((format) => {
+      const gen = this.create(format);
+      return {
+        formatId: gen.formatId,
+        formatName: gen.formatName,
+        version: gen.version,
+        specVersion: gen.specVersion,
+        specDate: gen.specDate,
+        deprecated: gen.deprecated ?? false,
+      };
+    });
+  }
+
+  /**
    * Clear the instance cache (useful for testing).
    */
   static clear(): void {

@@ -89,6 +89,8 @@ function replaceCustomizationId(xml: string): string {
 export class PeppolBISGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'peppol-bis';
   readonly formatName = 'PEPPOL BIS Billing 3.0';
+  /** @inheritdoc */
+  readonly version = '1.0.0';
   /** Peppol BIS Billing 3.0 — version 3.0.20 (mandatory from 2026-02-23) */
   readonly specVersion = '3.0.20';
   readonly specDate = '2024-10-09';

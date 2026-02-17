@@ -1,4 +1,6 @@
 const withNextIntl = require('next-intl/plugin')('./i18n/request.ts');
+const path = require('path');
+const webpack = require('webpack');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -7,7 +9,27 @@ const nextConfig = {
     serverExternalPackages: ['tesseract.js'],
     experimental: {
         optimizePackageImports: ['@/lib', '@/components'],
-        proxyClientMaxBodySize: '200mb',
+        // FIX: Audit #047 — reduced from 200mb. Bulk ZIP limit is 500MB in constants,
+        // but actual ZIP uploads typically < 100MB. Route-level validation enforces exact limits.
+        proxyClientMaxBodySize: '100mb',
+    },
+    // Turbopack (next build): swap log-context.server with no-op stub in browser bundles
+    turbopack: {
+        resolveAlias: {
+            '@/lib/log-context.server': { browser: '@/lib/log-context.stub' },
+        },
+    },
+    // Webpack (next dev): same swap via NormalModuleReplacementPlugin for client builds
+    webpack: (config, { isServer }) => {
+        if (!isServer) {
+            config.plugins.push(
+                new webpack.NormalModuleReplacementPlugin(
+                    /log-context\.server/,
+                    path.resolve(__dirname, 'lib', 'log-context.stub.ts')
+                )
+            );
+        }
+        return config;
     },
     async headers() {
         return [

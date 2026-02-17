@@ -8,6 +8,11 @@
 import { roundMoney } from '@/lib/monetary';
 import { logger } from '@/lib/logger';
 
+// Re-export XML security utilities for consumers that import from xml-utils
+export { sanitizeXml, validateXmlSafety, parseXmlSafe, ALLOWED_NAMESPACES } from '@/lib/xml-security';
+export type { XmlSafetyOptions, XmlSafetyResult } from '@/lib/xml-security';
+export { XmlSecurityError } from '@/lib/xml-security';
+
 /**
  * Escape XML special characters and strip invalid control characters.
  */

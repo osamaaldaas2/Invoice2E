@@ -1,16 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies before imports
-const createServerClientMock = vi.hoisted(() => vi.fn());
 const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
   debug: vi.fn(),
-}));
-
-vi.mock('@/lib/supabase.server', () => ({
-  createServerClient: () => createServerClientMock(),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -21,8 +16,22 @@ vi.mock('@/lib/constants', () => ({
   APP_VERSION: '1.0.0',
 }));
 
-vi.mock('@/lib/rate-limiter', () => ({
-  isUsingRedis: () => false,
+const mockCheckDatabase = vi.hoisted(() => vi.fn());
+const mockCheckRedis = vi.hoisted(() => vi.fn());
+const mockCheckAIProviders = vi.hoisted(() => vi.fn());
+const mockAggregateHealth = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/health-check', () => ({
+  checkDatabase: mockCheckDatabase,
+  checkRedis: mockCheckRedis,
+  checkAIProviders: mockCheckAIProviders,
+  aggregateHealth: mockAggregateHealth,
+}));
+
+vi.mock('@/services/format/GeneratorFactory', () => ({
+  GeneratorFactory: {
+    getEngineVersions: vi.fn().mockReturnValue([]),
+  },
 }));
 
 // Import after mocks
@@ -39,96 +48,85 @@ describe('Health API Route', () => {
 
   describe('GET /api/health', () => {
     it('should return ok status when database is healthy', async () => {
-      createServerClientMock.mockReturnValue({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ error: null })),
-          })),
-        })),
-      });
+      mockCheckDatabase.mockResolvedValue({ status: 'ok' });
+      mockCheckRedis.mockResolvedValue({ status: 'not_configured' });
+      mockCheckAIProviders.mockReturnValue({ gemini: { status: 'ok' } });
+      mockAggregateHealth.mockReturnValue('healthy');
 
-      const response = await GET(createMockRequest());
+      const response = await GET();
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('ok');
+      expect(data.status).toBe('healthy');
       expect(data.version).toBe('1.0.0');
-      expect(data.checks).toBeDefined();
-      expect(data.checks.database).toBe('ok');
-      expect(typeof data.checks.uptime).toBe('number');
+      expect(data.components).toBeDefined();
+      expect(data.components.database.status).toBe('ok');
     });
 
     it('should return degraded status when database has errors', async () => {
-      createServerClientMock.mockReturnValue({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ error: new Error('DB error') })),
-          })),
-        })),
-      });
+      mockCheckDatabase.mockResolvedValue({ status: 'degraded', message: 'Slow' });
+      mockCheckRedis.mockResolvedValue({ status: 'not_configured' });
+      mockCheckAIProviders.mockReturnValue({});
+      mockAggregateHealth.mockReturnValue('degraded');
 
-      const response = await GET(createMockRequest());
-      const data = await response.json();
-
-      expect(response.status).toBe(503);
-      expect(data.status).toBe('degraded');
-      expect(data.checks.database).toBe('error');
-    });
-
-    it('should return error status on exception', async () => {
-      createServerClientMock.mockReturnValue({
-        from: vi.fn(() => {
-          throw new Error('Connection failed');
-        }),
-      });
-
-      const response = await GET(createMockRequest());
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.status).toBe('error');
-      expect(loggerMock.error).toHaveBeenCalled();
-    });
-
-    it('should return ok for liveness probe', async () => {
-      const response = await GET(createMockRequest('http://localhost:3000/api/health?probe=live'));
+      const response = await GET();
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('ok');
-      expect(data.checks).toBeUndefined();
+      expect(data.status).toBe('degraded');
     });
 
-    it('should include redis and ai status in checks', async () => {
-      createServerClientMock.mockReturnValue({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ error: null })),
-          })),
-        })),
-      });
+    it('should return unhealthy with 503 when components are down', async () => {
+      mockCheckDatabase.mockResolvedValue({ status: 'down', message: 'Connection refused' });
+      mockCheckRedis.mockResolvedValue({ status: 'down' });
+      mockCheckAIProviders.mockReturnValue({});
+      mockAggregateHealth.mockReturnValue('unhealthy');
 
-      const response = await GET(createMockRequest());
+      const response = await GET();
       const data = await response.json();
 
-      expect(data.checks.redis).toBe('not_configured');
-      expect(data.checks.ai).toBeDefined();
+      expect(response.status).toBe(503);
+      expect(data.status).toBe('unhealthy');
+    });
+
+    it('should return error status on exception', async () => {
+      mockCheckDatabase.mockRejectedValue(new Error('Connection failed'));
+      mockCheckRedis.mockRejectedValue(new Error('Connection failed'));
+      mockCheckAIProviders.mockReturnValue({});
+      mockAggregateHealth.mockImplementation(() => { throw new Error('boom'); });
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.status).toBe('unhealthy');
+      expect(loggerMock.error).toHaveBeenCalled();
     });
 
     it('should include timestamp in response', async () => {
-      createServerClientMock.mockReturnValue({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ error: null })),
-          })),
-        })),
-      });
+      mockCheckDatabase.mockResolvedValue({ status: 'ok' });
+      mockCheckRedis.mockResolvedValue({ status: 'not_configured' });
+      mockCheckAIProviders.mockReturnValue({});
+      mockAggregateHealth.mockReturnValue('healthy');
 
-      const response = await GET(createMockRequest());
+      const response = await GET();
       const data = await response.json();
 
       expect(data.timestamp).toBeDefined();
       expect(new Date(data.timestamp).getTime()).not.toBeNaN();
+    });
+
+    it('should include memory info in response', async () => {
+      mockCheckDatabase.mockResolvedValue({ status: 'ok' });
+      mockCheckRedis.mockResolvedValue({ status: 'not_configured' });
+      mockCheckAIProviders.mockReturnValue({});
+      mockAggregateHealth.mockReturnValue('healthy');
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(data.memory).toBeDefined();
+      expect(typeof data.memory.heapUsedMB).toBe('number');
     });
   });
 });

@@ -1,0 +1,105 @@
+# Invoice2E — Prometheus Alert Rules
+# Import into Prometheus via rule_files config or Grafana Alerting.
+
+groups:
+  - name: invoice2e.alerts
+    rules:
+      # ─── HighErrorRate ─────────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: >
+          (
+            sum(rate(extraction_total{status="failure"}[5m]))
+            + sum(rate(conversion_total{status="failure"}[5m]))
+          )
+          /
+          (
+            sum(rate(extraction_total[5m]))
+            + sum(rate(conversion_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate detected (>5% for 5 min)"
+          description: >
+            Combined extraction + conversion error rate is
+            {{ $value | humanizePercentage }} over the last 5 minutes.
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/high-error-rate"
+
+      # ─── SlowExtractions ───────────────────────────────────────────────
+      - alert: SlowExtractions
+        expr: >
+          histogram_quantile(0.95, rate(extraction_duration_seconds_bucket[5m])) > 45
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Extraction p95 latency exceeds 45 s for 10 min"
+          description: >
+            95th percentile extraction duration is {{ $value | humanizeDuration }}
+            (threshold: 45 s).
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/slow-extractions"
+
+      # ─── AIProviderDown ────────────────────────────────────────────────
+      - alert: AIProviderDown
+        expr: >
+          rate(extraction_total{status="failure"}[5m])
+          / rate(extraction_total[5m]) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "AI provider appears down (>95% failure rate for 5 min)"
+          description: >
+            Provider {{ $labels.provider }} has a failure rate of
+            {{ $value | humanizePercentage }}. Circuit breaker likely open.
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/ai-provider-down"
+
+      # ─── LowCreditBalance ─────────────────────────────────────────────
+      - alert: LowCreditBalance
+        expr: credit_balance_total < 100
+        for: 0m
+        labels:
+          severity: warning
+          team: billing
+        annotations:
+          summary: "System-wide credit balance critically low (<100)"
+          description: >
+            Aggregate credit balance is {{ $value }}.
+            Users may be unable to process invoices.
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/low-credit-balance"
+
+      # ─── QueueBacklog ──────────────────────────────────────────────────
+      - alert: QueueBacklog
+        expr: active_jobs > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Queue backlog exceeds 100 jobs for 10 min"
+          description: >
+            Queue {{ $labels.queue }} has {{ $value }} active jobs.
+            Processing may be stalled.
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/queue-backlog"
+
+      # ─── HighMemoryUsage ───────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: >
+          process_resident_memory_bytes / (1024 * 1024 * 1024) > 0.85
+          or
+          (process_resident_memory_bytes
+           / on() group_left() machine_memory_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "Node.js process memory usage exceeds 85% for 5 min"
+          description: >
+            Resident memory is {{ $value | humanize1024 }}B.
+            Consider scaling or investigating memory leaks.
+          runbook_url: "https://wiki.invoice2e.dev/runbooks/high-memory-usage"

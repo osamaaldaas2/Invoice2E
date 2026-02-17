@@ -26,6 +26,9 @@ export {
     type CreateConversionData,
     type UpdateConversionData,
 } from './invoice.db.service';
+
+// Optimistic locking
+export { OptimisticLockError, withOptimisticLock, type Versioned } from '@/lib/optimistic-lock';
 export { paymentDbService, type CreatePaymentData } from './payment.db.service';
 export { auditDbService, type CreateAuditLogData } from './audit.db.service';
 

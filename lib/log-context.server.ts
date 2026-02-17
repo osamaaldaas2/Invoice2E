@@ -2,8 +2,10 @@
  * Server-only log context using AsyncLocalStorage.
  * Provides requestId / correlationId propagation across async call chains.
  *
- * IMPORTANT: This module uses `async_hooks` and must NEVER be imported
- * in client components or Edge Runtime. Use the `server-only` guard.
+ * IMPORTANT: This module uses `async_hooks` and only works in Node.js server runtime.
+ * In client/browser bundles, the bundler swaps this for log-context.stub.ts:
+ *   - Turbopack (next build): turbopack.resolveAlias with browser condition
+ *   - Webpack (next dev): NormalModuleReplacementPlugin for client builds
  *
  * Usage in API routes:
  *   import { withLogContext } from '@/lib/log-context.server';
@@ -13,16 +15,15 @@
  *     });
  *   }
  */
-import 'server-only';
-
 export interface LogContext {
   requestId?: string;
   tenantId?: string;
   userId?: string;
 }
 
-// Dynamic require keeps async_hooks out of the browser/Edge bundle
-
+// Plain 'async_hooks' (no node: prefix) — webpack externalises it on the server,
+// and both bundlers swap this entire module for log-context.stub.ts on the client.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { AsyncLocalStorage } = require('async_hooks') as typeof import('async_hooks');
 
 const storage = new AsyncLocalStorage<LogContext>();

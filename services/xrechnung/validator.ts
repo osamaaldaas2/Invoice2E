@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 import { ValidationError } from '@/lib/errors';
+import { validateXmlSafety } from '@/lib/xml-security';
 import { validateForProfile } from '@/validation/validation-pipeline';
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
 import { logger } from '@/lib/logger';
@@ -109,6 +110,13 @@ export function validateXmlStructure(xml: string): { valid: boolean; errors: str
 
   if (!xml || xml.trim().length === 0) {
     errors.push('XML content is empty');
+    return { valid: false, errors };
+  }
+
+  // Security pre-check: reject DOCTYPE, XXE, billion laughs, unknown namespaces
+  const safetyResult = validateXmlSafety(xml);
+  if (!safetyResult.safe) {
+    errors.push(`[SECURITY] ${safetyResult.reason ?? 'XML failed security validation'}`);
     return { valid: false, errors };
   }
 

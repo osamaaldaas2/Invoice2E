@@ -1,0 +1,138 @@
+# Invoice2E — Service Level Objectives (SLO) Definitions
+# Compatible with Sloth / OpenSLO / Google SRE conventions.
+
+apiVersion: openslo/v1
+kind: SLO
+
+metadata:
+  name: invoice2e-slos
+  labels:
+    app: invoice2e
+
+---
+# ─── 1. Availability ──────────────────────────────────────────────────────────
+# Target: 99.9% → Error budget: 43.2 min/month (0.1%)
+
+slos:
+  - name: availability
+    description: "Overall service availability — ratio of successful requests"
+    target: 0.999
+    error_budget_minutes_per_month: 43.2
+    indicator:
+      type: ratio
+      good:
+        expr: >
+          sum(rate(extraction_total{status="success"}[5m]))
+          + sum(rate(conversion_total{status="success"}[5m]))
+      total:
+        expr: >
+          sum(rate(extraction_total[5m]))
+          + sum(rate(conversion_total[5m]))
+    window: 30d
+    calendar:
+      period: monthly
+
+  # ─── 2. Extraction Latency ────────────────────────────────────────────────
+  # Target: p95 < 30 seconds
+
+  - name: extraction-latency
+    description: "95th percentile extraction duration under 30 seconds"
+    target: 0.95
+    indicator:
+      type: latency
+      threshold_seconds: 30
+      good:
+        expr: >
+          histogram_quantile(0.95, rate(extraction_duration_seconds_bucket[5m])) < 30
+      latency_query:
+        expr: >
+          histogram_quantile(0.95, rate(extraction_duration_seconds_bucket[5m]))
+    window: 30d
+
+  # ─── 3. Conversion Latency ───────────────────────────────────────────────
+  # Target: p95 < 10 seconds
+
+  - name: conversion-latency
+    description: "95th percentile conversion duration under 10 seconds"
+    target: 0.95
+    indicator:
+      type: latency
+      threshold_seconds: 10
+      good:
+        expr: >
+          histogram_quantile(0.95, rate(conversion_duration_seconds_bucket[5m])) < 10
+      latency_query:
+        expr: >
+          histogram_quantile(0.95, rate(conversion_duration_seconds_bucket[5m]))
+    window: 30d
+
+  # ─── 4. API Response Time ────────────────────────────────────────────────
+  # Target: p95 < 500 ms
+
+  - name: api-response-time
+    description: "95th percentile AI provider latency under 500 ms"
+    target: 0.95
+    indicator:
+      type: latency
+      threshold_seconds: 0.5
+      good:
+        expr: >
+          histogram_quantile(0.95, rate(ai_provider_latency_seconds_bucket[5m])) < 0.5
+      latency_query:
+        expr: >
+          histogram_quantile(0.95, rate(ai_provider_latency_seconds_bucket[5m]))
+    window: 30d
+
+# ─── Error Budget Policies ─────────────────────────────────────────────────
+
+error_budget_policies:
+  - name: automated-rollback
+    description: "Trigger automated rollback when burn rate exceeds threshold"
+    condition: "burn_rate_1h > 14.4"
+    action: rollback
+    notification_channels:
+      - pagerduty
+      - slack-ops
+
+  - name: development-freeze
+    description: "Halt non-critical deployments when budget consumed > 50%"
+    condition: "error_budget_remaining < 0.50"
+    action: freeze_deployments
+    notification_channels:
+      - slack-eng
+
+  - name: incident-review
+    description: "Mandatory incident review when budget consumed > 75%"
+    condition: "error_budget_remaining < 0.25"
+    action: incident_review
+    notification_channels:
+      - slack-ops
+      - email-oncall
+
+# ─── Burn Rate Alerts ──────────────────────────────────────────────────────
+# Multi-window burn rate alerting (Google SRE methodology).
+
+burn_rate_alerts:
+  # Fast burn — 2% of monthly budget consumed in 1 hour
+  - name: fast-burn
+    short_window: 5m
+    long_window: 1h
+    burn_rate_threshold: 14.4
+    severity: critical
+    description: "Exhausts 30-day error budget in ~2 hours at current rate"
+
+  # Medium burn — 5% of monthly budget consumed in 6 hours
+  - name: medium-burn
+    short_window: 30m
+    long_window: 6h
+    burn_rate_threshold: 6.0
+    severity: warning
+    description: "Exhausts 30-day error budget in ~5 days at current rate"
+
+  # Slow burn — 10% of monthly budget consumed in 3 days
+  - name: slow-burn
+    short_window: 6h
+    long_window: 3d
+    burn_rate_threshold: 1.0
+    severity: info
+    description: "Exhausts 30-day error budget in ~30 days at current rate"

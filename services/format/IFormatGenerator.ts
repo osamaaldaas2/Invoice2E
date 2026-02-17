@@ -37,6 +37,13 @@ export interface IFormatGenerator {
   readonly formatName: string;
 
   /**
+   * Semantic version of this generator implementation (semver).
+   * Tracks internal changes to the generator code itself.
+   * @example '1.0.0'
+   */
+  readonly version: string;
+
+  /**
    * Spec version of the standard this generator targets.
    * Examples: '3.0.20' (Peppol BIS), '3.0' (XRechnung), '1.3.1' (FatturaPA)
    */
@@ -47,6 +54,12 @@ export interface IFormatGenerator {
    * Used by /api/health to surface compliance-status for each format.
    */
   readonly specDate: string;
+
+  /**
+   * Whether this generator is deprecated and should no longer be used for new invoices.
+   * Deprecated generators remain available for backward compatibility.
+   */
+  readonly deprecated?: boolean;
 
   /**
    * Generate an e-invoice XML document from canonical invoice data.

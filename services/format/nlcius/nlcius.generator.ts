@@ -16,7 +16,9 @@ const PEPPOL_CUSTOMIZATION_ID =
 export class NLCIUSGenerator implements IFormatGenerator {
   readonly formatId: OutputFormat = 'nlcius';
   readonly formatName = 'NLCIUS / SI-UBL 2.0 (Netherlands)';
-  readonly specVersion = '1.0';
+  /** @inheritdoc */
+  readonly version = '1.0.0';
+  readonly specVersion = '2.0';
   readonly specDate = '2019-10-01';
 
   private peppolGenerator = new PeppolBISGenerator();

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
-import { getSessionFromCookie } from '@/lib/session';
+import { getSessionFromCookie, fetchSessionProfile } from '@/lib/session';
 
 export interface AuthenticatedUser {
     id: string;
@@ -30,12 +30,22 @@ export async function getAuthenticatedUser(req: NextRequest): Promise<Authentica
             return null;
         }
 
-        // Return authenticated user from verified session
+        // FIX: Audit #011 — fetch PII from DB if not in token (new tokens omit PII)
+        let email = session.email;
+        let firstName = session.firstName;
+        let lastName = session.lastName;
+        if (!email) {
+            const profile = await fetchSessionProfile(session.userId);
+            email = profile.email;
+            firstName = profile.firstName;
+            lastName = profile.lastName;
+        }
+
         return {
             id: session.userId,
-            email: session.email,
-            firstName: session.firstName,
-            lastName: session.lastName,
+            email,
+            firstName,
+            lastName,
         };
     } catch (error) {
         logger.error('Error in getAuthenticatedUser', { error });

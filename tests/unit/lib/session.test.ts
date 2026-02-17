@@ -40,14 +40,15 @@ describe('Session Token', () => {
             expect(parts[0]).toBe('v1');
         });
 
-        it('should embed user data in the payload', () => {
+        it('should embed user data in the payload (PII excluded per Audit #011)', () => {
             const token = createSessionToken(testUser);
             const parts = token.split('.');
             const payload = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf8'));
             expect(payload.userId).toBe('user-123');
-            expect(payload.email).toBe('test@example.com');
-            expect(payload.firstName).toBe('John');
-            expect(payload.lastName).toBe('Doe');
+            // FIX: Audit #011 — PII no longer stored in token
+            expect(payload.email).toBe('');
+            expect(payload.firstName).toBe('');
+            expect(payload.lastName).toBe('');
             expect(payload.role).toBe('user');
         });
 
@@ -73,7 +74,8 @@ describe('Session Token', () => {
             const result = verifySessionToken(token);
             expect(result).not.toBeNull();
             expect(result!.userId).toBe('user-123');
-            expect(result!.email).toBe('test@example.com');
+            // FIX: Audit #011 — PII no longer in token, email is empty string
+            expect(result!.email).toBe('');
         });
 
         it('should reject a tampered payload', () => {

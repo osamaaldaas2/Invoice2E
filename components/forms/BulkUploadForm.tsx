@@ -8,6 +8,9 @@ import { useUser } from '@/lib/user-context';
 import AILoadingSpinner from '@/components/ui/AILoadingSpinner';
 import { Button } from '@/components/ui/button';
 import InvoiceReviewForm from '@/components/forms/invoice-review/InvoiceReviewForm';
+import { FORMAT_FIELD_CONFIG } from '@/lib/format-field-config';
+import { getAllFormats } from '@/lib/format-registry';
+import type { OutputFormat } from '@/types/canonical-invoice';
 
 /* ------------------------------------------------------------------ */
 /*  Shared constants                                                   */
@@ -37,18 +40,46 @@ const APPLYABLE_FIELDS = [
   { key: 'currency', label: 'Währung' },
 ];
 
+const ALL_FORMATS = getAllFormats();
+
 /* ------------------------------------------------------------------ */
-/*  Readiness field labels (for tooltips)                              */
+/*  Format-aware readiness computation                                 */
 /* ------------------------------------------------------------------ */
 
-const READINESS_CHECKS: { test: (d: any) => boolean; label: string }[] = [
-  { test: (d) => !!d.sellerName, label: 'Verkäufername' },
-  { test: (d) => !!(d.sellerEmail || d.sellerElectronicAddress), label: 'Verkäufer-E-Mail' },
-  { test: (d) => !!(d.buyerEmail || d.buyerElectronicAddress), label: 'Käufer-E-Mail' },
-  { test: (d) => !!d.sellerIban, label: 'Verkäufer-IBAN' },
-  { test: (d) => Array.isArray(d.lineItems) && d.lineItems.length > 0, label: 'Positionen' },
-  { test: (d) => Number(d.totalAmount) > 0, label: 'Gesamtbetrag' },
-];
+/** Compute readiness for an extraction against a specific format. */
+function computeFormatReadiness(
+  data: Record<string, unknown> | null,
+  format: OutputFormat
+): { ready: boolean; missing: string[] } {
+  if (!data) return { ready: false, missing: ['Daten nicht geladen'] };
+  const d = (data as any)?.extractionData || data;
+  const config = FORMAT_FIELD_CONFIG[format] ?? FORMAT_FIELD_CONFIG['xrechnung-cii'];
+  const missing: string[] = [];
+
+  // Universal checks (all formats)
+  if (!d.sellerName) missing.push('Verkäufername');
+  if (!(Array.isArray(d.lineItems) && d.lineItems.length > 0)) missing.push('Positionen');
+  if (!(Number(d.totalAmount) > 0)) missing.push('Gesamtbetrag');
+
+  // Format-specific field checks
+  if (config.sellerPhone === 'required' && !d.sellerPhone && !d.sellerPhoneNumber) missing.push('Verkäufer-Telefon');
+  if (config.sellerEmail === 'required' && !d.sellerEmail && !d.sellerElectronicAddress) missing.push('Verkäufer-E-Mail');
+  if (config.sellerContactName === 'required' && !d.sellerContactName) missing.push('Verkäufer-Kontaktname');
+  if (config.sellerIban === 'required' && !d.sellerIban) missing.push('Verkäufer-IBAN');
+  if (config.sellerVatId === 'required' && !d.sellerVatId && !d.sellerTaxNumber && !d.sellerTaxId) missing.push('Verkäufer-Steuer-ID');
+  if (config.sellerStreet === 'required' && !d.sellerStreet && !d.sellerAddress) missing.push('Verkäufer-Straße');
+  if (config.sellerCity === 'required' && !d.sellerCity) missing.push('Verkäufer-Stadt');
+  if (config.sellerPostalCode === 'required' && !d.sellerPostalCode) missing.push('Verkäufer-PLZ');
+  if (config.buyerStreet === 'required' && !d.buyerStreet && !d.buyerAddress) missing.push('Käufer-Straße');
+  if (config.buyerCity === 'required' && !d.buyerCity) missing.push('Käufer-Stadt');
+  if (config.buyerPostalCode === 'required' && !d.buyerPostalCode) missing.push('Käufer-PLZ');
+  if (config.buyerCountryCode === 'required' && !d.buyerCountryCode) missing.push('Käufer-Ländercode');
+  if (config.buyerElectronicAddress === 'required' && !d.buyerElectronicAddress && !d.buyerEmail) missing.push('Käufer-E-Adresse');
+  if (config.buyerCodiceDestinatario === 'required' && !d.buyerCodiceDestinatario) missing.push('CodiceDestinatario');
+  if (config.paymentTerms === 'required' && !d.paymentTerms) missing.push('Zahlungsbedingungen');
+
+  return { ready: missing.length === 0, missing };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Apply to All Panel                                                 */
@@ -89,7 +120,7 @@ function ApplyToAllPanel({
       const data = await res.json();
       if (data.success) {
         setResult(
-          `✅ ${data.data.updated} Rechnungen aktualisiert (${data.data.skipped} hatten bereits Werte)`
+          `${data.data.updated} Rechnungen aktualisiert (${data.data.skipped} hatten bereits Werte)`
         );
         setTimeout(() => {
           onApplied();
@@ -144,6 +175,80 @@ function ApplyToAllPanel({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Format Assignment Bar                                              */
+/* ------------------------------------------------------------------ */
+
+function FormatAssignmentBar({
+  selectedIds,
+  allIds,
+  onSelectAll,
+  onUnselectAll,
+  onApplyFormat,
+  applying,
+}: {
+  selectedIds: Set<string>;
+  allIds: string[];
+  onSelectAll: () => void;
+  onUnselectAll: () => void;
+  onApplyFormat: (format: OutputFormat) => void;
+  applying: boolean;
+}) {
+  const [chosenFormat, setChosenFormat] = useState<OutputFormat>('xrechnung-cii');
+
+  return (
+    <div className="p-3 glass-panel border border-sky-400/20 rounded-xl">
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Format dropdown */}
+        <select
+          value={chosenFormat}
+          onChange={(e) => setChosenFormat(e.target.value as OutputFormat)}
+          className="px-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-white focus:border-sky-400/50 focus:outline-none"
+        >
+          {ALL_FORMATS.map((f) => (
+            <option key={f.id} value={f.id} className="bg-slate-800">
+              {f.displayName}
+            </option>
+          ))}
+        </select>
+
+        {/* Apply button */}
+        <button
+          onClick={() => onApplyFormat(chosenFormat)}
+          disabled={selectedIds.size === 0 || applying}
+          className="px-4 py-1.5 text-xs font-medium rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-100 hover:bg-sky-500/30 disabled:opacity-40"
+        >
+          {applying
+            ? 'Wird zugewiesen...'
+            : `Format zuweisen (${selectedIds.size})`}
+        </button>
+
+        {/* Select all / Unselect all */}
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={onSelectAll}
+            disabled={selectedIds.size === allIds.length}
+            className="text-xs text-sky-300 hover:text-sky-200 disabled:opacity-40"
+          >
+            Alle auswählen
+          </button>
+          <span className="text-slate-600">|</span>
+          <button
+            onClick={onUnselectAll}
+            disabled={selectedIds.size === 0}
+            className="text-xs text-slate-400 hover:text-white disabled:opacity-40"
+          >
+            Auswahl aufheben
+          </button>
+          <span className="text-xs text-slate-500 ml-2">
+            {selectedIds.size}/{allIds.length}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -192,6 +297,11 @@ export default function BulkUploadForm() {
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'done'>('idle');
   const [showApplyAll, setShowApplyAll] = useState(false);
+
+  // Format assignment state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [extractionFormats, setExtractionFormats] = useState<Record<string, OutputFormat>>({});
+  const [applyingFormat, setApplyingFormat] = useState(false);
 
   const completedStatuses = useMemo(
     () => new Set(['completed', 'failed', 'cancelled', 'partial_success']),
@@ -340,6 +450,8 @@ export default function BulkUploadForm() {
     setReviewedIds(new Set());
     setDownloadState('idle');
     setShowApplyAll(false);
+    setSelectedIds(new Set());
+    setExtractionFormats({});
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -348,16 +460,19 @@ export default function BulkUploadForm() {
     setDownloadState('downloading');
     setError(null);
     try {
-      // Always re-fetch status to get a fresh signed download URL
-      const statusRes = await fetch(`/api/invoices/bulk-upload?batchId=${job.id}`);
-      const statusData = await statusRes.json();
-      const url = statusData.downloadUrl;
-      if (url) {
-        setJob((prev) => (prev ? { ...prev, downloadUrl: url } : prev));
-      }
+      // Use batch-download endpoint with extraction IDs for format-aware generation
+      const ids = job.results
+        .filter((r) => r.extractionId && r.status === 'success')
+        .map((r) => r.extractionId!);
 
-      if (!url) throw new Error('Download-URL nicht verfügbar. Bitte versuchen Sie es erneut.');
-      const response = await fetch(url);
+      if (ids.length === 0) throw new Error('Keine Rechnungen zum Herunterladen.');
+
+      const response = await fetch('/api/invoices/batch-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extractionIds: ids }),
+      });
+
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
         throw new Error(errData?.error || `Download fehlgeschlagen (${response.status})`);
@@ -366,7 +481,7 @@ export default function BulkUploadForm() {
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = 'batch_xrechnung.zip';
+      a.download = 'invoices_batch.zip';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -379,19 +494,32 @@ export default function BulkUploadForm() {
     }
   };
 
-  // Compute per-invoice readiness from cached extraction data
-  const computeReadiness = (data: any): 'ready' | 'warning' => {
-    const d = data?.extractionData || data;
-    if (!d) return 'warning';
-    return READINESS_CHECKS.every((c) => c.test(d)) ? 'ready' : 'warning';
-  };
+  // Get the format for an extraction (from DB-loaded state, or default)
+  const getExtractionFormat = useCallback(
+    (extractionId: string): OutputFormat => {
+      return extractionFormats[extractionId] || 'xrechnung-cii';
+    },
+    [extractionFormats]
+  );
 
-  // Get list of missing field labels for a given extraction
-  const getMissingFields = (data: any): string[] => {
-    const d = data?.extractionData || data;
-    if (!d) return READINESS_CHECKS.map((c) => c.label);
-    return READINESS_CHECKS.filter((c) => !c.test(d)).map((c) => c.label);
-  };
+  // Compute per-invoice readiness using format-aware logic
+  const computeReadiness = useCallback(
+    (data: any, extractionId: string): 'ready' | 'warning' => {
+      const format = getExtractionFormat(extractionId);
+      const { ready } = computeFormatReadiness(data, format);
+      return ready ? 'ready' : 'warning';
+    },
+    [getExtractionFormat]
+  );
+
+  const getMissingFields = useCallback(
+    (data: any, extractionId: string): string[] => {
+      const format = getExtractionFormat(extractionId);
+      const { missing } = computeFormatReadiness(data, format);
+      return missing;
+    },
+    [getExtractionFormat]
+  );
 
   const loadExtraction = useCallback(
     async (extractionId: string) => {
@@ -401,6 +529,11 @@ export default function BulkUploadForm() {
         const data = await res.json();
         if (data.data) {
           setExtractionCache((prev) => ({ ...prev, [extractionId]: data.data }));
+          // Load format from extraction record if available
+          const outputFormat = data.data.outputFormat || data.data.output_format;
+          if (outputFormat) {
+            setExtractionFormats((prev) => ({ ...prev, [extractionId]: outputFormat as OutputFormat }));
+          }
         }
       } catch {
         // Silently fail — user can retry by collapsing/expanding
@@ -417,7 +550,6 @@ export default function BulkUploadForm() {
       .map((r) => r.extractionId!);
     if (idsToLoad.length === 0) return;
 
-    // Load in batches of 5 to avoid overwhelming the server
     let idx = 0;
     const loadNext = () => {
       const batch = idsToLoad.slice(idx, idx + 5);
@@ -429,6 +561,10 @@ export default function BulkUploadForm() {
           .then((data) => {
             if (data.data) {
               setExtractionCache((prev) => ({ ...prev, [id]: data.data }));
+              const outputFormat = data.data.outputFormat || data.data.output_format;
+              if (outputFormat) {
+                setExtractionFormats((prev) => ({ ...prev, [id]: outputFormat as OutputFormat }));
+              }
             }
           })
           .catch(() => {});
@@ -455,18 +591,76 @@ export default function BulkUploadForm() {
       if (!cached) {
         wc++;
         continue;
-      } // not loaded yet = treat as warning
-      if (computeReadiness(cached) === 'warning') wc++;
+      }
+      if (computeReadiness(cached, id) === 'warning') wc++;
       else rc++;
     }
     return { warningCount: wc, readyCount: rc };
-  }, [extractionIds, extractionCache]);
+  }, [extractionIds, extractionCache, computeReadiness]);
+
+  // Handle format assignment
+  const handleApplyFormat = useCallback(
+    async (format: OutputFormat) => {
+      const ids = [...selectedIds];
+      if (ids.length === 0) return;
+      setApplyingFormat(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/invoices/batch-format', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ extractionIds: ids, outputFormat: format }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Format-Zuweisung fehlgeschlagen');
+        }
+
+        // Update local format state
+        setExtractionFormats((prev) => {
+          const next = { ...prev };
+          for (const id of ids) {
+            next[id] = format;
+          }
+          return next;
+        });
+
+        // Clear cache so readiness recomputes with new format
+        setExtractionCache((prev) => {
+          const next = { ...prev };
+          for (const id of ids) {
+            if (next[id]) {
+              // Keep cached data but force readiness recomputation
+              // (readiness depends on extractionFormats which we just updated)
+            }
+          }
+          return next;
+        });
+
+        setSelectedIds(new Set());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Format-Zuweisung fehlgeschlagen');
+      } finally {
+        setApplyingFormat(false);
+      }
+    },
+    [selectedIds]
+  );
 
   // Callback when Apply to All succeeds — refresh extraction cache
   const handleApplyAllDone = useCallback(() => {
     setShowApplyAll(false);
-    // Clear cache to force re-fetch with updated data
     setExtractionCache({});
+  }, []);
+
+  // Toggle checkbox for an extraction
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }, []);
 
   return (
@@ -629,17 +823,30 @@ export default function BulkUploadForm() {
                 ) : null;
               })()}
 
+              {/* Format Assignment Bar */}
+              {extractionIds.length > 0 && (
+                <div className="mb-3">
+                  <FormatAssignmentBar
+                    selectedIds={selectedIds}
+                    allIds={extractionIds}
+                    onSelectAll={() => setSelectedIds(new Set(extractionIds))}
+                    onUnselectAll={() => setSelectedIds(new Set())}
+                    onApplyFormat={handleApplyFormat}
+                    applying={applyingFormat}
+                  />
+                </div>
+              )}
+
               {/* Validation error summary */}
               {extractionIds.length > 0 && warningCount > 0 && (
                 <div className="mb-3 space-y-2">
                   <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-amber-400">⚠</span>
+                        <span className="text-amber-400">&#9888;</span>
                         <span className="text-sm text-amber-200">
                           <strong>{warningCount}</strong> von {extractionIds.length} Rechnungen
-                          haben fehlende Felder — einzeln korrigieren oder „Auf alle anwenden"
-                          nutzen.
+                          haben fehlende Felder
                         </span>
                       </div>
                       <button
@@ -664,7 +871,7 @@ export default function BulkUploadForm() {
               {extractionIds.length > 0 && warningCount === 0 && readyCount > 0 && (
                 <div className="mb-3 p-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10">
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-400">✓</span>
+                    <span className="text-emerald-400">&#10003;</span>
                     <span className="text-sm text-emerald-200">
                       Alle {readyCount} Rechnungen sind vollständig.
                     </span>
@@ -679,8 +886,19 @@ export default function BulkUploadForm() {
               >
                 {job.results.map((row, idx) => {
                   const cached = row.extractionId ? extractionCache[row.extractionId] : null;
-                  const readiness = cached ? computeReadiness(cached) : null;
-                  const missing = cached && readiness === 'warning' ? getMissingFields(cached) : [];
+                  const readiness = cached && row.extractionId
+                    ? computeReadiness(cached, row.extractionId)
+                    : null;
+                  const missing = cached && readiness === 'warning' && row.extractionId
+                    ? getMissingFields(cached, row.extractionId)
+                    : [];
+                  const format = row.extractionId
+                    ? getExtractionFormat(row.extractionId)
+                    : null;
+                  const formatMeta = format
+                    ? ALL_FORMATS.find((f) => f.id === format)
+                    : null;
+                  const isSelected = row.extractionId ? selectedIds.has(row.extractionId) : false;
 
                   return (
                     <div key={`${row.filename}-${idx}`}>
@@ -697,11 +915,22 @@ export default function BulkUploadForm() {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
+                          {/* Multi-select checkbox */}
+                          {row.extractionId && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(row.extractionId!)}
+                              className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-sky-400 focus:ring-sky-400/50 flex-shrink-0 cursor-pointer"
+                            />
+                          )}
+
+                          {/* Status icon */}
                           {row.extractionId && reviewedIds.has(row.extractionId) ? (
                             <span className="text-emerald-400 text-sm flex-shrink-0">&#10003;</span>
                           ) : row.status === 'success' ? (
                             readiness === 'warning' ? (
-                              <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
+                              <span className="text-amber-400 text-sm flex-shrink-0">&#9888;</span>
                             ) : (
                               <span className="text-emerald-400 text-sm flex-shrink-0">
                                 &#10003;
@@ -710,10 +939,19 @@ export default function BulkUploadForm() {
                           ) : row.status === 'failed' ? (
                             <span className="text-rose-400 text-sm flex-shrink-0">&#10007;</span>
                           ) : null}
+
                           <span className="text-sm font-medium text-white truncate">
                             {row.filename}
                           </span>
-                          {/* Readiness dot with tooltip */}
+
+                          {/* Format badge */}
+                          {formatMeta && (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-white/10 text-slate-300 flex-shrink-0">
+                              {formatMeta.displayName}
+                            </span>
+                          )}
+
+                          {/* Readiness dot */}
                           {row.extractionId && cached && (
                             <span
                               className={`w-2 h-2 rounded-full flex-shrink-0 ${readiness === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`}
@@ -724,12 +962,14 @@ export default function BulkUploadForm() {
                               }
                             />
                           )}
-                          {/* Missing field count badge */}
+
+                          {/* Missing field count */}
                           {missing.length > 0 && (
                             <span className="text-xs text-amber-300/80 flex-shrink-0">
-                              ⚠ {missing.length} fehlend
+                              &#9888; {missing.length} fehlend
                             </span>
                           )}
+
                           {typeof row.confidenceScore === 'number' && (
                             <span className="text-xs text-faded flex-shrink-0">
                               {(row.confidenceScore * 100).toFixed(0)}%
@@ -791,7 +1031,7 @@ export default function BulkUploadForm() {
                         <div className="ml-6 mt-1 space-y-0.5">
                           {missing.slice(0, 3).map((f, i) => (
                             <p key={i} className="text-[11px] text-amber-400/70 truncate">
-                              • {f}
+                              &#8226; {f}
                             </p>
                           ))}
                           {missing.length > 3 && (
@@ -822,7 +1062,6 @@ export default function BulkUploadForm() {
                               onSubmitSuccess={() => {
                                 setReviewedIds((prev) => new Set(prev).add(row.extractionId!));
                                 setExpandedId(null);
-                                // Clear this extraction's cache to re-fetch updated data
                                 setExtractionCache((prev) => {
                                   const next = { ...prev };
                                   delete next[row.extractionId!];

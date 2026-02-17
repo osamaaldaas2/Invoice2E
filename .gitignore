@@ -40,3 +40,6 @@ yarn-debug.log*
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Schematron validation artifacts
+tmp/

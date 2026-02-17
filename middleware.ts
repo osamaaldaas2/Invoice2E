@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, SUPPORTED_LOCALES } from './lib/constants';
 import { getCorsHeaders, isOriginAllowed } from './lib/cors';
 
+// FIX: Audit #013 — security headers on all responses
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '0');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  return response;
+}
+
 export default function middleware(request: NextRequest) {
   // F-08: Generate request ID for tracing (propagated via header)
   const requestId = crypto.randomUUID();
@@ -42,7 +53,7 @@ export default function middleware(request: NextRequest) {
     for (const [key, value] of Object.entries(corsHeaders)) {
       response.headers.set(key, value);
     }
-    return response;
+    return addSecurityHeaders(response);
   }
 
   // For non-API routes: ensure locale cookie exists
@@ -56,10 +67,10 @@ export default function middleware(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 365, // 1 year
       sameSite: 'lax',
     });
-    return response;
+    return addSecurityHeaders(response);
   }
 
-  return NextResponse.next();
+  return addSecurityHeaders(NextResponse.next());
 }
 
 export const config = {

@@ -7,6 +7,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import { validateXmlSafety } from '@/lib/xml-security';
 import { roundMoney, sumMoney, computeTax } from '@/lib/monetary';
 import { DEFAULT_VAT_RATE } from '@/lib/constants';
 import { isEuVatId } from '@/lib/extraction-normalizer';
@@ -646,6 +647,14 @@ export class UBLService {
      */
     async validate(xml: string): Promise<{ valid: boolean; errors: string[] }> {
         const errors: string[] = [];
+
+        // Security pre-check: reject DOCTYPE, XXE, billion laughs, unknown namespaces
+        const safetyResult = validateXmlSafety(xml);
+        if (!safetyResult.safe) {
+            errors.push(`[SECURITY] ${safetyResult.reason ?? 'XML failed security validation'}`);
+            return { valid: false, errors };
+        }
+
         const isCreditNote = xml.includes('<CreditNote ') || xml.includes('<CreditNote>');
 
         const requiredElements = [

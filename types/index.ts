@@ -1,3 +1,14 @@
+// Optimistic locking types
+export type { Versioned } from '@/lib/optimistic-lock';
+
+// Idempotency system types
+export type {
+  IdempotencyKeyRow,
+  IdempotencyKeyRecord,
+  IdempotencyCheckResult,
+  IdempotencyOptions,
+} from './idempotency';
+
 // Canonical invoice model (multi-format support)
 export type {
   OutputFormat,
@@ -12,7 +23,7 @@ export type {
 // Core entity types for Invoice2E database
 
 // User role type for admin system
-export type UserRole = 'user' | 'admin' | 'super_admin';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'accountant';
 
 export type User = {
   id: string;
@@ -57,6 +68,9 @@ export type InvoiceExtraction = {
   geminiResponseTimeMs?: number;
   status: string;
   errorMessage?: string;
+  outputFormat?: string;
+  /** Optimistic locking version — auto-incremented on every UPDATE. */
+  rowVersion: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -78,6 +92,8 @@ export type InvoiceConversion = {
   fileDownloadTriggered: boolean;
   downloadTriggeredAt?: Date;
   creditsUsed: number;
+  /** Optimistic locking version — auto-incremented on every UPDATE. */
+  rowVersion: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -104,6 +120,10 @@ export type AuditLog = {
   changes?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
+  /** SHA-256 hash of this entry's canonical fields (immutable). */
+  entryHash: string;
+  /** SHA-256 hash of the previous entry in the chain (null for first entry). */
+  prevHash: string | null;
   createdAt: Date;
 };
 

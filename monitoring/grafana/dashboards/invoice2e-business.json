@@ -1,0 +1,167 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Revenue — Credits Purchased (Cumulative)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "green", "mode": "fixed" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "credit_deduction_total",
+          "legendFormat": "Total credit deductions",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Conversions per Format",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (format) (conversion_total{status=\"success\"})",
+          "legendFormat": "{{format}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Top Users by Conversion Count",
+      "description": "Requires a user label on conversion_total or a recording rule. Placeholder — extend with user-level labels.",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 10 },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (user_id) (conversion_total{status=\"success\"}))",
+          "legendFormat": "{{user_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Batch vs Single Conversion Ratio",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "batch_total",
+          "legendFormat": "Batch",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(conversion_total{status=\"success\"}) - batch_total",
+          "legendFormat": "Single",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Format Popularity Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 2,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(conversion_total{status=\"success\"}[5m])",
+          "legendFormat": "{{format}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["invoice2e", "business"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Invoice2E — Business Metrics",
+  "uid": "invoice2e-business",
+  "version": 1
+}

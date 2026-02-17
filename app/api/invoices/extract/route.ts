@@ -12,6 +12,10 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
+// Idempotency middleware available — wrap mutation handlers to prevent double-charges:
+//   import { withIdempotency } from '@/lib/idempotency';
+//   export const POST = withIdempotency(postHandler);
+// See lib/idempotency.ts for full docs.
 
 const BACKGROUND_THRESHOLD = 3;
 
@@ -252,20 +256,23 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Refund credits for failed segments
+      // FIX: Audit #014, #100 — idempotent refund for failed segments
       const failCount = extractions.filter((e) => !e.extractionId).length;
       if (failCount > 0) {
         try {
-          await creditsDbService.addCredits(userId, failCount, 'extraction:refund:multi');
+          const refundKey = `refund:multi:${idempotencyKey}:${failCount}`;
+          await creditsDbService.refundCreditsIdempotent(
+            userId, failCount, 'extraction:refund:multi', refundKey
+          );
         } catch (refundErr) {
           logger.error(
-            'CRITICAL: Failed to refund credits for failed multi-invoice segments — MANUAL RECOVERY NEEDED',
+            'CRITICAL: Failed to refund credits for failed multi-invoice segments',
             {
               userId,
               failCount,
               creditsLost: failCount,
-              action: 'manual_credit_add',
               error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+              audit: '#100',
             }
           );
         }
@@ -313,17 +320,20 @@ export async function POST(request: NextRequest) {
     try {
       extractedData = await extractor.extractFromFile(buffer, file.name, file.type);
     } catch (extractionError) {
-      // Refund the pre-deducted credit on AI failure
+      // FIX: Audit #014, #100 — idempotent refund on AI failure
       try {
-        await creditsDbService.addCredits(userId, 1, `extraction:refund:${idempotencyKey}`);
+        const refundKey = `refund:extract:${idempotencyKey}`;
+        await creditsDbService.refundCreditsIdempotent(
+          userId, 1, `extraction:refund:${idempotencyKey}`, refundKey
+        );
       } catch (refundErr) {
         logger.error(
-          'CRITICAL: Failed to refund credit after extraction failure — MANUAL RECOVERY NEEDED',
+          'CRITICAL: Failed to refund credit after extraction failure',
           {
             userId,
             creditsLost: 1,
-            action: 'manual_credit_add',
             error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+            audit: '#100',
           }
         );
       }
