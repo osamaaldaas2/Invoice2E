@@ -3,20 +3,20 @@ import { SignJWT } from 'jose';
 
 // Fail fast in production if critical secrets are missing
 if (process.env.NODE_ENV === 'production' && !process.env.SUPABASE_JWT_SECRET) {
-    throw new Error(
-        'CRITICAL: SUPABASE_JWT_SECRET is not set. ' +
-        'User-scoped routes will fail. Get from: Supabase Dashboard → Settings → API → JWT Secret'
-    );
+  throw new Error(
+    'CRITICAL: SUPABASE_JWT_SECRET is not set. ' +
+      'User-scoped routes will fail. Get from: Supabase Dashboard → Settings → API → JWT Secret'
+  );
 }
 
 let adminClient: SupabaseClient | null = null;
 
 const getSupabaseUrl = () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!url) {
-        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
-    }
-    return url;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+  }
+  return url;
 };
 
 /**
@@ -25,24 +25,24 @@ const getSupabaseUrl = () => {
  * NEVER use for user-facing data access.
  */
 export const createAdminClient = (): SupabaseClient => {
-    if (adminClient) {
-        return adminClient;
-    }
-
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-        throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
-    }
-
-    adminClient = createClient(getSupabaseUrl(), serviceRoleKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false,
-        },
-    });
-
+  if (adminClient) {
     return adminClient;
+  }
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  adminClient = createClient(getSupabaseUrl(), serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  return adminClient;
 };
 
 /**
@@ -54,55 +54,44 @@ export const createAdminClient = (): SupabaseClient => {
  * @returns Supabase client with user-scoped JWT
  */
 export const createUserScopedClient = async (userId: string): Promise<SupabaseClient> => {
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
-    if (!jwtSecret) {
-        throw new Error('Missing SUPABASE_JWT_SECRET - Required for RLS-based data isolation');
-    }
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('Missing SUPABASE_JWT_SECRET - Required for RLS-based data isolation');
+  }
 
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!anonKey) {
-        throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    }
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
 
-    // Sign a Supabase-compatible JWT with the user's ID
-    // JWT structure must match Supabase's expected claims
-    const secret = new TextEncoder().encode(jwtSecret);
-    const jwt = await new SignJWT({
-        sub: userId,
-        role: 'authenticated',
-        aud: 'authenticated',
-    })
-        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-        .setIssuedAt()
-        .setExpirationTime('15m') // Short-lived: 15 minutes
-        .sign(secret);
+  // Sign a Supabase-compatible JWT with the user's ID
+  // JWT structure must match Supabase's expected claims
+  const secret = new TextEncoder().encode(jwtSecret);
+  const jwt = await new SignJWT({
+    sub: userId,
+    role: 'authenticated',
+    aud: 'authenticated',
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime('15m') // Short-lived: 15 minutes
+    .sign(secret);
 
-    // Create client with the signed JWT as the access token
-    const client = createClient(getSupabaseUrl(), anonKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false,
-        },
-        global: {
-            headers: {
-                Authorization: `Bearer ${jwt}`,
-            },
-        },
-    });
+  // Create client with the signed JWT as the access token
+  const client = createClient(getSupabaseUrl(), anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+    },
+  });
 
-    return client;
-};
-
-/**
- * DEPRECATED: Use createAdminClient() or createUserScopedClient(userId) instead.
- * This function is kept temporarily for backward compatibility but will be removed.
- *
- * @deprecated - Use explicit admin or user-scoped clients
- */
-export const createServerClient = (): SupabaseClient => {
-    // FIX: Audit #067 — deprecation warning (once per process to avoid log spam)
-    return createAdminClient();
+  return client;
 };
 
 /**
@@ -112,19 +101,21 @@ export const createServerClient = (): SupabaseClient => {
  * @deprecated - Use createUserScopedClient(userId) for proper RLS isolation
  */
 export const createUserClient = (): SupabaseClient => {
-    console.warn('DEPRECATED: createUserClient() is unsafe. Use createUserScopedClient(userId) instead.');
+  console.warn(
+    'DEPRECATED: createUserClient() is unsafe. Use createUserScopedClient(userId) instead.'
+  );
 
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!anonKey) {
-        throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    }
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
 
-    // NO FALLBACK TO SERVICE ROLE - Fail explicitly instead
-    return createClient(getSupabaseUrl(), anonKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-            detectSessionInUrl: false,
-        },
-    });
-}
+  // NO FALLBACK TO SERVICE ROLE - Fail explicitly instead
+  return createClient(getSupabaseUrl(), anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+};

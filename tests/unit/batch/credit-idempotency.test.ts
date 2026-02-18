@@ -49,7 +49,7 @@ const mockChain = buildChain();
 
 vi.mock('@/lib/supabase.server', () => ({
   createAdminClient: vi.fn(() => mockChain),
-  createServerClient: vi.fn(() => mockChain),
+  createAdminClient: vi.fn(() => mockChain),
   createUserScopedClient: vi.fn(() => Promise.resolve(mockChain)),
 }));
 
@@ -98,7 +98,9 @@ vi.mock('@/services/invoice.db.service', () => ({
 
 vi.mock('@/services/boundary-detection.service', () => ({
   boundaryDetectionService: {
-    detect: vi.fn().mockResolvedValue({ totalInvoices: 1, invoices: [{ pages: [1], label: 'Invoice 1' }] }),
+    detect: vi
+      .fn()
+      .mockResolvedValue({ totalInvoices: 1, invoices: [{ pages: [1], label: 'Invoice 1' }] }),
     detectBoundaries: vi.fn().mockResolvedValue([]),
   },
 }));

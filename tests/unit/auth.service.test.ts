@@ -2,137 +2,137 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@/lib/supabase.server', () => ({
-    createServerClient: vi.fn(() => ({
-        from: vi.fn(() => ({
-            insert: vi.fn(() => ({
-                select: vi.fn(() => ({
-                    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-                })),
-            })),
-            select: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                    single: vi.fn(() => Promise.resolve({ data: null, error: { code: 'PGRST116' } })),
-                })),
-            })),
+  createAdminClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
         })),
+      })),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => Promise.resolve({ data: null, error: { code: 'PGRST116' } })),
+        })),
+      })),
     })),
+  })),
 }));
 
 vi.mock('bcrypt', () => ({
-    default: {
-        hash: vi.fn(() => Promise.resolve('hashed_password')),
-        compare: vi.fn(() => Promise.resolve(true)),
-    },
+  default: {
+    hash: vi.fn(() => Promise.resolve('hashed_password')),
+    compare: vi.fn(() => Promise.resolve(true)),
+  },
 }));
 
 import { AuthService } from '@/services/auth.service';
 
 describe('AuthService', () => {
-    let service: AuthService;
+  let service: AuthService;
 
-    beforeEach(() => {
-        service = new AuthService();
-        vi.clearAllMocks();
+  beforeEach(() => {
+    service = new AuthService();
+    vi.clearAllMocks();
+  });
+
+  describe('signup', () => {
+    const baseSignupData = {
+      addressLine1: 'Test Street 1',
+      city: 'Berlin',
+      postalCode: '10115',
+      country: 'DE',
+      phone: '+491234567890',
+    };
+
+    it('should have signup method', () => {
+      expect(typeof service.signup).toBe('function');
     });
 
-    describe('signup', () => {
-        const baseSignupData = {
-            addressLine1: 'Test Street 1',
-            city: 'Berlin',
-            postalCode: '10115',
-            country: 'DE',
-            phone: '+491234567890',
-        };
+    it('should reject invalid email format', async () => {
+      const data = {
+        ...baseSignupData,
+        email: 'invalid-email',
+        password: 'ValidPassword123!',
+        firstName: 'Test',
+        lastName: 'User',
+      };
 
-        it('should have signup method', () => {
-            expect(typeof service.signup).toBe('function');
-        });
-
-        it('should reject invalid email format', async () => {
-            const data = {
-                ...baseSignupData,
-                email: 'invalid-email',
-                password: 'ValidPassword123!',
-                firstName: 'Test',
-                lastName: 'User',
-            };
-
-            await expect(service.signup(data)).rejects.toThrow();
-        });
-
-        it('should reject weak password', async () => {
-            const data = {
-                ...baseSignupData,
-                email: 'test@example.com',
-                password: 'weak',
-                firstName: 'Test',
-                lastName: 'User',
-            };
-
-            await expect(service.signup(data)).rejects.toThrow();
-        });
-
-        it('should reject missing first name', async () => {
-            const data = {
-                ...baseSignupData,
-                email: 'test@example.com',
-                password: 'ValidPassword123!',
-                firstName: '',
-                lastName: 'User',
-            };
-
-            await expect(service.signup(data)).rejects.toThrow();
-        });
+      await expect(service.signup(data)).rejects.toThrow();
     });
 
-    describe('login', () => {
-        it('should have login method', () => {
-            expect(typeof service.login).toBe('function');
-        });
+    it('should reject weak password', async () => {
+      const data = {
+        ...baseSignupData,
+        email: 'test@example.com',
+        password: 'weak',
+        firstName: 'Test',
+        lastName: 'User',
+      };
 
-        it('should reject invalid email format', async () => {
-            const data = {
-                email: 'invalid',
-                password: 'password123',
-            };
-
-            await expect(service.login(data)).rejects.toThrow();
-        });
-
-        it('should reject empty password', async () => {
-            const data = {
-                email: 'test@example.com',
-                password: '',
-            };
-
-            await expect(service.login(data)).rejects.toThrow();
-        });
+      await expect(service.signup(data)).rejects.toThrow();
     });
 
-    describe('getUserByEmail', () => {
-        it('should have getUserByEmail method', () => {
-            expect(typeof service.getUserByEmail).toBe('function');
-        });
+    it('should reject missing first name', async () => {
+      const data = {
+        ...baseSignupData,
+        email: 'test@example.com',
+        password: 'ValidPassword123!',
+        firstName: '',
+        lastName: 'User',
+      };
 
-        it('should return null for non-existent email', async () => {
-            const result = await service.getUserByEmail('nonexistent@example.com');
-            expect(result).toBeNull();
-        });
+      await expect(service.signup(data)).rejects.toThrow();
+    });
+  });
+
+  describe('login', () => {
+    it('should have login method', () => {
+      expect(typeof service.login).toBe('function');
     });
 
-    describe('getUserById', () => {
-        it('should have getUserById method', () => {
-            expect(typeof service.getUserById).toBe('function');
-        });
+    it('should reject invalid email format', async () => {
+      const data = {
+        email: 'invalid',
+        password: 'password123',
+      };
+
+      await expect(service.login(data)).rejects.toThrow();
     });
 
-    describe('password utilities', () => {
-        it('should have verifyPassword method', () => {
-            expect(typeof service.verifyPassword).toBe('function');
-        });
+    it('should reject empty password', async () => {
+      const data = {
+        email: 'test@example.com',
+        password: '',
+      };
 
-        it('should have hashPassword method', () => {
-            expect(typeof service.hashPassword).toBe('function');
-        });
+      await expect(service.login(data)).rejects.toThrow();
     });
+  });
+
+  describe('getUserByEmail', () => {
+    it('should have getUserByEmail method', () => {
+      expect(typeof service.getUserByEmail).toBe('function');
+    });
+
+    it('should return null for non-existent email', async () => {
+      const result = await service.getUserByEmail('nonexistent@example.com');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getUserById', () => {
+    it('should have getUserById method', () => {
+      expect(typeof service.getUserById).toBe('function');
+    });
+  });
+
+  describe('password utilities', () => {
+    it('should have verifyPassword method', () => {
+      expect(typeof service.verifyPassword).toBe('function');
+    });
+
+    it('should have hashPassword method', () => {
+      expect(typeof service.hashPassword).toBe('function');
+    });
+  });
 });

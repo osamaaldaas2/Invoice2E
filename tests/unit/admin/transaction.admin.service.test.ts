@@ -38,7 +38,7 @@ const supabaseChain = {
 };
 
 vi.mock('@/lib/supabase.server', () => ({
-  createServerClient: vi.fn(() => supabaseChain),
+  createAdminClient: vi.fn(() => supabaseChain),
 }));
 
 vi.mock('@/lib/logger', () => ({
