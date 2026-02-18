@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
         // 1. Create session with adapter FIRST
         // FIX: Audit #069 — replace loose `any` with structured type
-        let result: { id: string; url?: string | null; [key: string]: unknown };
+        let result: { id: string; url?: string | null };
         let providerId = '';
 
         if (selectedMethod === 'stripe') {
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
                     credits: pkg.credits.toString()
                 }
             });
-            result = session as typeof result;
+            result = { id: session.id, url: session.url };
             providerId = session.id;
         } else {
             const order = await paypalAdapter.createOrder({
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
                     credits: pkg.credits
                 })
             });
-            result = order;
+            result = { id: order.id, url: order.url };
             providerId = order.id;
         }
 
