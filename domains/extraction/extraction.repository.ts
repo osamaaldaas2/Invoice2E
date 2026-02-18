@@ -10,7 +10,6 @@
 import type {
   InvoiceExtraction,
   ExtractionStatusType,
-  ExtractionRequest,
 } from './types';
 
 /** Data required to create a new extraction record. */
