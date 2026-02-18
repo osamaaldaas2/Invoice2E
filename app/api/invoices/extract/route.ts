@@ -507,6 +507,32 @@ export async function POST(request: NextRequest) {
 
     const extractionId = pendingExtractionId || 'unknown';
 
+    // S3.8: Publish outbox event when flag is enabled
+    const useOutbox = await isFeatureEnabled(userClient, FEATURE_FLAGS.USE_OUTBOX).catch(
+      () => false
+    );
+    if (useOutbox && pendingExtractionId) {
+      try {
+        const { OutboxService } = await import('@/lib/outbox/outbox');
+        const outbox = new OutboxService();
+        await outbox.appendEvent(userClient, {
+          aggregateType: 'extraction',
+          aggregateId: pendingExtractionId,
+          eventType: 'extraction.completed',
+          payload: {
+            userId,
+            extractionId: pendingExtractionId,
+            confidence: extractedData.confidence,
+          },
+        });
+      } catch (outboxErr) {
+        logger.warn('Outbox event append failed (non-blocking)', {
+          extractionId: pendingExtractionId,
+          error: outboxErr instanceof Error ? outboxErr.message : String(outboxErr),
+        });
+      }
+    }
+
     logger.info('Invoice extraction and storage completed', {
       extractionId,
       userId,
