@@ -37,7 +37,7 @@ export function getQueue(name: QueueName, jobOptions?: DefaultJobOptions): Queue
   if (existing) return existing;
 
   const queue = new Queue(name, {
-    connection: getQueueConnection(),
+    connection: getQueueConnection() as any,
     defaultJobOptions: { ...DEFAULT_JOB_OPTIONS, ...jobOptions },
   });
 

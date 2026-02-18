@@ -53,7 +53,7 @@ export function createBatchProcessor(deps: BatchDeps) {
     await job.updateProgress(5);
 
     // Create child extraction jobs via FlowProducer
-    const flowProducer = new FlowProducer({ connection: getQueueConnection() });
+    const flowProducer = new FlowProducer({ connection: getQueueConnection() as any });
 
     const childJobs = fileIds.map((fileId, index) => ({
       name: `extract:${batchId}:${index}`,

@@ -37,7 +37,7 @@ export function createWorker<TData = unknown, TResult = unknown>(
   opts?: Partial<WorkerOptions>
 ): Worker<TData, TResult> {
   const worker = new Worker<TData, TResult>(queueName, processor, {
-    connection: getWorkerConnection(),
+    connection: getWorkerConnection() as any,
     concurrency: CONCURRENCY[queueName] ?? 3,
     stalledInterval: 30_000, // Check for stalled jobs every 30s
     maxStalledCount: 2, // Allow 2 stalls before marking failed
