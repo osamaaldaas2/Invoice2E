@@ -339,6 +339,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               retryCount: 0,
               format: resolvedFormat,
               errorMessage: null,
+              creditsAvailable: 0,
+              creditsRequired: 1,
             },
           }),
         });

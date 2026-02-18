@@ -42,6 +42,15 @@ export interface InvoiceContext {
   format: ValidFormat | string;
   /** Last error message, if any. */
   errorMessage: string | null;
+  /**
+   * FIX: Re-audit #7 — available credits, populated by caller before transition.
+   * Used by the hasCredits guard at REVIEW → CONVERTING.
+   */
+  creditsAvailable: number;
+  /**
+   * FIX: Re-audit #7 — credits required for the current operation (default: 1).
+   */
+  creditsRequired: number;
 }
 
 // ── Events ─────────────────────────────────────────────────────────────

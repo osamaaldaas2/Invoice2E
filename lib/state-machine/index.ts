@@ -14,17 +14,8 @@ import { type InvoiceContext, type InvoiceEvent, type InvoiceState } from './typ
 
 export { invoiceMachine } from './invoice-machine';
 export type { InvoiceMachine } from './invoice-machine';
-export {
-  InvoiceStateEnum,
-  MAX_RETRY_COUNT,
-  VALID_FORMATS,
-} from './types';
-export type {
-  InvoiceContext,
-  InvoiceEvent,
-  InvoiceState,
-  ValidFormat,
-} from './types';
+export { InvoiceStateEnum, MAX_RETRY_COUNT, VALID_FORMATS } from './types';
+export type { InvoiceContext, InvoiceEvent, InvoiceState, ValidFormat } from './types';
 
 // ── Terminal states ────────────────────────────────────────────────────
 
@@ -53,7 +44,7 @@ export function isTerminalState(state: InvoiceState): boolean {
  */
 export function getNextStates(
   currentState: InvoiceState,
-  context?: Partial<InvoiceContext>,
+  context?: Partial<InvoiceContext>
 ): InvoiceState[] {
   const allEvents: InvoiceEvent[] = [
     { type: 'UPLOAD' },
@@ -77,6 +68,8 @@ export function getNextStates(
     retryCount: 0,
     format: 'zugferd',
     errorMessage: null,
+    creditsAvailable: 0,
+    creditsRequired: 1,
     ...context,
   };
 
@@ -112,7 +105,7 @@ export function getNextStates(
 export function canTransition(
   currentState: InvoiceState,
   eventType: InvoiceEvent['type'],
-  context?: Partial<InvoiceContext>,
+  context?: Partial<InvoiceContext>
 ): boolean {
   const resolvedContext: InvoiceContext = {
     invoiceId: 'introspect',
@@ -120,6 +113,8 @@ export function canTransition(
     retryCount: 0,
     format: 'zugferd',
     errorMessage: null,
+    creditsAvailable: 0,
+    creditsRequired: 1,
     ...context,
   };
 

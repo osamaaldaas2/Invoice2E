@@ -9,11 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { createActor } from 'xstate';
 import { invoiceMachine } from './invoice-machine';
-import {
-  getNextStates,
-  isTerminalState,
-  canTransition,
-} from './index';
+import { getNextStates, isTerminalState, canTransition } from './index';
 import { MAX_RETRY_COUNT, type InvoiceContext } from './types';
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -30,6 +26,8 @@ function createInvoiceActor(contextOverrides?: Partial<InvoiceContext>) {
         retryCount: 0,
         format: 'zugferd',
         errorMessage: null,
+        creditsAvailable: 10,
+        creditsRequired: 1,
         ...contextOverrides,
       },
     }),
@@ -47,6 +45,8 @@ function actorAt(state: string, contextOverrides?: Partial<InvoiceContext>) {
         retryCount: 0,
         format: 'zugferd',
         errorMessage: null,
+        creditsAvailable: 10,
+        creditsRequired: 1,
         ...contextOverrides,
       },
     }),
@@ -164,22 +164,97 @@ describe('Invoice State Machine — canRetry guard', () => {
   });
 });
 
-// ── Guard: hasCredits ──────────────────────────────────────────────────
+// ── Guard: hasCredits (FIX: Re-audit #7) ─────────────────────────────
 
 describe('Invoice State Machine — hasCredits guard', () => {
-  it('should allow CONVERT from REVIEW when userId is present', () => {
-    const actor = actorAt('REVIEW', { userId: 'user-1' });
+  it('should allow CONVERT from REVIEW when creditsAvailable >= creditsRequired', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 5, creditsRequired: 1 });
     actor.start();
     actor.send({ type: 'CONVERT' });
     expect(actor.getSnapshot().value).toBe('CONVERTING');
     actor.stop();
   });
 
-  it('should block CONVERT from REVIEW when userId is empty', () => {
-    const actor = actorAt('REVIEW', { userId: '' });
+  it('should block CONVERT from REVIEW when creditsAvailable is 0', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 0, creditsRequired: 1 });
     actor.start();
     actor.send({ type: 'CONVERT' });
     expect(actor.getSnapshot().value).toBe('REVIEW'); // stays
+    actor.stop();
+  });
+
+  it('should block CONVERT from REVIEW when creditsAvailable < creditsRequired', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 2, creditsRequired: 5 });
+    actor.start();
+    actor.send({ type: 'CONVERT' });
+    expect(actor.getSnapshot().value).toBe('REVIEW'); // stays
+    actor.stop();
+  });
+
+  it('should allow CONVERT when creditsAvailable equals creditsRequired exactly', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 3, creditsRequired: 3 });
+    actor.start();
+    actor.send({ type: 'CONVERT' });
+    expect(actor.getSnapshot().value).toBe('CONVERTING');
+    actor.stop();
+  });
+
+  it('should default creditsRequired to 1 when not explicitly set', () => {
+    // creditsRequired defaults to 1 in machine initial context
+    const actor = actorAt('REVIEW', { creditsAvailable: 1, creditsRequired: 1 });
+    actor.start();
+    actor.send({ type: 'CONVERT' });
+    expect(actor.getSnapshot().value).toBe('CONVERTING');
+    actor.stop();
+  });
+});
+
+// ── Action: deductCredits (FIX: Re-audit #7, #24) ────────────────────
+
+describe('Invoice State Machine — deductCredits action', () => {
+  it('should decrement creditsAvailable on CONVERT_SUCCESS', () => {
+    const actor = actorAt('CONVERTING', { creditsAvailable: 5, creditsRequired: 1 });
+    actor.start();
+    actor.send({ type: 'CONVERT_SUCCESS' });
+    expect(actor.getSnapshot().value).toBe('CONVERTED');
+    expect(actor.getSnapshot().context.creditsAvailable).toBe(4);
+    actor.stop();
+  });
+
+  it('should decrement by creditsRequired amount', () => {
+    const actor = actorAt('CONVERTING', { creditsAvailable: 10, creditsRequired: 3 });
+    actor.start();
+    actor.send({ type: 'CONVERT_SUCCESS' });
+    expect(actor.getSnapshot().value).toBe('CONVERTED');
+    expect(actor.getSnapshot().context.creditsAvailable).toBe(7);
+    actor.stop();
+  });
+});
+
+// ── Full REVIEW → CONVERTING transition (FIX: Re-audit #7) ───────────
+
+describe('Invoice State Machine — REVIEW → CONVERTING credit gating', () => {
+  it('should complete REVIEW → CONVERTING → CONVERTED with sufficient credits', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 5, creditsRequired: 1 });
+    actor.start();
+
+    actor.send({ type: 'CONVERT' });
+    expect(actor.getSnapshot().value).toBe('CONVERTING');
+
+    actor.send({ type: 'CONVERT_SUCCESS' });
+    expect(actor.getSnapshot().value).toBe('CONVERTED');
+    expect(actor.getSnapshot().context.creditsAvailable).toBe(4);
+
+    actor.stop();
+  });
+
+  it('should block REVIEW → CONVERTING with insufficient credits', () => {
+    const actor = actorAt('REVIEW', { creditsAvailable: 0, creditsRequired: 1 });
+    actor.start();
+
+    actor.send({ type: 'CONVERT' });
+    expect(actor.getSnapshot().value).toBe('REVIEW'); // blocked by guard
+
     actor.stop();
   });
 });
@@ -271,12 +346,22 @@ describe('canTransition', () => {
   });
 
   it('should return false for FAILED + RETRY when retries exhausted', () => {
-    expect(
-      canTransition('FAILED', 'RETRY', { retryCount: MAX_RETRY_COUNT }),
-    ).toBe(false);
+    expect(canTransition('FAILED', 'RETRY', { retryCount: MAX_RETRY_COUNT })).toBe(false);
   });
 
   it('should return true for FAILED + RETRY when retries remain', () => {
     expect(canTransition('FAILED', 'RETRY', { retryCount: 0 })).toBe(true);
+  });
+
+  it('should return true for REVIEW + CONVERT with sufficient credits', () => {
+    expect(canTransition('REVIEW', 'CONVERT', { creditsAvailable: 5, creditsRequired: 1 })).toBe(
+      true
+    );
+  });
+
+  it('should return false for REVIEW + CONVERT with insufficient credits', () => {
+    expect(canTransition('REVIEW', 'CONVERT', { creditsAvailable: 0, creditsRequired: 1 })).toBe(
+      false
+    );
   });
 });

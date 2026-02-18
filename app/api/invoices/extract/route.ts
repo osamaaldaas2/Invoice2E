@@ -475,6 +475,8 @@ async function handleExtractPost(request: NextRequest) {
               retryCount: 0,
               format: '',
               errorMessage: null,
+              creditsAvailable: 0,
+              creditsRequired: 1,
             },
           }),
         });

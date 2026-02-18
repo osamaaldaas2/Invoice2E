@@ -7,17 +7,14 @@
  * guards that enforce business rules (retry budget, credit balance, format
  * validation) and actions that maintain context.
  *
- * Side-effects: None. This is a pure machine definition; actors and
- * services are wired at interpretation time.
+ * Side-effects: Minimal — the hasCredits guard emits a logger.warn
+ * when called without creditsAvailable (safety check for misconfigured
+ * context). All other side-effects are wired at interpretation time.
  */
 
 import { setup, assign } from 'xstate';
-import {
-  type InvoiceContext,
-  type InvoiceEvent,
-  MAX_RETRY_COUNT,
-  VALID_FORMATS,
-} from './types';
+import { logger } from '@/lib/logger';
+import { type InvoiceContext, type InvoiceEvent, MAX_RETRY_COUNT, VALID_FORMATS } from './types';
 
 // ── Guards ─────────────────────────────────────────────────────────────
 
@@ -31,13 +28,25 @@ function canRetry({ context }: { context: InvoiceContext }): boolean {
 }
 
 /**
- * Placeholder credit check — in production this would query a credit
- * service.  Here we assume credits exist when `userId` is present.
+ * FIX: Re-audit #7 — real credit check replacing placeholder.
+ * `creditsAvailable` must be populated in context by the caller
+ * BEFORE attempting the REVIEW → CONVERTING transition.
  * @param context Current machine context.
- * @returns `true` when the user conceptually has credits.
+ * @returns `true` when creditsAvailable >= creditsRequired.
  */
 function hasCredits({ context }: { context: InvoiceContext }): boolean {
-  return context.userId.length > 0;
+  // Safety: if credits weren't checked, deny the transition
+  if (context.creditsAvailable == null) {
+    logger.warn('hasCredits guard called without creditsAvailable in context', {
+      userId: context.userId,
+      invoiceId: context.invoiceId,
+      audit: 'Re-audit #7',
+    });
+    return false;
+  }
+
+  const required = context.creditsRequired || 1;
+  return context.creditsAvailable >= required;
 }
 
 /**
@@ -95,10 +104,17 @@ export const invoiceMachine = setup({
     }),
     /** Clear a previously stored error. */
     clearErrorMessage: assign({ errorMessage: () => null }),
-    /** Placeholder credit deduction — wired to real service at runtime. */
-    deductCredits: ({ context }) => {
-      void context;
-    },
+    /**
+     * FIX: Re-audit #7, #24 — update context to reflect credit deduction.
+     * Actual credit deduction happens via atomic RPC in the route handler;
+     * this action keeps the machine's in-memory context consistent.
+     */
+    deductCredits: assign({
+      creditsAvailable: ({ context }) => {
+        const required = context.creditsRequired || 1;
+        return context.creditsAvailable - required;
+      },
+    }),
   },
 }).createMachine({
   id: 'invoice',
@@ -109,6 +125,8 @@ export const invoiceMachine = setup({
     retryCount: 0,
     format: '',
     errorMessage: null,
+    creditsAvailable: 0,
+    creditsRequired: 1,
   },
   states: {
     // ── Upload & quarantine ────────────────────────────────────────────
