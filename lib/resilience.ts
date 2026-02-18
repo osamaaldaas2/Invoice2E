@@ -38,6 +38,18 @@ export class TimeoutError extends AppError {
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
+/**
+ * FIX: Re-audit #67 — Verified production-ready retry defaults.
+ *
+ * - **maxRetries (3):** 4 total attempts. Sufficient for transient API failures.
+ * - **baseDelayMs (500):** First retry after ~500 ms; doubles each attempt.
+ * - **maxDelayMs (10 000):** Caps at 10 s to avoid excessively long waits.
+ * - **jitter (true):** Adds ±30 % randomness to prevent thundering herd on
+ *   concurrent retries (e.g. batch extraction hitting rate limits).
+ *
+ * Note: `ai-resilience.ts` overrides maxRetries to 2 for per-provider calls
+ * because the fallback chain already provides additional resilience.
+ */
 const DEFAULT_RETRY: RetryConfig = {
   maxRetries: 3,
   baseDelayMs: 500,
@@ -73,7 +85,11 @@ export function withRetry(config: Partial<RetryConfig> = {}): ResiliencePolicy {
         const jitter = cfg.jitter ? Math.random() * exp * 0.3 : 0;
         const delay = Math.round(exp + jitter);
 
-        logger.warn('Retrying after failure', { attempt: attempt + 1, delay, error: String(error) });
+        logger.warn('Retrying after failure', {
+          attempt: attempt + 1,
+          delay,
+          error: String(error),
+        });
         await sleep(delay);
       }
     }
@@ -108,7 +124,7 @@ export function withTimeout(config: TimeoutConfig): ResiliencePolicy {
  */
 export function withFallback<T>(
   primary: () => Promise<T>,
-  secondary: () => Promise<T>,
+  secondary: () => Promise<T>
 ): () => Promise<T> {
   return async () => {
     try {

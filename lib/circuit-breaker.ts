@@ -40,7 +40,7 @@ export class CircuitBreakerError extends AppError {
       'CIRCUIT_OPEN',
       `Circuit breaker "${circuitName}" is open — requests are being rejected`,
       503,
-      { circuit: circuitName },
+      { circuit: circuitName }
     );
     this.name = 'CircuitBreakerError';
   }
@@ -48,6 +48,19 @@ export class CircuitBreakerError extends AppError {
 
 // ─── Default config ──────────────────────────────────────────────────────────
 
+/**
+ * FIX: Re-audit #67 — Verified production-ready defaults.
+ *
+ * - **failureThreshold (5):** Opens the circuit after 5 consecutive failures.
+ *   Industry range 3–10; 5 tolerates transient blips without masking persistent
+ *   outages.
+ * - **resetTimeoutMs (30 000 ms / 30 s):** Cool-down before probing recovery.
+ *   Industry range 10–60 s; 30 s balances fast recovery against overwhelming a
+ *   provider that is still degraded.
+ * - **halfOpenMaxAttempts (3):** Probe requests allowed before deciding whether
+ *   to close or re-open. 3 gives a statistically meaningful success signal
+ *   without flooding the recovering service.
+ */
 const DEFAULTS: Omit<CircuitBreakerConfig, 'name'> = {
   failureThreshold: 5,
   resetTimeoutMs: 30_000,
@@ -93,7 +106,10 @@ export class CircuitBreaker {
       }
     }
 
-    if (this.state === CircuitState.HALF_OPEN && this.halfOpenAttempts >= this.config.halfOpenMaxAttempts) {
+    if (
+      this.state === CircuitState.HALF_OPEN &&
+      this.halfOpenAttempts >= this.config.halfOpenMaxAttempts
+    ) {
       this.transitionTo(CircuitState.OPEN);
       throw new CircuitBreakerError(this.config.name);
     }

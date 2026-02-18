@@ -16,6 +16,16 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export class BatchProcessor {
   /**
    * Retry extraction with exponential backoff on 429/transient errors.
+   *
+   * FIX: Re-audit #67 — Retry amplification warning.
+   * When `USE_CIRCUIT_BREAKER` is enabled, `resilientExtract()` already
+   * applies its own retry (2 retries) + provider fallback (3 providers).
+   * This outer loop compounds to up to 3 × 2 × 3 = 18 attempts in the worst case.
+   * This is acceptable today because the circuit breaker fast-fails open
+   * providers (ms, not seconds) and this loop only retries specific transient
+   * errors. When the flag goes live, consider reducing MAX_RETRIES to 0 here
+   * and letting the resilience layer handle all retry logic.
+   * See also: `lib/ai-resilience.ts` module docblock.
    */
   private async extractWithRetry(
     extractor: ReturnType<typeof ExtractorFactory.create>,
