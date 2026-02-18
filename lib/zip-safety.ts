@@ -76,8 +76,9 @@ export function validateZipSafety(buffer: Buffer): ZipSafetyResult {
 
   // Parse EOCD
   const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
-  const centralDirSize = buffer.readUInt32LE(eocdOffset + 12);
+  const _centralDirSize = buffer.readUInt32LE(eocdOffset + 12);
   const centralDirOffset = buffer.readUInt32LE(eocdOffset + 16);
+  void _centralDirSize; // reserved for future ratio checks
 
   // Check entry count
   if (totalEntries > ZIP_SAFETY_LIMITS.MAX_ENTRIES) {

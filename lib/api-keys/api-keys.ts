@@ -75,12 +75,6 @@ export class ApiKeyService {
   }
 
   /**
-   * Extract a display hint from a raw key: prefix + last 4 chars.
-   */
-  private getHint(rawKey: string): string {
-    return `${API_KEY_PREFIX}...${rawKey.slice(-4)}`;
-  }
-
   /**
    * Map a database row to an ApiKeyResponse (safe metadata only).
    */

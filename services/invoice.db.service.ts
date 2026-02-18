@@ -6,8 +6,8 @@ import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { createAdminClient } from '@/lib/supabase.server';
 import { withOptimisticLock, OptimisticLockError } from '@/lib/optimistic-lock';
 import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
-import { encryptSensitiveFields, decryptSensitiveFields } from '@/lib/encryption';
-import { EnvelopeEncryption } from '@/lib/encryption';
+import { encryptSensitiveFields } from '@/lib/encryption';
+import crypto from 'crypto';
 
 export type CreateExtractionData = {
   userId: string;
@@ -149,7 +149,7 @@ export class InvoiceDatabaseService {
     );
     if (useEncryption && data.extractionData) {
       try {
-        const dek = EnvelopeEncryption.generateDEK();
+        const dek = crypto.randomBytes(32);
         const meta = encryptSensitiveFields(data.extractionData as any, dek);
         if (meta.encryptedFields.length > 0) {
           logger.info('Sensitive fields encrypted', { extractionId, fields: meta.encryptedFields });
