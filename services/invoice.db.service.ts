@@ -5,6 +5,9 @@ import type { InvoiceExtraction, InvoiceConversion } from '@/types';
 import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { createAdminClient } from '@/lib/supabase.server';
 import { withOptimisticLock, OptimisticLockError } from '@/lib/optimistic-lock';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { encryptSensitiveFields, decryptSensitiveFields } from '@/lib/encryption';
+import { EnvelopeEncryption } from '@/lib/encryption';
 
 export type CreateExtractionData = {
   userId: string;
@@ -139,6 +142,26 @@ export class InvoiceDatabaseService {
     client?: SupabaseClient
   ): Promise<InvoiceExtraction> {
     this.assertClientProvided(client, 'updateExtraction');
+
+    // S3.6: Encrypt sensitive fields when flag is enabled
+    const useEncryption = await isFeatureEnabled(client!, FEATURE_FLAGS.USE_FIELD_ENCRYPTION).catch(
+      () => false
+    );
+    if (useEncryption && data.extractionData) {
+      try {
+        const dek = EnvelopeEncryption.generateDEK();
+        const meta = encryptSensitiveFields(data.extractionData as any, dek);
+        if (meta.encryptedFields.length > 0) {
+          logger.info('Sensitive fields encrypted', { extractionId, fields: meta.encryptedFields });
+        }
+      } catch (encErr) {
+        logger.warn('Field encryption failed, storing unencrypted', {
+          extractionId,
+          error: encErr instanceof Error ? encErr.message : String(encErr),
+        });
+      }
+    }
+
     const snakeData = camelToSnakeKeys(data);
 
     const { data: extraction, error } = await client!
