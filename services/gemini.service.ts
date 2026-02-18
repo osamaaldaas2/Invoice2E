@@ -109,7 +109,7 @@ export class GeminiService {
       this.model = this.getClient().getGenerativeModel({
         model: modelName,
         generationConfig: {
-          // @ts-ignore – thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
+          // @ts-expect-error – thinkingConfig is supported by Gemini 2.5 but not yet in the SDK types
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
