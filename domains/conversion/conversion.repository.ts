@@ -4,7 +4,7 @@
  * @module domains/conversion
  */
 
-import type { InvoiceConversion, ConversionStatusType } from './types';
+import type { InvoiceConversion } from './types';
 
 /** Data required to create a new conversion record. */
 export interface CreateConversionInput {
