@@ -5,6 +5,7 @@ import type { AuditLog } from '@/types';
 import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { computeAuditHash, verifyChainIntegrity } from '@/lib/audit-hash';
 import type { AuditChainEntry, ChainVerificationResult } from '@/lib/audit-hash';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
 
 export type CreateAuditLogData = {
   userId?: string;
@@ -99,7 +100,43 @@ export class AuditDatabaseService {
       throw new AppError('DB_ERROR', 'Failed to fetch audit logs', 500);
     }
 
-    return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as AuditLog);
+    const logs = (data ?? []).map(
+      (item: Record<string, unknown>) => snakeToCamelKeys(item) as AuditLog
+    );
+
+    // S3.9: Auto-verify hash chain when flag is enabled
+    const autoVerify = await isFeatureEnabled(supabase, FEATURE_FLAGS.USE_AUDIT_HASH_VERIFY).catch(
+      () => false
+    );
+    if (autoVerify && logs.length > 0) {
+      try {
+        const chainEntries: AuditChainEntry[] = logs.map((e: AuditLog) => ({
+          id: e.id,
+          action: e.action,
+          resourceType: (e as Record<string, unknown>).resourceType as string | null,
+          resourceId: (e as Record<string, unknown>).resourceId as string | null,
+          userId: (e as Record<string, unknown>).userId as string | null,
+          changes: (e as Record<string, unknown>).changes as Record<string, unknown> | null,
+          createdAt: (e as Record<string, unknown>).createdAt as string,
+          entryHash: (e as Record<string, unknown>).entryHash as string,
+          prevHash: (e as Record<string, unknown>).prevHash as string | null,
+        }));
+        const result = await verifyChainIntegrity(chainEntries);
+        if (!result.isValid) {
+          logger.error('AUDIT CHAIN INTEGRITY VIOLATION detected on read', {
+            userId,
+            firstBrokenId: result.firstBrokenId,
+            error: result.error,
+          });
+        }
+      } catch (verifyErr) {
+        logger.warn('Audit chain verification failed', {
+          error: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
+        });
+      }
+    }
+
+    return logs;
   }
 
   /**
