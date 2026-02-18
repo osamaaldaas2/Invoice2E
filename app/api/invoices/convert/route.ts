@@ -7,6 +7,9 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { invoiceMachine, InvoiceStateEnum } from '@/lib/state-machine';
+import { createActor } from 'xstate';
 import { validateForProfile } from '@/validation/validation-pipeline';
 import { getFormatMetadata } from '@/lib/format-registry';
 import { formatToProfileId, resolveOutputFormat, toLegacyFormat } from '@/lib/format-utils';
@@ -320,6 +323,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         userId,
       });
 
+      // S3.2: Determine conversion status via state machine when flag is enabled
+      let conversionStatus = 'completed';
+      const useStateMachine = await isFeatureEnabled(
+        userClient,
+        FEATURE_FLAGS.USE_STATE_MACHINE
+      ).catch(() => false);
+      if (useStateMachine) {
+        const actor = createActor(invoiceMachine, {
+          snapshot: invoiceMachine.resolveState({
+            value: InvoiceStateEnum.CONVERTING,
+            context: {
+              invoiceId: extractionId,
+              userId,
+              retryCount: 0,
+              format: resolvedFormat,
+              errorMessage: null,
+            },
+          }),
+        });
+        actor.start();
+        actor.send({ type: 'CONVERT_SUCCESS' });
+        const nextState = actor.getSnapshot().value as string;
+        actor.stop();
+        conversionStatus =
+          nextState === InvoiceStateEnum.CONVERTED ? 'completed' : nextState.toLowerCase();
+        logger.info('State machine transition: CONVERTING → CONVERT_SUCCESS', {
+          nextState,
+          extractionId,
+        });
+      }
+
       // Update validation status, cache XML, and mark conversion as completed (PERF-2, RLS enforced)
       await invoiceDbService.updateConversion(
         actualConversionId,
@@ -329,7 +363,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             result.validationErrors.length > 0
               ? ({ errors: result.validationErrors } as Record<string, unknown>)
               : undefined,
-          conversionStatus: 'completed',
+          conversionStatus,
           xmlContent: result.xmlContent,
           xmlFileName: result.fileName,
         },
@@ -337,7 +371,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
 
       // Mark extraction as completed (RLS enforced)
-      await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
+      await invoiceDbService.updateExtraction(
+        extractionId,
+        { status: conversionStatus },
+        userClient
+      );
     } catch (txError) {
       logger.error('Failed to update conversion status', {
         userId,

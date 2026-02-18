@@ -18,7 +18,9 @@ import { createUserScopedClient } from '@/lib/supabase.server';
 // TODO: Refactor POST handler into named function and wrap with withIdempotency().
 import { withIdempotency as _withIdempotency } from '@/lib/idempotency';
 import { resilientExtract } from '@/lib/ai-resilience';
-import { isFeatureEnabled } from '@/lib/feature-flags';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { invoiceMachine, InvoiceStateEnum } from '@/lib/state-machine';
+import { createActor } from 'xstate';
 
 const BACKGROUND_THRESHOLD = 3;
 
@@ -413,13 +415,44 @@ export async function POST(request: NextRequest) {
     // S2: Update the pending extraction record created by the atomic RPC
     // (instead of creating a new one — the record already exists with status 'pending')
     if (pendingExtractionId) {
+      // S3.2: Determine status via state machine when flag is enabled
+      let extractionStatus = 'completed';
+      const useStateMachine = await isFeatureEnabled(
+        userClient,
+        FEATURE_FLAGS.USE_STATE_MACHINE
+      ).catch(() => false);
+      if (useStateMachine) {
+        const actor = createActor(invoiceMachine, {
+          snapshot: invoiceMachine.resolveState({
+            value: InvoiceStateEnum.EXTRACTING,
+            context: {
+              invoiceId: pendingExtractionId,
+              userId,
+              retryCount: 0,
+              format: '',
+              errorMessage: null,
+            },
+          }),
+        });
+        actor.start();
+        actor.send({ type: 'EXTRACT_SUCCESS' });
+        const nextState = actor.getSnapshot().value as string;
+        actor.stop();
+        extractionStatus =
+          nextState === InvoiceStateEnum.EXTRACTED ? 'completed' : nextState.toLowerCase();
+        logger.info('State machine transition: EXTRACTING → EXTRACT_SUCCESS', {
+          nextState,
+          extractionId: pendingExtractionId,
+        });
+      }
+
       await invoiceDbService.updateExtraction(
         pendingExtractionId,
         {
           extractionData: extractedData as unknown as Record<string, unknown>,
           confidenceScore: extractedData.confidence,
           geminiResponseTimeMs: responseTime,
-          status: 'completed',
+          status: extractionStatus,
         },
         userClient
       );
