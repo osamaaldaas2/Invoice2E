@@ -146,7 +146,7 @@ export function compose(...policies: ResiliencePolicy[]): ResiliencePolicy {
     // Apply from right to left so the leftmost policy is the outermost wrapper
     for (let i = policies.length - 1; i >= 0; i--) {
       const current = wrapped;
-      const policy = policies[i];
+      const policy = policies[i]!;
       wrapped = () => policy(current);
     }
 
