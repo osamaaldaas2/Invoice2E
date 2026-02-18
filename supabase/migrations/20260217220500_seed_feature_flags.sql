@@ -1,4 +1,14 @@
 -- FIX: Audit #054 — seed feature flags (all disabled by default)
+
+-- Ensure unique constraint on name exists (table PK is id, not name)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'feature_flags_name_key'
+  ) THEN
+    ALTER TABLE feature_flags ADD CONSTRAINT feature_flags_name_key UNIQUE (name);
+  END IF;
+END $$;
+
 INSERT INTO feature_flags (name, enabled, description) VALUES
   ('USE_STATE_MACHINE', false, 'Enforce XState state machine transitions'),
   ('USE_CIRCUIT_BREAKER', false, 'Enable circuit breaker on AI provider calls'),
