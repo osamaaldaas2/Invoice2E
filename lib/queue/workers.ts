@@ -8,9 +8,12 @@
  */
 
 import { Worker, type Processor, type WorkerOptions } from 'bullmq';
-import { getWorkerConnection } from './connection';
+import { getWorkerConnection, closeAllConnections } from './connection';
 import { QUEUE_NAMES, type QueueName } from './types';
 import { logger } from '@/lib/logger';
+
+/** FIX: Re-audit #8 — graceful shutdown timeout for in-flight jobs. */
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /** Default concurrency per queue. */
 const CONCURRENCY: Record<QueueName, number> = {
@@ -22,6 +25,74 @@ const CONCURRENCY: Record<QueueName, number> = {
 
 /** Active workers tracked for graceful shutdown. */
 const activeWorkers: Worker[] = [];
+
+// ── Graceful Shutdown (FIX: Re-audit #8) ──────────────────────────────
+
+/** Whether the signal handlers have been registered. */
+let _shutdownRegistered = false;
+
+/**
+ * FIX: Re-audit #8 — register SIGTERM/SIGINT handlers that gracefully
+ * shut down all BullMQ workers before closing Redis connections.
+ *
+ * Idempotent: calling multiple times only registers once.
+ * Called automatically on first `createWorker()` invocation so the
+ * handler is active whenever workers exist.
+ *
+ * Shutdown sequence:
+ * 1. Wait for in-flight jobs to complete (up to SHUTDOWN_TIMEOUT_MS)
+ * 2. Close Redis connections
+ * 3. Exit process
+ */
+export function registerGracefulShutdown(): void {
+  if (_shutdownRegistered) return;
+  if (typeof process === 'undefined' || typeof process.on !== 'function') return;
+  _shutdownRegistered = true;
+
+  const shutdown = async (signal: string) => {
+    logger.info({
+      msg: `Received ${signal} — shutting down workers gracefully`,
+      workerCount: activeWorkers.length,
+      audit: 'Re-audit #8',
+    });
+
+    try {
+      // Give workers time to complete in-flight jobs
+      await Promise.race([
+        shutdownAllWorkers(),
+        new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+      ]);
+      logger.info('Workers shut down successfully');
+    } catch (error) {
+      logger.error('Error during worker shutdown', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      await closeAllConnections();
+    } catch (connErr) {
+      logger.error('Error closing Redis connections during shutdown', {
+        error: connErr instanceof Error ? connErr.message : String(connErr),
+      });
+    }
+
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+}
+
+/** Exposed for testing — returns whether shutdown handlers have been registered. */
+export function _isShutdownRegistered(): boolean {
+  return _shutdownRegistered;
+}
+
+/** Exposed for testing — reset the registration flag. */
+export function _resetShutdownRegistered(): void {
+  _shutdownRegistered = false;
+}
 
 /**
  * Create and register a BullMQ Worker for a specific queue.
@@ -36,6 +107,8 @@ export function createWorker<TData = unknown, TResult = unknown>(
   processor: Processor<TData, TResult>,
   opts?: Partial<WorkerOptions>
 ): Worker<TData, TResult> {
+  // FIX: Re-audit #8 — register shutdown handler on first worker creation
+  registerGracefulShutdown();
   const worker = new Worker<TData, TResult>(queueName, processor, {
     connection: getWorkerConnection() as any,
     concurrency: CONCURRENCY[queueName] ?? 3,
