@@ -153,10 +153,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // FIX: Audit #063 — file quarantine placeholder.
-    // Full quarantine lifecycle (store → scan → promote/reject) requires Supabase storage integration.
-    // Currently: magic byte validation above provides the core security check.
-    // Enable USE_FILE_QUARANTINE flag when full quarantine storage is wired up.
+    // S3.4: File quarantine — full scan when flag is enabled
+    const useQuarantine = await isFeatureEnabled(
+      userClient,
+      FEATURE_FLAGS.USE_FILE_QUARANTINE
+    ).catch(() => false);
+    if (useQuarantine) {
+      const { QuarantineService } = await import('@/lib/file-quarantine');
+      const quarantineEntries = new Map<string, unknown>();
+      const quarantineSvc = new QuarantineService({
+        storeQuarantine: async (id, buf) => {
+          quarantineEntries.set(id, buf);
+        },
+        insertEntry: async () => {},
+        updateEntry: async () => {},
+        getEntry: async (id) => quarantineEntries.get(id) as any,
+        getFile: async (id) => quarantineEntries.get(id) as Buffer,
+        promoteFile: async () => {},
+        deleteFile: async () => {},
+      });
+      const entry = await quarantineSvc.quarantine(buffer, {
+        originalName: file.name,
+        mimeType: file.type,
+        uploadedBy: userId,
+      });
+      const scanResult = await quarantineSvc.scan(entry.id);
+      if (!scanResult.passed) {
+        logger.warn('File quarantine scan failed', {
+          userId,
+          fileName: file.name,
+          failures: scanResult.checks.filter((c: any) => !c.passed),
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: `File rejected by quarantine scan: ${scanResult.checks
+              .filter((c: any) => !c.passed)
+              .map((c: any) => c.reason)
+              .join(', ')}`,
+          },
+          { status: 422 }
+        );
+      }
+    }
+    // Legacy path: magic byte validation above provides the core security check when flag is off.
 
     // Get AI extractor from factory
     const extractor = ExtractorFactory.create();
@@ -260,7 +300,14 @@ export async function POST(request: NextRequest) {
             const pendingId = batchExtractionIds[i];
 
             try {
-              const extractedData = await extractor.extractFromFile(buf, segmentName, file.type);
+              // S3.3: Use circuit breaker for multi-invoice segments when enabled
+              const useCircuitBreakerMulti = await isFeatureEnabled(
+                userClient,
+                FEATURE_FLAGS.USE_CIRCUIT_BREAKER
+              ).catch(() => false);
+              const extractedData = useCircuitBreakerMulti
+                ? await resilientExtract(buf, segmentName, file.type)
+                : await extractor.extractFromFile(buf, segmentName, file.type);
 
               // S2: Update the pending extraction record (created atomically with credit deduction)
               if (pendingId) {
