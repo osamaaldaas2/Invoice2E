@@ -4,6 +4,13 @@
  * Creates separate IORedis connections for queues and workers (BullMQ best practice).
  * Uses REDIS_URL env var for TCP-based Redis (separate from Upstash REST).
  *
+ * FIX: Re-audit #10 — connections are lazy-initialized (singleton pattern).
+ * No Redis connection is created until getQueueConnection() or
+ * getWorkerConnection() is explicitly called. In a Vercel serverless
+ * deployment where BullMQ workers are not active, these connections are
+ * never established, avoiding unnecessary Redis resource usage.
+ *
+ * @see lib/queue/workers.ts — worker registration and activation docs
  * @module lib/queue/connection
  */
 

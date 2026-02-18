@@ -2,8 +2,33 @@
  * BullMQ Worker Registration Factory
  *
  * Creates workers with per-queue concurrency, stalled job detection,
- * and graceful shutdown handling.
+ * graceful shutdown handling, and dead letter routing.
  *
+ * STATUS: Scaffolded but intentionally inactive in Vercel deployment.
+ *
+ * ARCHITECTURE DECISION (Re-audit #10, 2026-02):
+ * Vercel serverless functions cannot run long-lived BullMQ workers.
+ * Batch processing currently uses HTTP self-invocation via
+ * /api/internal/batch-worker as a serverless-compatible alternative.
+ *
+ * The BullMQ queue infrastructure (queues, workers, dead letter handling,
+ * graceful shutdown) is maintained for:
+ * 1. Future migration to a dedicated worker process (Docker/VM)
+ * 2. Local development with a real Redis instance
+ * 3. Self-hosted deployments that support long-lived processes
+ *
+ * TO ACTIVATE:
+ * 1. Deploy a long-lived worker process (not serverless)
+ * 2. Call createWorker() for each queue in the worker process entry point
+ * 3. Configure BULLMQ_REDIS_URL to point to a Redis instance with noeviction policy
+ * 4. Graceful shutdown handlers auto-register on first createWorker() call
+ * 5. Dead letter handler auto-wires to worker failed events
+ * 6. Monitor dead letter entries via structured logging
+ *
+ * Related: Re-audit findings #8, #9, #10
+ *
+ * @see services/batch/batch.processor.ts — current HTTP-based processing
+ * @see app/api/internal/batch-worker/route.ts — serverless batch trigger
  * @module lib/queue/workers
  */
 
