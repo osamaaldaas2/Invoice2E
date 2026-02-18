@@ -12,6 +12,8 @@ import { getSessionFromCookie, fetchSessionProfile, UserRole } from '@/lib/sessi
 import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { assertCan, type Action, type Subject } from '@/lib/rbac';
 
 // Re-export UserRole for convenience
 export type { UserRole };
@@ -239,4 +241,38 @@ export function getClientIp(request: NextRequest): string {
  */
 export function getUserAgent(request: NextRequest): string {
   return request.headers.get('user-agent') || 'unknown';
+}
+
+/**
+ * S3.5: Granular RBAC permission check behind USE_GRANULAR_RBAC flag.
+ * When flag is ON: uses CASL abilities for fine-grained permission checks.
+ * When flag is OFF: falls back to requireAdmin (role-based check).
+ *
+ * @param request - The incoming request
+ * @param action - CASL action (e.g., 'manage', 'read', 'create', 'update', 'delete')
+ * @param subject - CASL subject (e.g., 'Invoice', 'Package', 'User', 'Credits')
+ * @returns AuthorizedUser if permitted
+ */
+export async function requirePermission(
+  request: NextRequest,
+  action: Action,
+  subject: Subject
+): Promise<AuthorizedUser> {
+  // Always authenticate first via the existing admin flow
+  const admin = await requireAdmin(request);
+
+  // Check if granular RBAC is enabled
+  const supabase = createAdminClient();
+  const useRbac = await isFeatureEnabled(supabase, FEATURE_FLAGS.USE_GRANULAR_RBAC).catch(
+    () => false
+  );
+
+  if (useRbac) {
+    // Use CASL-based permission check
+    assertCan({ id: admin.id, role: admin.role as any }, action, subject);
+    logger.debug('RBAC permission granted', { userId: admin.id, action, subject });
+  }
+  // When flag is OFF, requireAdmin already verified admin/super_admin role
+
+  return admin;
 }
