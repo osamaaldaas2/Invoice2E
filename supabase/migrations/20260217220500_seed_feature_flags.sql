@@ -9,12 +9,12 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-INSERT INTO feature_flags (name, enabled, description) VALUES
-  ('USE_STATE_MACHINE', false, 'Enforce XState state machine transitions'),
-  ('USE_CIRCUIT_BREAKER', false, 'Enable circuit breaker on AI provider calls'),
-  ('USE_FILE_QUARANTINE', false, 'Enable file quarantine before processing'),
-  ('USE_GRANULAR_RBAC', false, 'Use CASL permission checks instead of role checks'),
-  ('USE_FIELD_ENCRYPTION', false, 'Enable envelope encryption on sensitive fields'),
-  ('USE_OUTBOX', false, 'Enable transactional outbox for domain events'),
-  ('USE_DI_CONTAINER', false, 'Use Awilix DI container for service resolution')
+INSERT INTO feature_flags (id, name, enabled, description) VALUES
+  ('use_state_machine',    'USE_STATE_MACHINE',    false, 'Enforce XState state machine transitions'),
+  ('use_circuit_breaker',  'USE_CIRCUIT_BREAKER',  false, 'Enable circuit breaker on AI provider calls'),
+  ('use_file_quarantine',  'USE_FILE_QUARANTINE',  false, 'Enable file quarantine before processing'),
+  ('use_granular_rbac',    'USE_GRANULAR_RBAC',    false, 'Use CASL permission checks instead of role checks'),
+  ('use_field_encryption', 'USE_FIELD_ENCRYPTION', false, 'Enable envelope encryption on sensitive fields'),
+  ('use_outbox',           'USE_OUTBOX',           false, 'Enable transactional outbox for domain events'),
+  ('use_di_container',     'USE_DI_CONTAINER',     false, 'Use Awilix DI container for service resolution')
 ON CONFLICT (name) DO NOTHING;
