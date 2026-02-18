@@ -1,9 +1,43 @@
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
-import { IAIExtractor } from './IAIExtractor';
+import { IAIExtractor, ExtractedInvoiceData } from './IAIExtractor';
 import { GeminiExtractor } from './gemini.extractor';
 import { OpenAIExtractor } from './openai.extractor';
 import { MistralExtractor } from './mistral.extractor';
+import { validateExtractionOutput } from '@/lib/extraction-validation';
+
+/**
+ * FIX: Audit #016 — wraps any extractor with strict output validation.
+ * Rejects hallucinated/malformed AI output before it reaches storage.
+ */
+class ValidatedExtractor implements IAIExtractor {
+  constructor(private inner: IAIExtractor) {}
+
+  getProviderName(): string {
+    return this.inner.getProviderName();
+  }
+
+  validateConfiguration(): boolean {
+    return this.inner.validateConfiguration();
+  }
+
+  async extractFromFile(
+    fileBuffer: Buffer,
+    fileName: string,
+    fileType: string
+  ): Promise<ExtractedInvoiceData> {
+    const raw = await this.inner.extractFromFile(fileBuffer, fileName, fileType);
+    const result = validateExtractionOutput(raw, this.inner.getProviderName());
+    if (!result.valid) {
+      throw new AppError(
+        'EXTRACTION_VALIDATION_FAILED',
+        `AI extraction output failed validation: ${result.errors?.slice(0, 3).join('; ')}`,
+        422
+      );
+    }
+    return raw; // Return original (validated) data — preserves extra fields
+  }
+}
 
 export type AIProvider = 'gemini' | 'openai' | 'mistral' | 'aws';
 
@@ -53,6 +87,9 @@ export class ExtractorFactory {
         500
       );
     }
+
+    // FIX: Audit #016 — wrap with output validation
+    extractor = new ValidatedExtractor(extractor);
 
     // Cache instance
     this.instances.set(selectedProvider, extractor);
