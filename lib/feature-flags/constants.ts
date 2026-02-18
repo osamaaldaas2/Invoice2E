@@ -19,6 +19,18 @@ export const FEATURE_FLAGS = {
   NEW_EXTRACTION_MODEL: 'new_extraction_model',
   /** Enhanced validation rule set */
   ENHANCED_VALIDATION: 'enhanced_validation',
+
+  // S3 wire-in flags (all default OFF in DB)
+  USE_STATE_MACHINE: 'use_state_machine',
+  USE_CIRCUIT_BREAKER: 'use_circuit_breaker',
+  USE_FILE_QUARANTINE: 'use_file_quarantine',
+  USE_GRANULAR_RBAC: 'use_granular_rbac',
+  USE_FIELD_ENCRYPTION: 'use_field_encryption',
+  USE_OUTBOX: 'use_outbox',
+  USE_DI_CONTAINER: 'use_di_container',
+  USE_AUDIT_HASH_VERIFY: 'use_audit_hash_verify',
+  USE_DATA_RETENTION: 'use_data_retention',
+  USE_GDPR_ENDPOINTS: 'use_gdpr_endpoints',
 } as const;
 
 /** Union type of all known flag IDs */
