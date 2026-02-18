@@ -94,28 +94,6 @@ export const createUserScopedClient = async (userId: string): Promise<SupabaseCl
   return client;
 };
 
-/**
- * DEPRECATED: Use createUserScopedClient(userId) instead.
- * This function is kept temporarily for backward compatibility but will be removed.
- *
- * @deprecated - Use createUserScopedClient(userId) for proper RLS isolation
- */
-export const createUserClient = (): SupabaseClient => {
-  console.warn(
-    'DEPRECATED: createUserClient() is unsafe. Use createUserScopedClient(userId) instead.'
-  );
-
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!anonKey) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-
-  // NO FALLBACK TO SERVICE ROLE - Fail explicitly instead
-  return createClient(getSupabaseUrl(), anonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-};
+// FIX: Re-audit #10 — deleted deprecated createUserClient() export.
+// It created a client WITHOUT user scoping, bypassing RLS tenant isolation.
+// Use createUserScopedClient(userId) for all user-facing data access.

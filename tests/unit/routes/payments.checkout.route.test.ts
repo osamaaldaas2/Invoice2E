@@ -15,7 +15,7 @@ const paypalAdapterMock = vi.hoisted(() => ({
   createOrder: vi.fn(),
 }));
 const createAdminClientMock = vi.hoisted(() => vi.fn());
-const createUserClientMock = vi.hoisted(() => vi.fn());
+// FIX: Re-audit #10 — removed createUserClientMock (deprecated export deleted)
 const createUserScopedClientMock = vi.hoisted(() => vi.fn());
 const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
@@ -42,7 +42,6 @@ vi.mock('@/adapters/paypal.adapter', () => ({
 
 vi.mock('@/lib/supabase.server', () => ({
   createAdminClient: () => createAdminClientMock(),
-  createUserClient: () => createUserClientMock(),
   createUserScopedClient: (...args: any[]) => createUserScopedClientMock(...args),
 }));
 
