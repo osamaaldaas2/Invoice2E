@@ -26,7 +26,7 @@ function getSupabaseAdmin() {
   return createClient(url, serviceKey);
 }
 
-function jsonResponse(data: unknown, status = 200): NextResponse {
+function jsonResponse(data: Record<string, unknown>, status = 200): NextResponse {
   return NextResponse.json(
     { success: status < 400, ...data, timestamp: new Date().toISOString() },
     { status }
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const supabase = getSupabaseAdmin();
-    const service = new ApiKeyService(supabase);
+    const service = new ApiKeyService(supabase as any);
 
     // FIX: Audit #059 — limit API keys per user
     const MAX_API_KEYS_PER_USER = 10;
@@ -108,7 +108,7 @@ export async function GET(): Promise<NextResponse> {
     }
 
     const supabase = getSupabaseAdmin();
-    const service = new ApiKeyService(supabase);
+    const service = new ApiKeyService(supabase as any);
     const keys = await service.listKeys(session.userId);
 
     return jsonResponse({ data: keys });
@@ -136,7 +136,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     }
 
     const supabase = getSupabaseAdmin();
-    const service = new ApiKeyService(supabase);
+    const service = new ApiKeyService(supabase as any);
     await service.revokeKey(keyId, session.userId);
 
     return jsonResponse({ message: 'API key revoked' });
@@ -173,7 +173,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
 
     const supabase = getSupabaseAdmin();
-    const service = new ApiKeyService(supabase);
+    const service = new ApiKeyService(supabase as any);
     const result = await service.rotateKey(keyId, session.userId);
 
     return jsonResponse({ data: result });
@@ -187,3 +187,4 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return jsonResponse({ error: 'Internal server error' }, 500);
   }
 }
+
