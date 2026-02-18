@@ -431,36 +431,29 @@ export class BatchProcessor {
       const failCount = results.filter((r) => r.status === 'failed').length;
 
       // Deduct extra credits for multi-invoice expansion (1 record for entire batch)
+      // FIX: Re-audit #8 — atomic + idempotent expansion deduction (no racy select-then-deduct)
       const extraInvoices = results.length - totalFiles;
       if (extraInvoices > 0) {
+        const expansionIdempotencyKey = `batch-expansion:${jobId}:${extraInvoices}`;
         const extraDeducted = await creditsDbService.deductCredits(
           userId,
           extraInvoices,
-          `batch:expansion:${jobId}`
+          `batch:expansion:${jobId}`,
+          expansionIdempotencyKey
         );
         if (!extraDeducted) {
-          // Deduct whatever credits remain
-          const { data: credits } = await supabase
-            .from('user_credits')
-            .select('available_credits')
-            .eq('user_id', userId)
-            .single();
-          const available = credits?.available_credits || 0;
-          if (available > 0) {
-            await creditsDbService.deductCredits(userId, available, `batch:expansion:${jobId}`);
-          }
-          logger.warn('Insufficient credits for all multi-invoice extras', {
+          logger.warn('Insufficient credits for multi-invoice expansion', {
             jobId,
             userId,
             extraInvoices,
-            availableCredits: available,
+          });
+        } else {
+          logger.info('Deducted extra credits for multi-invoice expansion', {
+            jobId,
+            userId,
+            extraInvoices,
           });
         }
-        logger.info('Deducted extra credits for multi-invoice expansion', {
-          jobId,
-          userId,
-          extraInvoices,
-        });
       }
 
       // FIX: Re-audit #41 — use idempotent refund to prevent double-crediting on retry
