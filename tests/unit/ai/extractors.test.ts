@@ -32,14 +32,13 @@ describe('AI Extractors', () => {
     it('should create Gemini extractor by default if no provider specified', () => {
       delete process.env.AI_PROVIDER;
       const extractor = ExtractorFactory.create();
-      expect(extractor).toBeInstanceOf(GeminiExtractor);
+      // Factory wraps in ValidatedExtractor; verify via provider name
       expect(extractor.getProviderName()).toBe('Gemini');
     });
 
     it('should create Gemini extractor when specified via env', () => {
       process.env.AI_PROVIDER = 'gemini';
       const extractor = ExtractorFactory.create();
-      expect(extractor).toBeInstanceOf(GeminiExtractor);
       expect(extractor.getProviderName()).toBe('Gemini');
     });
 
@@ -58,7 +57,7 @@ describe('AI Extractors', () => {
     it('should create OpenAI extractor when specified via env', () => {
       process.env.AI_PROVIDER = 'openai';
       const extractor = ExtractorFactory.create();
-      expect(extractor).toBeInstanceOf(OpenAIExtractor);
+      // Factory wraps in ValidatedExtractor; verify via provider name
       expect(extractor.getProviderName()).toBe('OpenAI');
     });
 
@@ -66,7 +65,7 @@ describe('AI Extractors', () => {
       process.env.AI_PROVIDER = 'openai';
       // Even if env is openai, requesting gemini should work
       const extractor = ExtractorFactory.create('gemini');
-      expect(extractor).toBeInstanceOf(GeminiExtractor);
+      expect(extractor.getProviderName()).toBe('Gemini');
     });
   });
 
