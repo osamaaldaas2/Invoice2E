@@ -15,9 +15,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase.server';
+import { createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
-import type { IdempotencyKeyRow, IdempotencyCheckResult, IdempotencyOptions } from '@/types/idempotency';
+import type {
+  IdempotencyKeyRow,
+  IdempotencyCheckResult,
+  IdempotencyOptions,
+} from '@/types/idempotency';
 import { getAuthenticatedUser } from '@/lib/auth';
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -31,7 +35,7 @@ const IDEMPOTENCY_HEADER = 'idempotency-key';
  * @returns Cached response data if found and not expired, otherwise `{ hit: false }`.
  */
 async function checkIdempotencyKey(key: string, userId: string): Promise<IdempotencyCheckResult> {
-  const supabase = createServerClient();
+  const supabase = await createUserScopedClient(userId);
 
   const { data, error } = await supabase
     .from('idempotency_keys')
@@ -70,9 +74,9 @@ async function storeIdempotencyKey(
   requestPath: string,
   status: number,
   body: string,
-  ttlMs: number,
+  ttlMs: number
 ): Promise<void> {
-  const supabase = createServerClient();
+  const supabase = await createUserScopedClient(userId);
   const expiresAt = new Date(Date.now() + ttlMs).toISOString();
 
   const { error } = await supabase.from('idempotency_keys').upsert(
@@ -84,7 +88,7 @@ async function storeIdempotencyKey(
       response_body: body,
       expires_at: expiresAt,
     },
-    { onConflict: 'idempotency_key,user_id' },
+    { onConflict: 'idempotency_key,user_id' }
   );
 
   if (error) {
@@ -97,12 +101,8 @@ async function storeIdempotencyKey(
  * Remove an expired idempotency record.
  */
 async function cleanupExpiredKey(key: string, userId: string): Promise<void> {
-  const supabase = createServerClient();
-  await supabase
-    .from('idempotency_keys')
-    .delete()
-    .eq('idempotency_key', key)
-    .eq('user_id', userId);
+  const supabase = await createUserScopedClient(userId);
+  await supabase.from('idempotency_keys').delete().eq('idempotency_key', key).eq('user_id', userId);
 }
 
 /**
@@ -124,7 +124,7 @@ async function cleanupExpiredKey(key: string, userId: string): Promise<void> {
  */
 export function withIdempotency(
   handler: (request: NextRequest) => Promise<NextResponse>,
-  options: IdempotencyOptions = {},
+  options: IdempotencyOptions = {}
 ): (request: NextRequest) => Promise<NextResponse> {
   const { ttlMs = DEFAULT_TTL_MS, required = false } = options;
 
@@ -136,7 +136,7 @@ export function withIdempotency(
       if (required) {
         return NextResponse.json(
           { success: false, error: 'Idempotency-Key header is required for this endpoint' },
-          { status: 400 },
+          { status: 400 }
         );
       }
       // No key — execute without idempotency protection
@@ -147,7 +147,7 @@ export function withIdempotency(
     if (idempotencyKey.length > 255 || !/^[\x20-\x7E]+$/.test(idempotencyKey)) {
       return NextResponse.json(
         { success: false, error: 'Invalid Idempotency-Key format' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -156,7 +156,7 @@ export function withIdempotency(
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -187,7 +187,7 @@ export function withIdempotency(
       requestPath,
       response.status,
       responseBody,
-      ttlMs,
+      ttlMs
     );
 
     return response;
