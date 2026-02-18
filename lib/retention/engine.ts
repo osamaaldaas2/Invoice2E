@@ -22,7 +22,7 @@ import type {
   RetainableEntityType,
   RetentionLogRow,
 } from './types';
-import { getPolicyForJurisdiction, RETENTION_POLICIES } from './policies';
+import { RETENTION_POLICIES } from './policies';
 
 // ─── Database adapter interface (dependency injection) ────────────────────────
 
@@ -332,7 +332,7 @@ export class RetentionEngine {
 
     let totalRetained = 0;
     let totalProcessed = 0;
-    const results: RetentionReport['results'] = [];
+    const results: Array<RetentionReport['results'][number]> = [];
 
     for (const policy of RETENTION_POLICIES) {
       const retained = await this.db.countRetainedEntities(policy.entityType);
