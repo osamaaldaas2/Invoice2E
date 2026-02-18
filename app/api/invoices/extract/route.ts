@@ -12,11 +12,10 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
-// FIX: Audit #068 — HTTP-level idempotency available via withIdempotency() wrapper.
+// FIX: Re-audit #11 — apply HTTP-level idempotency middleware to extract endpoint.
 // DB-level idempotency is enforced by file-hash dedup + refund_credits_idempotent RPC.
 // HTTP-level middleware adds defense-in-depth for clients sending Idempotency-Key headers.
-// TODO: Refactor POST handler into named function and wrap with withIdempotency().
-import { withIdempotency as _withIdempotency } from '@/lib/idempotency';
+import { withIdempotency } from '@/lib/idempotency';
 import { resilientExtract } from '@/lib/ai-resilience';
 import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { invoiceMachine, InvoiceStateEnum } from '@/lib/state-machine';
@@ -54,7 +53,8 @@ const triggerBatchWorker = async (req: NextRequest): Promise<void> => {
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
 export const maxDuration = 300; // 5 min — covers inline (≤3) and large batch processing
 
-export async function POST(request: NextRequest) {
+// FIX: Re-audit #11 — wrap POST handler with idempotency middleware
+async function handleExtractPost(request: NextRequest) {
   try {
     // SECURITY FIX (BUG-001): Authenticate user from session, not request body
     const user = await getAuthenticatedUser(request);
@@ -557,6 +557,9 @@ export async function POST(request: NextRequest) {
     });
   }
 }
+
+// FIX: Re-audit #11 — export wrapped POST handler with idempotency protection
+export const POST = withIdempotency(handleExtractPost);
 
 /**
  * GET /api/invoices/extract?jobId=X
