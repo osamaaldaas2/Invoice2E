@@ -8,7 +8,7 @@
 
 import { createActor } from 'xstate';
 import { invoiceMachine } from './invoice-machine';
-import { type InvoiceContext, type InvoiceEvent, type InvoiceState, InvoiceStateEnum } from './types';
+import { type InvoiceContext, type InvoiceEvent, type InvoiceState } from './types';
 
 // ── Re-exports ─────────────────────────────────────────────────────────
 
