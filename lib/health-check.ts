@@ -56,7 +56,7 @@ export async function checkDatabase(): Promise<ComponentHealth> {
   try {
     const supabase = createAdminClient();
     const { error } = await withTimeout(
-      supabase.from('users').select('id', { count: 'exact', head: true }).limit(1).then((r: any) => r)
+      Promise.resolve(supabase.from('users').select('id', { count: 'exact', head: true }).limit(1))
     ) as any;
     const latencyMs = Date.now() - start;
     if (error) {
