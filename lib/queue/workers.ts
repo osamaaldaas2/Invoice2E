@@ -76,8 +76,7 @@ export function registerGracefulShutdown(): void {
   _shutdownRegistered = true;
 
   const shutdown = async (signal: string) => {
-    logger.info({
-      msg: `Received ${signal} — shutting down workers gracefully`,
+    logger.info(`Received ${signal} — shutting down workers gracefully`, {
       workerCount: activeWorkers.length,
       audit: 'Re-audit #8',
     });
