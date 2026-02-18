@@ -10,6 +10,7 @@
 import { Worker, type Processor, type WorkerOptions } from 'bullmq';
 import { getWorkerConnection, closeAllConnections } from './connection';
 import { QUEUE_NAMES, type QueueName } from './types';
+import { handleDeadLetter } from './dead-letter';
 import { logger } from '@/lib/logger';
 
 /** FIX: Re-audit #8 — graceful shutdown timeout for in-flight jobs. */
@@ -129,6 +130,11 @@ export function createWorker<TData = unknown, TResult = unknown>(
       error: err.message,
       attemptsMade: job?.attemptsMade,
     });
+
+    // FIX: Re-audit #9 — route permanently failed jobs to dead letter handler
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      handleDeadLetter(job, queueName, err);
+    }
   });
 
   worker.on('stalled', (jobId) => {
