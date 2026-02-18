@@ -97,24 +97,38 @@ export async function POST(req: NextRequest) {
 
     // Validate file size
     if (file.size > FILE_LIMITS.MAX_ZIP_SIZE_BYTES) {
-      return NextResponse.json({ error: `File size exceeds ${FILE_LIMITS.MAX_ZIP_SIZE_MB}MB limit` }, { status: 400 });
+      return NextResponse.json(
+        { error: `File size exceeds ${FILE_LIMITS.MAX_ZIP_SIZE_MB}MB limit` },
+        { status: 400 }
+      );
     }
 
     // Convert file to buffer
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // FIX: Audit #032 — validate ZIP magic bytes
-    const { detectFileType } = await import('@/lib/magic-bytes');
-    const detected = detectFileType(buffer);
-    if (!detected || detected.extension !== 'pdf') {
-      // ZIP files start with PK (0x50, 0x4B) — detectFileType may not detect ZIP
-      // Check manually for ZIP header
-      if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
-        return NextResponse.json(
-          { success: false, error: 'File is not a valid ZIP archive' },
-          { status: 422 }
-        );
-      }
+    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+      return NextResponse.json(
+        { success: false, error: 'File is not a valid ZIP archive' },
+        { status: 422 }
+      );
+    }
+
+    // FIX: Audit #032 — ZIP bomb protection
+    const { validateZipSafety } = await import('@/lib/zip-safety');
+    const zipCheck = validateZipSafety(buffer);
+    if (!zipCheck.safe) {
+      logger.warn('ZIP safety check failed', {
+        userId: user.id,
+        fileName: file.name,
+        reason: zipCheck.reason,
+        stats: zipCheck.stats,
+        audit: '#032',
+      });
+      return NextResponse.json(
+        { success: false, error: `ZIP rejected: ${zipCheck.reason}` },
+        { status: 422 }
+      );
     }
 
     // CREDIT CHECK FIX: Estimate file count BEFORE creating job to avoid orphan jobs
