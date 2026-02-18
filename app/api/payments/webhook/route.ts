@@ -11,7 +11,6 @@ import { stripeService } from '@/services/stripe.service';
 import { paypalService } from '@/services/paypal.service';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
-import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export const maxDuration = 60;
 
