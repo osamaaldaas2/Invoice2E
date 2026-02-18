@@ -176,7 +176,10 @@ export const logger = {
   error: (message: string, errorOrData?: Error | LogData | unknown): void => {
     let errorData: LogData | undefined;
     if (errorOrData instanceof Error) {
-      errorData = { message: errorOrData.message, stack: errorOrData.stack };
+      // FIX: Audit #039 — strip stack traces in production to avoid leaking internals
+      errorData = process.env.NODE_ENV === 'development'
+        ? { message: errorOrData.message, stack: errorOrData.stack }
+        : { message: errorOrData.message };
     } else if (
       errorOrData !== null &&
       typeof errorOrData === 'object' &&
