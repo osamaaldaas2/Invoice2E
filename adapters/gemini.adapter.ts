@@ -98,8 +98,6 @@ export class GeminiAdapter implements IGeminiAdapter {
       }
 
       clearTimeout(timeoutId);
-
-      // @ts-expect-error - Gemini SDK response type mismatch (FIX: Audit #066)
       const textContent = result.response.text();
       const extractedData = this.parseResponse(textContent);
 
@@ -120,7 +118,6 @@ export class GeminiAdapter implements IGeminiAdapter {
         data: finalResult,
         confidence: finalResult.confidence ?? 0.8,
         processingTimeMs: totalTime,
-        // @ts-expect-error - Gemini SDK response type mismatch (FIX: Audit #066)
         rawResponse: result.response,
       };
     } catch (error) {
@@ -185,7 +182,6 @@ export class GeminiAdapter implements IGeminiAdapter {
       } finally {
         clearTimeout(raceTimerId!);
       }
-      // @ts-expect-error - Gemini SDK response type mismatch (FIX: Audit #066)
       return result.response.text();
     } catch (error) {
       if (error instanceof Error && error.message.includes('timeout')) {
@@ -302,8 +298,6 @@ export class GeminiAdapter implements IGeminiAdapter {
       } finally {
         clearTimeout(raceTimerId!);
       }
-
-      // @ts-expect-error - Gemini SDK response type mismatch (FIX: Audit #066)
       const textContent = result.response.text();
       return parseJsonFromAiResponse(textContent) as Record<string, unknown>;
     } catch (error) {

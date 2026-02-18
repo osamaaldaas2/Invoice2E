@@ -58,7 +58,7 @@ export async function GET(
     const response: JobStatusResponse = {
       jobId: job.id ?? jobId,
       queueName,
-      status: state === 'wait' || state === 'waiting' ? 'waiting' : (state as JobStatusResponse['status']),
+      status: (state as string) === 'wait' || state === 'waiting' ? 'waiting' : (state as JobStatusResponse['status']),
       progress: typeof job.progress === 'number' ? job.progress : 0,
       result: state === 'completed' ? job.returnvalue : undefined,
       failedReason: state === 'failed' ? job.failedReason : undefined,
