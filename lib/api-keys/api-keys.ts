@@ -11,7 +11,6 @@
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import {
-  ApiKey,
   ApiKeyContext,
   ApiKeyCreatedResponse,
   ApiKeyResponse,
