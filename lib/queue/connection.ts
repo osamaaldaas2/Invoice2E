@@ -7,11 +7,11 @@
  * @module lib/queue/connection
  */
 
-import IORedis from 'ioredis';
+import IORedis, { type RedisOptions } from 'ioredis';
 import { logger } from '@/lib/logger';
 
 /** Redis connection options shared across queue and worker connections. */
-const BASE_OPTIONS: IORedis.RedisOptions = {
+const BASE_OPTIONS: RedisOptions = {
   maxRetriesPerRequest: null, // Required by BullMQ
   enableReadyCheck: false,
   retryStrategy(times: number): number | null {
