@@ -12,6 +12,9 @@ import { z } from 'zod';
 import { getQueue } from '@/lib/queue/queues';
 import { QUEUE_NAMES, type QueueName, type JobStatusResponse } from '@/lib/queue/types';
 import { logger } from '@/lib/logger';
+// FIX: Re-audit #1 — authenticate jobs endpoint
+import { getAuthenticatedUser } from '@/lib/auth';
+import { isAdmin } from '@/lib/authorization';
 
 const QuerySchema = z.object({
   queue: z.enum([
@@ -29,6 +32,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ): Promise<NextResponse> {
+  // FIX: Re-audit #1 — authenticate jobs endpoint
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { jobId } = await params;
 
   const queueParam = request.nextUrl.searchParams.get('queue');
@@ -47,10 +56,16 @@ export async function GET(
     const job = await queue.getJob(jobId);
 
     if (!job) {
-      return NextResponse.json(
-        { success: false, error: 'Job not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
+    }
+
+    // FIX: Re-audit #1 — ownership check: user can only access their own jobs
+    const jobUserId = job.data?.userId as string | undefined;
+    if (jobUserId && jobUserId !== user.id) {
+      const adminAccess = await isAdmin();
+      if (!adminAccess) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const state = await job.getState();
@@ -58,7 +73,10 @@ export async function GET(
     const response: JobStatusResponse = {
       jobId: job.id ?? jobId,
       queueName,
-      status: (state as string) === 'wait' || state === 'waiting' ? 'waiting' : (state as JobStatusResponse['status']),
+      status:
+        (state as string) === 'wait' || state === 'waiting'
+          ? 'waiting'
+          : (state as JobStatusResponse['status']),
       progress: typeof job.progress === 'number' ? job.progress : 0,
       result: state === 'completed' ? job.returnvalue : undefined,
       failedReason: state === 'failed' ? job.failedReason : undefined,
@@ -70,9 +88,6 @@ export async function GET(
     return NextResponse.json({ success: true, data: response });
   } catch (error) {
     logger.error('Failed to fetch job status', { jobId, queueName, error: String(error) });
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
 }
