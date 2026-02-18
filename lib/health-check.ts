@@ -5,7 +5,7 @@
  * @module lib/health-check
  */
 
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { isUsingRedis } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 
@@ -30,10 +30,19 @@ const CHECK_TIMEOUT_MS = 5000;
  */
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number = CHECK_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Health check timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`Health check timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
     );
   });
 }
@@ -45,9 +54,9 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number = CHECK_TIMEOUT_M
 export async function checkDatabase(): Promise<ComponentHealth> {
   const start = Date.now();
   try {
-    const supabase = createServerClient();
+    const supabase = createAdminClient();
     const { error } = await withTimeout(
-      supabase.from('users').select('id', { count: 'exact', head: true }).limit(1),
+      supabase.from('users').select('id', { count: 'exact', head: true }).limit(1)
     );
     const latencyMs = Date.now() - start;
     if (error) {

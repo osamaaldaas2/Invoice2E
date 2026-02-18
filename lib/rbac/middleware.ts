@@ -10,7 +10,7 @@ import { buildAbility } from './abilities';
 import type { AppAbility } from './abilities';
 import type { Action, Subject, RbacUser, Role } from './types';
 import { logger } from '@/lib/logger';
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 
 /**
  * Result of a successful authorization check.
@@ -28,7 +28,7 @@ export interface AuthorizedContext {
  * @returns The user's current role, or null if not found
  */
 async function getLiveRole(userId: string): Promise<Role | null> {
-  const supabase = createServerClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('users')
     .select('role, is_banned')
@@ -71,7 +71,7 @@ async function getLiveRole(userId: string): Promise<Role | null> {
 export async function authorize(
   request: NextRequest,
   action?: Action,
-  subject?: Subject,
+  subject?: Subject
 ): Promise<AuthorizedContext> {
   const session = await getSessionFromCookie();
 

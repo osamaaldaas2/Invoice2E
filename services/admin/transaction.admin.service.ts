@@ -3,7 +3,7 @@
  * Handles transaction viewing and refund operations for admins
  */
 
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError } from '@/lib/errors';
 import { AdminTransaction, AdminTransactionsFilter, RefundTransactionInput } from '@/types/admin';
@@ -30,7 +30,7 @@ type TransactionRow = {
 
 class AdminTransactionService {
   private getSupabase() {
-    return createServerClient();
+    return createAdminClient();
   }
 
   /**

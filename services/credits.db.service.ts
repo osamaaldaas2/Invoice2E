@@ -1,4 +1,4 @@
-import { createServerClient, createUserScopedClient } from '@/lib/supabase.server';
+import { createAdminClient, createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError, ValidationError } from '@/lib/errors';
 import type { UserCredits } from '@/types';
@@ -8,7 +8,7 @@ export class CreditsDatabaseService {
   // FIX: Audit #001, #006, #031 — use user-scoped client for direct queries (RLS-protected)
   // RPCs are SECURITY DEFINER and bypass RLS by design, so admin client is fine for those.
   private getSupabase() {
-    return createServerClient();
+    return createAdminClient();
   }
 
   private async getUserScopedSupabase(userId: string) {

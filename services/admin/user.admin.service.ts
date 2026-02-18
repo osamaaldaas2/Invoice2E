@@ -3,7 +3,7 @@
  * Handles user management operations for admins
  */
 
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError } from '@/lib/errors';
 import {
@@ -98,7 +98,7 @@ type BatchJobRow = {
 
 class AdminUserService {
   private getSupabase() {
-    return createServerClient();
+    return createAdminClient();
   }
 
   private resolveCredits(

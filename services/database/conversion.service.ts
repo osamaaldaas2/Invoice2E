@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase.server';
+import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError, NotFoundError } from '@/lib/errors';
 import type { InvoiceConversion } from '@/types';
@@ -6,81 +6,86 @@ import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { CreateConversionData, UpdateConversionData } from './types';
 
 export class ConversionService {
-    private getSupabase() {
-        return createServerClient();
+  private getSupabase() {
+    return createAdminClient();
+  }
+
+  async createConversion(data: CreateConversionData): Promise<InvoiceConversion> {
+    const supabase = this.getSupabase();
+    const snakeData = camelToSnakeKeys(data);
+
+    const { data: conversion, error } = await supabase
+      .from('invoice_conversions')
+      .insert([snakeData])
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to create conversion', { error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to save conversion', 500);
     }
 
-    async createConversion(data: CreateConversionData): Promise<InvoiceConversion> {
-        const supabase = this.getSupabase();
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(conversion) as InvoiceConversion;
+  }
 
-        const { data: conversion, error } = await supabase
-            .from('invoice_conversions')
-            .insert([snakeData])
-            .select()
-            .single();
+  async updateConversion(
+    conversionId: string,
+    data: UpdateConversionData
+  ): Promise<InvoiceConversion> {
+    const supabase = this.getSupabase();
+    const snakeData = camelToSnakeKeys(data);
 
-        if (error) {
-            logger.error('Failed to create conversion', { error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to save conversion', 500);
-        }
+    const { data: conversion, error } = await supabase
+      .from('invoice_conversions')
+      .update(snakeData)
+      .eq('id', conversionId)
+      .select()
+      .single();
 
-        return snakeToCamelKeys(conversion) as InvoiceConversion;
+    if (error) {
+      logger.error('Failed to update conversion', { conversionId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to update conversion', 500);
     }
 
-    async updateConversion(conversionId: string, data: UpdateConversionData): Promise<InvoiceConversion> {
-        const supabase = this.getSupabase();
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(conversion) as InvoiceConversion;
+  }
 
-        const { data: conversion, error } = await supabase
-            .from('invoice_conversions')
-            .update(snakeData)
-            .eq('id', conversionId)
-            .select()
-            .single();
+  async getConversionById(conversionId: string): Promise<InvoiceConversion> {
+    const supabase = this.getSupabase();
 
-        if (error) {
-            logger.error('Failed to update conversion', { conversionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to update conversion', 500);
-        }
+    const { data, error } = await supabase
+      .from('invoice_conversions')
+      .select('*')
+      .eq('id', conversionId)
+      .single();
 
-        return snakeToCamelKeys(conversion) as InvoiceConversion;
+    if (error) {
+      logger.error('Failed to get conversion', { conversionId, error: error.message });
+      throw new NotFoundError('Conversion not found');
     }
 
-    async getConversionById(conversionId: string): Promise<InvoiceConversion> {
-        const supabase = this.getSupabase();
+    return snakeToCamelKeys(data) as InvoiceConversion;
+  }
 
-        const { data, error } = await supabase
-            .from('invoice_conversions')
-            .select('*')
-            .eq('id', conversionId)
-            .single();
+  async getUserConversions(userId: string, limit: number = 10): Promise<InvoiceConversion[]> {
+    const supabase = this.getSupabase();
 
-        if (error) {
-            logger.error('Failed to get conversion', { conversionId, error: error.message });
-            throw new NotFoundError('Conversion not found');
-        }
+    const { data, error } = await supabase
+      .from('invoice_conversions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-        return snakeToCamelKeys(data) as InvoiceConversion;
+    if (error) {
+      logger.error('Failed to get conversions', { userId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to fetch conversions', 500);
     }
 
-    async getUserConversions(userId: string, limit: number = 10): Promise<InvoiceConversion[]> {
-        const supabase = this.getSupabase();
-
-        const { data, error } = await supabase
-            .from('invoice_conversions')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
-
-        if (error) {
-            logger.error('Failed to get conversions', { userId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch conversions', 500);
-        }
-
-        return (data ?? []).map((item: Record<string, unknown>) => snakeToCamelKeys(item) as InvoiceConversion);
-    }
+    return (data ?? []).map(
+      (item: Record<string, unknown>) => snakeToCamelKeys(item) as InvoiceConversion
+    );
+  }
 }
 
 export const conversionService = new ConversionService();
