@@ -3,6 +3,8 @@ import { logger } from '@/lib/logger';
 import JSZip from 'jszip';
 import { BatchJob, BatchProgress, BatchResult } from './types';
 import { batchProcessor } from './batch.processor';
+import { resilientExtract } from '@/lib/ai-resilience';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { batchGenerator } from './batch.generator';
 import { AppError, ValidationError } from '@/lib/errors';
 import { MAX_CONCURRENT_BATCH_JOBS, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
@@ -358,11 +360,14 @@ export class BatchService {
           const segmentName = `Invoice [${invoice.label}]`;
 
           try {
-            const extractedData = await extractor.extractFromFile(
-              buf,
-              segmentName,
-              'application/pdf'
+            // S3.3: Use circuit breaker when flag is enabled
+            const cbClient = createAdminClient();
+            const useCB = await isFeatureEnabled(cbClient, FEATURE_FLAGS.USE_CIRCUIT_BREAKER).catch(
+              () => false
             );
+            const extractedData = useCB
+              ? await resilientExtract(buf, segmentName, 'application/pdf')
+              : await extractor.extractFromFile(buf, segmentName, 'application/pdf');
 
             const adminClient = createAdminClient();
             const extraction = await invoiceDbService.createExtraction(
@@ -602,14 +607,21 @@ export class BatchService {
         if (unprocessed > 0 && job.credits_deducted) {
           try {
             await creditsDbService.addCredits(
-              job.user_id, unprocessed, `batch:refund:stuck:${job.id}`, job.id
+              job.user_id,
+              unprocessed,
+              `batch:refund:stuck:${job.id}`,
+              job.id
             );
             logger.info('Refunded credits for unprocessed files in stuck batch', {
-              jobId: job.id, refunded: unprocessed, completedFiles, totalFiles,
+              jobId: job.id,
+              refunded: unprocessed,
+              completedFiles,
+              totalFiles,
             });
           } catch (refundErr) {
             logger.error('CRITICAL: Failed to refund credits for stuck batch', {
-              jobId: job.id, unprocessed,
+              jobId: job.id,
+              unprocessed,
               error: refundErr instanceof Error ? refundErr.message : String(refundErr),
             });
           }

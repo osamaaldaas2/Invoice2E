@@ -3,6 +3,8 @@ import { logger } from '@/lib/logger';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { creditsDbService } from '@/services/credits.db.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
+import { resilientExtract } from '@/lib/ai-resilience';
+import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { boundaryDetectionService } from '@/services/boundary-detection.service';
 import { pdfSplitterService } from '@/services/pdf-splitter.service';
 import { BATCH_EXTRACTION, MULTI_INVOICE_CONCURRENCY } from '@/lib/constants';
@@ -25,6 +27,14 @@ export class BatchProcessor {
 
     for (let attempt = 0; attempt <= BATCH_EXTRACTION.MAX_RETRIES; attempt++) {
       try {
+        // S3.3: Use circuit breaker when flag is enabled
+        const adminClient = createAdminClient();
+        const useCB = await isFeatureEnabled(adminClient, FEATURE_FLAGS.USE_CIRCUIT_BREAKER).catch(
+          () => false
+        );
+        if (useCB) {
+          return await resilientExtract(fileContent, fileName, 'application/pdf');
+        }
         return await extractor.extractFromFile(fileContent, fileName, 'application/pdf');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
