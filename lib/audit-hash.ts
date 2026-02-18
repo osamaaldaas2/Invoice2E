@@ -82,7 +82,7 @@ export async function verifyChainIntegrity(
   }
 
   for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
+    const entry = entries[i]!;
     const recomputed = await computeAuditHash(entry);
 
     // Check entry_hash integrity
@@ -97,7 +97,7 @@ export async function verifyChainIntegrity(
 
     // Check prev_hash chain linkage (skip first entry — prev_hash may be null)
     if (i > 0) {
-      const expectedPrev = entries[i - 1].entryHash;
+      const expectedPrev = entries[i - 1]!.entryHash;
       if (entry.prevHash !== expectedPrev) {
         return {
           isValid: false,
