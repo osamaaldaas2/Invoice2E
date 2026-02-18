@@ -139,7 +139,12 @@ export async function POST(request: NextRequest) {
     // FIX: Audit #061, #062 — validate file magic bytes match claimed MIME type
     const { verifyMagicBytes } = await import('@/lib/magic-bytes');
     if (!verifyMagicBytes(buffer, file.type)) {
-      logger.warn('File magic bytes mismatch', { fileName: file.name, claimedType: file.type, userId, audit: '#061' });
+      logger.warn('File magic bytes mismatch', {
+        fileName: file.name,
+        claimedType: file.type,
+        userId,
+        audit: '#061',
+      });
       return NextResponse.json(
         { success: false, error: 'File content does not match declared type' },
         { status: 422 }
@@ -162,16 +167,28 @@ export async function POST(request: NextRequest) {
     // Detect invoice boundaries in PDF files
     const boundaryResult = await boundaryDetectionService.detect(buffer, file.type);
 
+    // Compute file hash + idempotency key early (used by both single and multi paths)
+    const { createHash } = await import('crypto');
+    const fileHash = createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+    const idempotencyKey = `extraction:deduct:${userId}:${fileHash}:${hourBucket}`;
+
     if (boundaryResult.totalInvoices > 1) {
-      // Multi-invoice PDF: deduct all credits atomically upfront
+      // Multi-invoice PDF: atomically deduct N credits + create N extraction records
       const requiredCredits = boundaryResult.totalInvoices;
+      const multiIdempotencyKey = `${idempotencyKey}:multi:${requiredCredits}`;
+      let batchResult;
       try {
-        const deducted = await creditsDbService.deductCredits(
+        batchResult = await creditsDbService.batchExtractWithCreditDeduction(
           userId,
           requiredCredits,
-          'extraction:deduct:multi'
+          'extraction:deduct:multi',
+          multiIdempotencyKey,
+          file.name,
+          fileHash,
+          requiredCredits
         );
-        if (!deducted) {
+        if (batchResult.status === 'insufficient_credits') {
           return NextResponse.json(
             {
               success: false,
@@ -220,6 +237,8 @@ export async function POST(request: NextRequest) {
       }
 
       // ≤3 invoices: process inline with parallelism
+      // S2: extraction records already created by batchExtractWithCreditDeduction (status: 'pending')
+      const batchExtractionIds = batchResult.extractionIds;
       const pageGroups = boundaryResult.invoices.map((inv) => inv.pages);
       const splitBuffers = await pdfSplitterService.splitByPageGroups(buffer, pageGroups);
 
@@ -236,25 +255,27 @@ export async function POST(request: NextRequest) {
             const invoice = boundaryResult.invoices[i]!;
             const label = invoice.label;
             const segmentName = `${file.name} [${label}]`;
+            const pendingId = batchExtractionIds[i];
 
             try {
               const extractedData = await extractor.extractFromFile(buf, segmentName, file.type);
 
-              const extraction = await invoiceDbService.createExtraction(
-                {
-                  userId,
-                  extractionData: extractedData as unknown as Record<string, unknown>,
-                  confidenceScore: extractedData.confidence,
-                  geminiResponseTimeMs: extractedData.processingTimeMs,
-                  status: 'completed',
-                },
-                userClient
-              );
-
-              // Credits already deducted upfront — no per-segment deduction
+              // S2: Update the pending extraction record (created atomically with credit deduction)
+              if (pendingId) {
+                await invoiceDbService.updateExtraction(
+                  pendingId,
+                  {
+                    extractionData: extractedData as unknown as Record<string, unknown>,
+                    confidenceScore: extractedData.confidence,
+                    geminiResponseTimeMs: extractedData.processingTimeMs,
+                    status: 'completed',
+                  },
+                  userClient
+                );
+              }
 
               extractions[i] = {
-                extractionId: extraction.id,
+                extractionId: pendingId || '',
                 label,
                 confidence: extractedData.confidence ?? 0,
               };
@@ -262,10 +283,11 @@ export async function POST(request: NextRequest) {
               logger.error('Failed to extract invoice segment', {
                 index: i,
                 label,
+                pendingExtractionId: pendingId,
                 error: segmentError instanceof Error ? segmentError.message : String(segmentError),
               });
               extractions[i] = {
-                extractionId: '',
+                extractionId: pendingId || '',
                 label,
                 confidence: 0,
               };
@@ -280,19 +302,19 @@ export async function POST(request: NextRequest) {
         try {
           const refundKey = `refund:multi:${idempotencyKey}:${failCount}`;
           await creditsDbService.refundCreditsIdempotent(
-            userId, failCount, 'extraction:refund:multi', refundKey
+            userId,
+            failCount,
+            'extraction:refund:multi',
+            refundKey
           );
         } catch (refundErr) {
-          logger.error(
-            'CRITICAL: Failed to refund credits for failed multi-invoice segments',
-            {
-              userId,
-              failCount,
-              creditsLost: failCount,
-              error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-              audit: '#100',
-            }
-          );
+          logger.error('CRITICAL: Failed to refund credits for failed multi-invoice segments', {
+            userId,
+            failCount,
+            creditsLost: failCount,
+            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+            audit: '#100',
+          });
         }
       }
 
@@ -317,28 +339,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Single invoice flow — deduct credit BEFORE AI call to prevent double-spend.
-    // Idempotency key = userId + SHA-256(file content) + hour bucket.
-    // Same file re-uploaded within the same hour by the same user won't double-deduct.
-    const { createHash } = await import('crypto');
-    const fileHash = createHash('sha256').update(buffer).digest('hex').slice(0, 16);
-    const hourBucket = Math.floor(Date.now() / (60 * 60 * 1000));
-    const idempotencyKey = `extraction:deduct:${userId}:${fileHash}:${hourBucket}`;
+    // S2: Single invoice — atomically deduct credit + create extraction record.
+    // Guarantees: no credit lost without extraction record, no extraction without deduction.
+    // AI extraction happens after; on failure, refund via idempotent RPC (already wired below).
+    const atomicResult = await creditsDbService.extractWithCreditDeduction(
+      userId,
+      1,
+      idempotencyKey,
+      idempotencyKey,
+      file.name,
+      fileHash
+    );
 
-    const deducted = await creditsDbService.deductCredits(userId, 1, idempotencyKey);
-    if (!deducted) {
+    if (atomicResult.status === 'insufficient_credits') {
       return NextResponse.json(
         { success: false, error: 'Insufficient credits. Please purchase more credits.' },
         { status: 402 }
       );
     }
 
+    const pendingExtractionId = atomicResult.extractionId;
+
     const startTime = Date.now();
     let extractedData;
     try {
       // FIX: Audit #017, #060 — use circuit breaker with fallback when enabled
       const useCircuitBreaker = await isFeatureEnabled(
-        await createUserScopedClient(userId), 'USE_CIRCUIT_BREAKER'
+        await createUserScopedClient(userId),
+        'USE_CIRCUIT_BREAKER'
       ).catch(() => false);
 
       if (useCircuitBreaker) {
@@ -351,18 +379,18 @@ export async function POST(request: NextRequest) {
       try {
         const refundKey = `refund:extract:${idempotencyKey}`;
         await creditsDbService.refundCreditsIdempotent(
-          userId, 1, `extraction:refund:${idempotencyKey}`, refundKey
+          userId,
+          1,
+          `extraction:refund:${idempotencyKey}`,
+          refundKey
         );
       } catch (refundErr) {
-        logger.error(
-          'CRITICAL: Failed to refund credit after extraction failure',
-          {
-            userId,
-            creditsLost: 1,
-            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-            audit: '#100',
-          }
-        );
+        logger.error('CRITICAL: Failed to refund credit after extraction failure', {
+          userId,
+          creditsLost: 1,
+          error: refundErr instanceof Error ? refundErr.message : String(refundErr),
+          audit: '#100',
+        });
       }
 
       logger.error(
@@ -382,22 +410,25 @@ export async function POST(request: NextRequest) {
 
     const responseTime = Date.now() - startTime;
 
-    // Save extraction to database (RLS enforced)
-    const extraction = await invoiceDbService.createExtraction(
-      {
-        userId,
-        extractionData: extractedData as unknown as Record<string, unknown>,
-        confidenceScore: extractedData.confidence,
-        geminiResponseTimeMs: responseTime,
-        status: 'completed',
-      },
-      userClient
-    );
+    // S2: Update the pending extraction record created by the atomic RPC
+    // (instead of creating a new one — the record already exists with status 'pending')
+    if (pendingExtractionId) {
+      await invoiceDbService.updateExtraction(
+        pendingExtractionId,
+        {
+          extractionData: extractedData as unknown as Record<string, unknown>,
+          confidenceScore: extractedData.confidence,
+          geminiResponseTimeMs: responseTime,
+          status: 'completed',
+        },
+        userClient
+      );
+    }
 
-    // Credits already deducted before AI call — no post-extraction deduction needed
+    const extractionId = pendingExtractionId || 'unknown';
 
     logger.info('Invoice extraction and storage completed', {
-      extractionId: extraction.id,
+      extractionId,
       userId,
       responseTime,
       confidence: extractedData.confidence,
@@ -408,7 +439,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         data: {
-          extractionId: extraction.id,
+          extractionId,
           extractedData,
           provider: extractor.getProviderName(),
         },

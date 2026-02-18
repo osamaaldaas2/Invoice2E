@@ -216,6 +216,172 @@ export class CreditsDatabaseService {
   }
 
   /**
+   * S2: Atomically deduct credits AND create an extraction record in one transaction.
+   * Returns extraction ID on success, or existing ID if idempotent replay.
+   * Throws on insufficient credits or DB error.
+   */
+  async extractWithCreditDeduction(
+    userId: string,
+    amount: number,
+    reason: string,
+    idempotencyKey: string,
+    fileName: string,
+    fileHash: string,
+    extractionData: Record<string, unknown> = {}
+  ): Promise<{ status: string; extractionId: string | null; creditsRemaining?: number }> {
+    if (amount <= 0) {
+      throw new ValidationError('Amount must be positive');
+    }
+
+    const supabase = this.getSupabase();
+
+    const { data, error } = await supabase.rpc('extract_with_credit_deduction', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_reason: reason,
+      p_idempotency_key: idempotencyKey,
+      p_file_name: fileName,
+      p_file_hash: fileHash,
+      p_extraction_data: extractionData,
+    });
+
+    if (error) {
+      logger.error('extract_with_credit_deduction RPC failed', {
+        userId,
+        amount,
+        reason,
+        idempotencyKey,
+        error: error.message,
+      });
+      throw new AppError('DB_ERROR', 'Failed to deduct credits and create extraction', 500);
+    }
+
+    const result = data as {
+      status: string;
+      extraction_id?: string;
+      credits_remaining?: number;
+      available?: number;
+      required?: number;
+      error?: string;
+    };
+
+    if (result.status === 'insufficient_credits') {
+      logger.warn('Insufficient credits for extraction', {
+        userId,
+        available: result.available,
+        required: result.required,
+      });
+      return { status: 'insufficient_credits', extractionId: null };
+    }
+
+    if (result.status === 'error') {
+      throw new AppError('DB_ERROR', result.error || 'Atomic extraction failed', 500);
+    }
+
+    if (result.status === 'already_processed') {
+      logger.info('Extraction already processed (idempotent)', {
+        userId,
+        idempotencyKey,
+        extractionId: result.extraction_id,
+      });
+      return { status: 'already_processed', extractionId: result.extraction_id || null };
+    }
+
+    logger.info('Atomic credit deduction + extraction created', {
+      userId,
+      amount,
+      extractionId: result.extraction_id,
+      creditsRemaining: result.credits_remaining,
+    });
+
+    return {
+      status: 'success',
+      extractionId: result.extraction_id || null,
+      creditsRemaining: result.credits_remaining,
+    };
+  }
+
+  /**
+   * S2: Batch variant — atomically deduct N credits and create N extraction records.
+   * Used for multi-invoice PDFs.
+   */
+  async batchExtractWithCreditDeduction(
+    userId: string,
+    amount: number,
+    reason: string,
+    idempotencyKey: string,
+    fileName: string,
+    fileHash: string,
+    invoiceCount: number
+  ): Promise<{ status: string; extractionIds: string[]; creditsRemaining?: number }> {
+    if (amount <= 0 || invoiceCount <= 0) {
+      throw new ValidationError('Amount and invoice count must be positive');
+    }
+
+    const supabase = this.getSupabase();
+
+    const { data, error } = await supabase.rpc('batch_extract_with_credit_deduction', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_reason: reason,
+      p_idempotency_key: idempotencyKey,
+      p_file_name: fileName,
+      p_file_hash: fileHash,
+      p_invoice_count: invoiceCount,
+    });
+
+    if (error) {
+      logger.error('batch_extract_with_credit_deduction RPC failed', {
+        userId,
+        amount,
+        invoiceCount,
+        error: error.message,
+      });
+      throw new AppError('DB_ERROR', 'Failed to deduct credits for batch extraction', 500);
+    }
+
+    const result = data as {
+      status: string;
+      extraction_ids?: string[];
+      credits_remaining?: number;
+      available?: number;
+      required?: number;
+      error?: string;
+    };
+
+    if (result.status === 'insufficient_credits') {
+      logger.warn('Insufficient credits for batch extraction', {
+        userId,
+        available: result.available,
+        required: result.required,
+      });
+      return { status: 'insufficient_credits', extractionIds: [] };
+    }
+
+    if (result.status === 'error') {
+      throw new AppError('DB_ERROR', result.error || 'Batch atomic extraction failed', 500);
+    }
+
+    if (result.status === 'already_processed') {
+      logger.info('Batch extraction already processed (idempotent)', { userId, idempotencyKey });
+      return { status: 'already_processed', extractionIds: [] };
+    }
+
+    logger.info('Batch atomic credit deduction + extractions created', {
+      userId,
+      amount,
+      invoiceCount,
+      creditsRemaining: result.credits_remaining,
+    });
+
+    return {
+      status: 'success',
+      extractionIds: result.extraction_ids || [],
+      creditsRemaining: result.credits_remaining,
+    };
+  }
+
+  /**
    * FIX: Audit #014, #015 — idempotent credit refund.
    * Uses refund_credits_idempotent RPC to prevent double-refunds.
    */

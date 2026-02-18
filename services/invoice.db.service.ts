@@ -7,417 +7,484 @@ import { createAdminClient } from '@/lib/supabase.server';
 import { withOptimisticLock, OptimisticLockError } from '@/lib/optimistic-lock';
 
 export type CreateExtractionData = {
-    userId: string;
-    extractionData: Record<string, unknown>;
-    confidenceScore?: number;
-    geminiResponseTimeMs?: number;
-    status?: string;
+  userId: string;
+  extractionData: Record<string, unknown>;
+  confidenceScore?: number;
+  geminiResponseTimeMs?: number;
+  status?: string;
 };
 
 export type CreateConversionData = {
-    userId: string;
-    extractionId: string;
-    invoiceNumber?: string;
-    buyerName?: string;
-    conversionFormat: string;
-    outputFormat?: string;
-    creditsUsed?: number;
-    conversionStatus?: string;
+  userId: string;
+  extractionId: string;
+  invoiceNumber?: string;
+  buyerName?: string;
+  conversionFormat: string;
+  outputFormat?: string;
+  creditsUsed?: number;
+  conversionStatus?: string;
 };
 
 export type UpdateConversionData = {
-    invoiceNumber?: string;
-    buyerName?: string;
-    conversionFormat?: string;
-    outputFormat?: string;
-    validationStatus?: string;
-    validationErrors?: Record<string, unknown>;
-    conversionStatus?: string;
-    emailSent?: boolean;
-    emailSentAt?: Date;
-    emailRecipient?: string;
-    fileDownloadTriggered?: boolean;
-    downloadTriggeredAt?: Date;
-    xmlContent?: string;
-    xmlFileName?: string;
+  invoiceNumber?: string;
+  buyerName?: string;
+  conversionFormat?: string;
+  outputFormat?: string;
+  validationStatus?: string;
+  validationErrors?: Record<string, unknown>;
+  conversionStatus?: string;
+  emailSent?: boolean;
+  emailSentAt?: Date;
+  emailRecipient?: string;
+  fileDownloadTriggered?: boolean;
+  downloadTriggeredAt?: Date;
+  xmlContent?: string;
+  xmlFileName?: string;
 };
 
 export class InvoiceDatabaseService {
-    /**
-     * P0-1: Fail-fast pattern - NO ADMIN FALLBACK.
-     * User-facing operations MUST provide a SupabaseClient.
-     * If client is missing, throws an error instead of silently bypassing RLS.
-     * Admin operations should use explicit *Admin() methods.
-     */
-    private assertClientProvided(client: SupabaseClient | undefined, methodName: string): asserts client is SupabaseClient {
-        if (!client) {
-            throw new AppError(
-                'MISSING_CLIENT',
-                `${methodName} requires a Supabase client for RLS enforcement. Pass createUserScopedClient(userId) or use *Admin() method variant.`,
-                500
-            );
-        }
+  /**
+   * P0-1: Fail-fast pattern - NO ADMIN FALLBACK.
+   * User-facing operations MUST provide a SupabaseClient.
+   * If client is missing, throws an error instead of silently bypassing RLS.
+   * Admin operations should use explicit *Admin() methods.
+   */
+  private assertClientProvided(
+    client: SupabaseClient | undefined,
+    methodName: string
+  ): asserts client is SupabaseClient {
+    if (!client) {
+      throw new AppError(
+        'MISSING_CLIENT',
+        `${methodName} requires a Supabase client for RLS enforcement. Pass createUserScopedClient(userId) or use *Admin() method variant.`,
+        500
+      );
+    }
+  }
+
+  async createExtraction(
+    data: CreateExtractionData,
+    client?: SupabaseClient
+  ): Promise<InvoiceExtraction> {
+    // P0-1: Client required - fail fast if missing
+    this.assertClientProvided(client, 'createExtraction');
+    const snakeData = camelToSnakeKeys(data);
+
+    const { data: extraction, error } = await client!
+      .from('invoice_extractions')
+      .insert([snakeData])
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to create extraction', { error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to save extraction', 500);
     }
 
-    async createExtraction(data: CreateExtractionData, client?: SupabaseClient): Promise<InvoiceExtraction> {
-        // P0-1: Client required - fail fast if missing
-        this.assertClientProvided(client, 'createExtraction');
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+  }
 
-        const { data: extraction, error } = await client!
-            .from('invoice_extractions')
-            .insert([snakeData])
-            .select()
-            .single();
+  async getExtractionById(
+    extractionId: string,
+    client?: SupabaseClient
+  ): Promise<InvoiceExtraction> {
+    // P0-1: Client required - fail fast if missing
+    this.assertClientProvided(client, 'getExtractionById');
 
-        if (error) {
-            logger.error('Failed to create extraction', { error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to save extraction', 500);
-        }
+    const { data, error } = await client!
+      .from('invoice_extractions')
+      .select('*')
+      .eq('id', extractionId)
+      .single();
 
-        return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    if (error) {
+      logger.error('Failed to get extraction', { extractionId, error: error.message });
+      throw new NotFoundError('Extraction not found');
     }
 
-    async getExtractionById(extractionId: string, client?: SupabaseClient): Promise<InvoiceExtraction> {
-        // P0-1: Client required - fail fast if missing
-        this.assertClientProvided(client, 'getExtractionById');
+    return snakeToCamelKeys(data) as InvoiceExtraction;
+  }
 
-        const { data, error } = await client!
-            .from('invoice_extractions')
-            .select('*')
-            .eq('id', extractionId)
-            .single();
+  async getUserExtractions(
+    userId: string,
+    limit: number = 10,
+    client?: SupabaseClient
+  ): Promise<InvoiceExtraction[]> {
+    // P0-1: Client required - fail fast if missing
+    this.assertClientProvided(client, 'getUserExtractions');
 
-        if (error) {
-            logger.error('Failed to get extraction', { extractionId, error: error.message });
-            throw new NotFoundError('Extraction not found');
-        }
+    const { data, error } = await client!
+      .from('invoice_extractions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-        return snakeToCamelKeys(data) as InvoiceExtraction;
+    if (error) {
+      logger.error('Failed to get extractions', { userId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to fetch extractions', 500);
     }
 
-    async getUserExtractions(userId: string, limit: number = 10, client?: SupabaseClient): Promise<InvoiceExtraction[]> {
-        // P0-1: Client required - fail fast if missing
-        this.assertClientProvided(client, 'getUserExtractions');
+    return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceExtraction);
+  }
 
-        const { data, error } = await client!
-            .from('invoice_extractions')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
+  async updateExtraction(
+    extractionId: string,
+    data: {
+      status?: string;
+      extractionData?: Record<string, unknown>;
+      confidenceScore?: number;
+      geminiResponseTimeMs?: number;
+    },
+    client?: SupabaseClient
+  ): Promise<InvoiceExtraction> {
+    this.assertClientProvided(client, 'updateExtraction');
+    const snakeData = camelToSnakeKeys(data);
 
-        if (error) {
-            logger.error('Failed to get extractions', { userId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch extractions', 500);
-        }
+    const { data: extraction, error } = await client!
+      .from('invoice_extractions')
+      .update(snakeData)
+      .eq('id', extractionId)
+      .select()
+      .single();
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceExtraction);
+    if (error) {
+      logger.error('Failed to update extraction', {
+        extractionId,
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
     }
 
-    async updateExtraction(
-        extractionId: string,
-        data: { status?: string; extractionData?: Record<string, unknown> },
-        client?: SupabaseClient
-    ): Promise<InvoiceExtraction> {
-        this.assertClientProvided(client, 'updateExtraction');
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+  }
 
-        const { data: extraction, error } = await client!
-            .from('invoice_extractions')
-            .update(snakeData)
-            .eq('id', extractionId)
-            .select()
-            .single();
+  /**
+   * Bulk-update output_format for multiple extractions (RLS-scoped).
+   * Returns the number of rows actually updated.
+   */
+  async updateExtractionFormats(
+    extractionIds: string[],
+    outputFormat: string,
+    client?: SupabaseClient
+  ): Promise<number> {
+    this.assertClientProvided(client, 'updateExtractionFormats');
 
-        if (error) {
-            logger.error('Failed to update extraction', { extractionId, error: error.message, code: error.code, details: error.details, hint: error.hint });
-            throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
-        }
+    const { data, error } = await client!
+      .from('invoice_extractions')
+      .update({ output_format: outputFormat })
+      .in('id', extractionIds)
+      .select('id');
 
-        return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    if (error) {
+      logger.error('Failed to bulk-update extraction formats', {
+        count: extractionIds.length,
+        outputFormat,
+        error: error.message,
+      });
+      throw new AppError('DB_ERROR', 'Failed to update extraction formats', 500);
     }
 
-    /**
-     * Bulk-update output_format for multiple extractions (RLS-scoped).
-     * Returns the number of rows actually updated.
-     */
-    async updateExtractionFormats(
-        extractionIds: string[],
-        outputFormat: string,
-        client?: SupabaseClient
-    ): Promise<number> {
-        this.assertClientProvided(client, 'updateExtractionFormats');
+    return data?.length ?? 0;
+  }
 
-        const { data, error } = await client!
-            .from('invoice_extractions')
-            .update({ output_format: outputFormat })
-            .in('id', extractionIds)
-            .select('id');
+  // FIX: Audit #009 — statuses that cannot be deleted (compliance retention)
+  private static readonly IMMUTABLE_STATUSES = [
+    'completed',
+    'converted',
+    'validated',
+    'stored',
+    'archived',
+  ];
 
-        if (error) {
-            logger.error('Failed to bulk-update extraction formats', {
-                count: extractionIds.length,
-                outputFormat,
-                error: error.message,
-            });
-            throw new AppError('DB_ERROR', 'Failed to update extraction formats', 500);
-        }
+  async deleteExtraction(extractionId: string, client?: SupabaseClient): Promise<void> {
+    this.assertClientProvided(client, 'deleteExtraction');
 
-        return data?.length ?? 0;
+    // FIX: Audit #009 — prevent deletion of completed/stored extractions
+    const { data: existing, error: fetchError } = await client!
+      .from('invoice_extractions')
+      .select('status')
+      .eq('id', extractionId)
+      .single();
+
+    if (fetchError) {
+      logger.error('Failed to check extraction status before delete', {
+        extractionId,
+        error: fetchError.message,
+      });
+      throw new NotFoundError('Extraction not found');
     }
 
-    // FIX: Audit #009 — statuses that cannot be deleted (compliance retention)
-    private static readonly IMMUTABLE_STATUSES = ['completed', 'converted', 'validated', 'stored', 'archived'];
-
-    async deleteExtraction(extractionId: string, client?: SupabaseClient): Promise<void> {
-        this.assertClientProvided(client, 'deleteExtraction');
-
-        // FIX: Audit #009 — prevent deletion of completed/stored extractions
-        const { data: existing, error: fetchError } = await client!
-            .from('invoice_extractions')
-            .select('status')
-            .eq('id', extractionId)
-            .single();
-
-        if (fetchError) {
-            logger.error('Failed to check extraction status before delete', { extractionId, error: fetchError.message });
-            throw new NotFoundError('Extraction not found');
-        }
-
-        const status = (existing?.status as string) ?? '';
-        if (InvoiceDatabaseService.IMMUTABLE_STATUSES.includes(status)) {
-            logger.warn('Blocked deletion of immutable extraction', { extractionId, status, audit: '#009' });
-            throw new AppError(
-                'IMMUTABLE',
-                `Cannot delete extraction in '${status}' state — compliance retention policy requires preservation`,
-                403
-            );
-        }
-
-        const { error } = await client!
-            .from('invoice_extractions')
-            .delete()
-            .eq('id', extractionId);
-
-        if (error) {
-            logger.error('Failed to delete extraction', { extractionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to delete extraction', 500);
-        }
+    const status = (existing?.status as string) ?? '';
+    if (InvoiceDatabaseService.IMMUTABLE_STATUSES.includes(status)) {
+      logger.warn('Blocked deletion of immutable extraction', {
+        extractionId,
+        status,
+        audit: '#009',
+      });
+      throw new AppError(
+        'IMMUTABLE',
+        `Cannot delete extraction in '${status}' state — compliance retention policy requires preservation`,
+        403
+      );
     }
 
-    async createConversion(data: CreateConversionData, client?: SupabaseClient): Promise<InvoiceConversion> {
-        this.assertClientProvided(client, 'createConversion');
-        const snakeData = camelToSnakeKeys(data);
+    const { error } = await client!.from('invoice_extractions').delete().eq('id', extractionId);
 
-        const { data: conversion, error } = await client!
-            .from('invoice_conversions')
-            .insert([snakeData])
-            .select()
-            .single();
+    if (error) {
+      logger.error('Failed to delete extraction', { extractionId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to delete extraction', 500);
+    }
+  }
 
-        if (error) {
-            logger.error('Failed to create conversion', { error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to save conversion', 500);
-        }
+  async createConversion(
+    data: CreateConversionData,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion> {
+    this.assertClientProvided(client, 'createConversion');
+    const snakeData = camelToSnakeKeys(data);
 
-        return snakeToCamelKeys(conversion) as InvoiceConversion;
+    const { data: conversion, error } = await client!
+      .from('invoice_conversions')
+      .insert([snakeData])
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to create conversion', { error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to save conversion', 500);
     }
 
-    async updateConversion(conversionId: string, data: UpdateConversionData, client?: SupabaseClient): Promise<InvoiceConversion> {
-        this.assertClientProvided(client, 'updateConversion');
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(conversion) as InvoiceConversion;
+  }
 
-        const { data: conversion, error } = await client!
-            .from('invoice_conversions')
-            .update(snakeData)
-            .eq('id', conversionId)
-            .select()
-            .single();
+  async updateConversion(
+    conversionId: string,
+    data: UpdateConversionData,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion> {
+    this.assertClientProvided(client, 'updateConversion');
+    const snakeData = camelToSnakeKeys(data);
 
-        if (error) {
-            logger.error('Failed to update conversion', {
-                conversionId,
-                errorCode: error.code,
-                errorMessage: error.message,
-                errorDetails: error.details,
-                errorHint: error.hint,
-                fullError: JSON.stringify(error)
-            });
-            throw new AppError('DB_ERROR', 'Failed to update conversion', 500);
-        }
+    const { data: conversion, error } = await client!
+      .from('invoice_conversions')
+      .update(snakeData)
+      .eq('id', conversionId)
+      .select()
+      .single();
 
-        if (!conversion) {
-            logger.error('Conversion not found after update', { conversionId });
-            throw new NotFoundError('Conversion not found');
-        }
-
-        return snakeToCamelKeys(conversion) as InvoiceConversion;
+    if (error) {
+      logger.error('Failed to update conversion', {
+        conversionId,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        fullError: JSON.stringify(error),
+      });
+      throw new AppError('DB_ERROR', 'Failed to update conversion', 500);
     }
 
-    /**
-     * Update a conversion with optimistic locking.
-     *
-     * The caller must supply the `expectedVersion` they last read.
-     * If another request modified the row in the meantime, an
-     * {@link OptimisticLockError} (HTTP 409) is thrown so the client
-     * can reload and retry.
-     *
-     * @throws {OptimisticLockError} When the row was modified concurrently.
-     * @throws {AppError}            On any other database error.
-     */
-    async updateConversionVersioned(
-        conversionId: string,
-        expectedVersion: number,
-        data: UpdateConversionData,
-        client?: SupabaseClient,
-    ): Promise<InvoiceConversion> {
-        this.assertClientProvided(client, 'updateConversionVersioned');
-        const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
-
-        const row = await withOptimisticLock({
-            client: client!,
-            table: 'invoice_conversions',
-            id: conversionId,
-            expectedVersion,
-            data: snakeData,
-        });
-
-        return snakeToCamelKeys(row) as InvoiceConversion;
+    if (!conversion) {
+      logger.error('Conversion not found after update', { conversionId });
+      throw new NotFoundError('Conversion not found');
     }
 
-    async getConversionById(conversionId: string, client?: SupabaseClient): Promise<InvoiceConversion> {
-        this.assertClientProvided(client, 'getConversionById');
+    return snakeToCamelKeys(conversion) as InvoiceConversion;
+  }
 
-        const { data, error } = await client!
-            .from('invoice_conversions')
-            .select('*')
-            .eq('id', conversionId)
-            .single();
+  /**
+   * Update a conversion with optimistic locking.
+   *
+   * The caller must supply the `expectedVersion` they last read.
+   * If another request modified the row in the meantime, an
+   * {@link OptimisticLockError} (HTTP 409) is thrown so the client
+   * can reload and retry.
+   *
+   * @throws {OptimisticLockError} When the row was modified concurrently.
+   * @throws {AppError}            On any other database error.
+   */
+  async updateConversionVersioned(
+    conversionId: string,
+    expectedVersion: number,
+    data: UpdateConversionData,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion> {
+    this.assertClientProvided(client, 'updateConversionVersioned');
+    const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                throw new NotFoundError('Conversion not found');
-            }
-            logger.error('Failed to get conversion', { conversionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch conversion', 500);
-        }
-        return snakeToCamelKeys(data) as InvoiceConversion;
+    const row = await withOptimisticLock({
+      client: client!,
+      table: 'invoice_conversions',
+      id: conversionId,
+      expectedVersion,
+      data: snakeData,
+    });
+
+    return snakeToCamelKeys(row) as InvoiceConversion;
+  }
+
+  async getConversionById(
+    conversionId: string,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion> {
+    this.assertClientProvided(client, 'getConversionById');
+
+    const { data, error } = await client!
+      .from('invoice_conversions')
+      .select('*')
+      .eq('id', conversionId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundError('Conversion not found');
+      }
+      logger.error('Failed to get conversion', { conversionId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to fetch conversion', 500);
+    }
+    return snakeToCamelKeys(data) as InvoiceConversion;
+  }
+
+  async getUserConversions(
+    userId: string,
+    limit: number = 10,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion[]> {
+    this.assertClientProvided(client, 'getUserConversions');
+
+    const { data, error } = await client!
+      .from('invoice_conversions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      logger.error('Failed to get conversions', { userId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to fetch conversions', 500);
     }
 
-    async getUserConversions(userId: string, limit: number = 10, client?: SupabaseClient): Promise<InvoiceConversion[]> {
-        this.assertClientProvided(client, 'getUserConversions');
+    return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceConversion);
+  }
 
-        const { data, error } = await client!
-            .from('invoice_conversions')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
+  async getConversionByExtractionId(
+    extractionId: string,
+    client?: SupabaseClient
+  ): Promise<InvoiceConversion | null> {
+    this.assertClientProvided(client, 'getConversionByExtractionId');
 
-        if (error) {
-            logger.error('Failed to get conversions', { userId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch conversions', 500);
-        }
+    const { data, error } = await client!
+      .from('invoice_conversions')
+      .select('*')
+      .eq('extraction_id', extractionId)
+      .single();
 
-        return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceConversion);
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        return null;
+      }
+      logger.error('Failed to get conversion by extraction ID', {
+        extractionId,
+        error: error.message,
+      });
+      throw new AppError('DB_ERROR', 'Failed to fetch conversion', 500);
     }
 
-    async getConversionByExtractionId(extractionId: string, client?: SupabaseClient): Promise<InvoiceConversion | null> {
-        this.assertClientProvided(client, 'getConversionByExtractionId');
+    return snakeToCamelKeys(data) as InvoiceConversion;
+  }
 
-        const { data, error } = await client!
-            .from('invoice_conversions')
-            .select('*')
-            .eq('extraction_id', extractionId)
-            .single();
+  async processConversionTransaction(
+    userId: string,
+    conversionId: string,
+    client?: SupabaseClient
+  ): Promise<{ success: boolean; remainingCredits?: number; error?: string }> {
+    this.assertClientProvided(client, 'processConversionTransaction');
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                // No rows returned
-                return null;
-            }
-            logger.error('Failed to get conversion by extraction ID', { extractionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to fetch conversion', 500);
-        }
+    const { data, error } = await client!.rpc('convert_invoice_with_credit_deduction', {
+      p_user_id: userId,
+      p_conversion_id: conversionId,
+      p_credits_cost: 1,
+    });
 
-        return snakeToCamelKeys(data) as InvoiceConversion;
+    if (error) {
+      logger.error('Failed to process conversion transaction', {
+        userId,
+        conversionId,
+        error: error.message,
+      });
+      throw new AppError('DB_ERROR', 'Transaction failed', 500);
     }
 
-    async processConversionTransaction(userId: string, conversionId: string, client?: SupabaseClient): Promise<{ success: boolean; remainingCredits?: number; error?: string }> {
-        this.assertClientProvided(client, 'processConversionTransaction');
+    const result = data as {
+      success: boolean;
+      remaining_credits?: number;
+      error?: string;
+      message?: string;
+    };
 
-        const { data, error } = await client!.rpc('convert_invoice_with_credit_deduction', {
-            p_user_id: userId,
-            p_conversion_id: conversionId,
-            p_credits_cost: 1
-        });
-
-        if (error) {
-            logger.error('Failed to process conversion transaction', { userId, conversionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Transaction failed', 500);
-        }
-
-        const result = data as { success: boolean; remaining_credits?: number; error?: string; message?: string };
-
-        if (!result.success) {
-            logger.error('Conversion transaction failed logic', { result });
-            return { success: false, error: result.error || result.message || 'Transaction failed' };
-        }
-
-        return { success: true, remainingCredits: result.remaining_credits };
+    if (!result.success) {
+      logger.error('Conversion transaction failed logic', { result });
+      return { success: false, error: result.error || result.message || 'Transaction failed' };
     }
 
-    // ============================================================
-    // ADMIN METHODS - Use ONLY in admin routes or background jobs
-    // These methods bypass RLS by design
-    // ============================================================
+    return { success: true, remainingCredits: result.remaining_credits };
+  }
 
-    /**
-     * Admin-only: Get any extraction by ID (bypasses RLS).
-     * Use ONLY in admin routes or background jobs.
-     */
-    async getExtractionByIdAdmin(extractionId: string): Promise<InvoiceExtraction> {
-        const adminClient = createAdminClient();
-        const { data, error } = await adminClient
-            .from('invoice_extractions')
-            .select('*')
-            .eq('id', extractionId)
-            .single();
+  // ============================================================
+  // ADMIN METHODS - Use ONLY in admin routes or background jobs
+  // These methods bypass RLS by design
+  // ============================================================
 
-        if (error) {
-            logger.error('Failed to get extraction (admin)', { extractionId, error: error.message });
-            throw new NotFoundError('Extraction not found');
-        }
+  /**
+   * Admin-only: Get any extraction by ID (bypasses RLS).
+   * Use ONLY in admin routes or background jobs.
+   */
+  async getExtractionByIdAdmin(extractionId: string): Promise<InvoiceExtraction> {
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient
+      .from('invoice_extractions')
+      .select('*')
+      .eq('id', extractionId)
+      .single();
 
-        return snakeToCamelKeys(data) as InvoiceExtraction;
+    if (error) {
+      logger.error('Failed to get extraction (admin)', { extractionId, error: error.message });
+      throw new NotFoundError('Extraction not found');
     }
 
-    /**
-     * Admin-only: Update any extraction (bypasses RLS).
-     * Use ONLY in admin routes or background jobs.
-     */
-    async updateExtractionAdmin(
-        extractionId: string,
-        data: { status?: string; extractionData?: Record<string, unknown> }
-    ): Promise<InvoiceExtraction> {
-        const adminClient = createAdminClient();
-        const snakeData = camelToSnakeKeys(data);
+    return snakeToCamelKeys(data) as InvoiceExtraction;
+  }
 
-        const { data: extraction, error } = await adminClient
-            .from('invoice_extractions')
-            .update(snakeData)
-            .eq('id', extractionId)
-            .select()
-            .single();
+  /**
+   * Admin-only: Update any extraction (bypasses RLS).
+   * Use ONLY in admin routes or background jobs.
+   */
+  async updateExtractionAdmin(
+    extractionId: string,
+    data: { status?: string; extractionData?: Record<string, unknown> }
+  ): Promise<InvoiceExtraction> {
+    const adminClient = createAdminClient();
+    const snakeData = camelToSnakeKeys(data);
 
-        if (error) {
-            logger.error('Failed to update extraction (admin)', { extractionId, error: error.message });
-            throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
-        }
+    const { data: extraction, error } = await adminClient
+      .from('invoice_extractions')
+      .update(snakeData)
+      .eq('id', extractionId)
+      .select()
+      .single();
 
-        return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    if (error) {
+      logger.error('Failed to update extraction (admin)', { extractionId, error: error.message });
+      throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
     }
+
+    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+  }
 }
 
 export const invoiceDbService = new InvoiceDatabaseService();
