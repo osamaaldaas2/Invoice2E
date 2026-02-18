@@ -73,7 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // FIX: Audit #059 — limit API keys per user
     const MAX_API_KEYS_PER_USER = 10;
-    const existingKeys = await service.listApiKeys(session.userId);
+    const existingKeys = await service.listKeys(session.userId);
     if (existingKeys.length >= MAX_API_KEYS_PER_USER) {
       return jsonResponse({ error: `Maximum ${MAX_API_KEYS_PER_USER} API keys per user` }, 429);
     }
