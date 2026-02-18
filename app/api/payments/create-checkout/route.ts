@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
                 success: true,
                 method: 'paypal',
                 orderId: result.id,
-                url: result.approvalUrl,
+                url: result.url,
                 credits: pkg.credits,
                 amount: pkg.price,
                 currency: pkg.currency,
