@@ -11,6 +11,8 @@ import {
 } from '@/lib/extraction-prompt';
 import { normalizeExtractedData, parseJsonFromAiResponse } from '@/lib/extraction-normalizer';
 import { openaiThrottle } from '@/lib/api-throttle';
+// FIX: Re-audit #7 — sanitize document text before injecting into AI prompts
+import { sanitizeDocumentContent, wrapDocumentContent } from '@/lib/ai-sanitization';
 import { EXTRACTION_JSON_SCHEMA } from '@/lib/extraction-schema';
 import { validateExtraction } from '@/lib/extraction-validator';
 import { buildRetryPrompt, shouldRetry } from '@/lib/extraction-retry';
@@ -260,8 +262,10 @@ export class OpenAIAdapter implements IOpenAIAdapter {
     }
 
     const hasText = !!options?.extractedText;
+    // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
     const prompt = hasText
-      ? EXTRACTION_PROMPT_WITH_TEXT + options!.extractedText!.substring(0, 50000)
+      ? EXTRACTION_PROMPT_WITH_TEXT +
+        wrapDocumentContent(sanitizeDocumentContent(options!.extractedText!))
       : EXTRACTION_PROMPT_VISION;
 
     let data = await this.callWithStructuredOutputs(fileBuffer, mimeType, prompt);

@@ -4,12 +4,11 @@ import { logger } from '@/lib/logger';
 import { AppError, ValidationError } from '@/lib/errors';
 import { IMistralAdapter, MistralExtractionResult } from './interfaces';
 import { ExtractedInvoiceData } from '@/types';
-import {
-  EXTRACTION_PROMPT_WITH_TEXT,
-  EXTRACTION_PROMPT_VISION,
-} from '@/lib/extraction-prompt';
+import { EXTRACTION_PROMPT_WITH_TEXT, EXTRACTION_PROMPT_VISION } from '@/lib/extraction-prompt';
 import { normalizeExtractedData, parseJsonFromAiResponse } from '@/lib/extraction-normalizer';
 import { mistralThrottle } from '@/lib/api-throttle';
+// FIX: Re-audit #7 — sanitize document text before injecting into AI prompts
+import { sanitizeDocumentContent, wrapDocumentContent } from '@/lib/ai-sanitization';
 import { extractText } from '@/lib/text-extraction';
 import { extractPagedTextFromPdf } from '@/lib/pdf-text-extractor';
 import { extractTextWithMistralOcr } from '@/lib/ocr-extractor';
@@ -77,11 +76,18 @@ export class MistralAdapter implements IMistralAdapter {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           if (attempt < MISTRAL_MAX_429_RETRIES) {
             const backoff = MISTRAL_429_INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-            logger.warn('Mistral 429 rate limited, retrying', { attempt: attempt + 1, backoffMs: backoff });
+            logger.warn('Mistral 429 rate limited, retrying', {
+              attempt: attempt + 1,
+              backoffMs: backoff,
+            });
             await new Promise((r) => setTimeout(r, backoff));
             continue;
           }
-          throw new AppError('MISTRAL_ERROR', 'Mistral Chat failed: Request failed with status code 429', 429);
+          throw new AppError(
+            'MISTRAL_ERROR',
+            'Mistral Chat failed: Request failed with status code 429',
+            429
+          );
         }
         if (error instanceof AppError) throw error;
         if (error instanceof SyntaxError) {
@@ -103,8 +109,9 @@ export class MistralAdapter implements IMistralAdapter {
     await mistralThrottle.acquire();
 
     const base64Data = fileBuffer.toString('base64');
+    // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
     const prompt = extractedText
-      ? EXTRACTION_PROMPT_WITH_TEXT + extractedText.substring(0, 50000)
+      ? EXTRACTION_PROMPT_WITH_TEXT + wrapDocumentContent(sanitizeDocumentContent(extractedText))
       : EXTRACTION_PROMPT_VISION;
 
     const payload = {
@@ -149,10 +156,7 @@ export class MistralAdapter implements IMistralAdapter {
   }
 
   // --- Two-Step Extraction (OCR → Chat) ---
-  async extractInvoiceData(
-    fileBuffer: Buffer,
-    mimeType: string
-  ): Promise<MistralExtractionResult> {
+  async extractInvoiceData(fileBuffer: Buffer, mimeType: string): Promise<MistralExtractionResult> {
     const startTime = Date.now();
 
     if (!this.apiKey) throw new AppError('CONFIG_ERROR', 'Mistral API not configured', 500);
@@ -166,7 +170,9 @@ export class MistralAdapter implements IMistralAdapter {
     // Step 2: Chat extraction (text path or vision fallback)
     let data: Record<string, unknown>;
     if (ocrText) {
-      const prompt = EXTRACTION_PROMPT_WITH_TEXT + ocrText.substring(0, 50000);
+      // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
+      const prompt =
+        EXTRACTION_PROMPT_WITH_TEXT + wrapDocumentContent(sanitizeDocumentContent(ocrText));
       data = await this.callChat(prompt);
     } else {
       logger.info('OCR returned no text, falling back to Mistral Vision', { mimeType });
@@ -214,7 +220,9 @@ export class MistralAdapter implements IMistralAdapter {
       logger.info('No extracted text available, falling back to Mistral Vision', { mimeType });
       data = await this.callChatWithVision(fileBuffer, mimeType);
     } else {
-      const prompt = EXTRACTION_PROMPT_WITH_TEXT + text.substring(0, 50000);
+      // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
+      const prompt =
+        EXTRACTION_PROMPT_WITH_TEXT + wrapDocumentContent(sanitizeDocumentContent(text));
       data = await this.callChat(prompt);
     }
     const normalizedData = normalizeExtractedData(data);
@@ -290,7 +298,10 @@ export class MistralAdapter implements IMistralAdapter {
         const textResult = await extractText(fileBuffer, mimeType);
         if (textResult.hasText) {
           docText = textResult.text;
-          logger.info('sendPrompt using flat text extraction', { source: textResult.source, textLength: docText.length });
+          logger.info('sendPrompt using flat text extraction', {
+            source: textResult.source,
+            textLength: docText.length,
+          });
         }
       } catch (error) {
         logger.warn('Flat text extraction failed in sendPrompt', {
@@ -305,10 +316,15 @@ export class MistralAdapter implements IMistralAdapter {
     }
 
     if (!docText) {
-      throw new AppError('MISTRAL_ERROR', 'Could not extract text from document for sendPrompt', 500);
+      throw new AppError(
+        'MISTRAL_ERROR',
+        'Could not extract text from document for sendPrompt',
+        500
+      );
     }
 
-    const fullPrompt = `${prompt}\n\nDOCUMENT TEXT:\n${docText.substring(0, 50000)}`;
+    // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
+    const fullPrompt = `${prompt}\n\n${wrapDocumentContent(sanitizeDocumentContent(docText))}`;
 
     // Use callChat with 429 retry (but parse raw text, not JSON)
     await mistralThrottle.acquire();
@@ -343,7 +359,10 @@ export class MistralAdapter implements IMistralAdapter {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           if (attempt < MISTRAL_MAX_429_RETRIES) {
             const backoff = MISTRAL_429_INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-            logger.warn('Mistral 429 in sendPrompt, retrying', { attempt: attempt + 1, backoffMs: backoff });
+            logger.warn('Mistral 429 in sendPrompt, retrying', {
+              attempt: attempt + 1,
+              backoffMs: backoff,
+            });
             await new Promise((r) => setTimeout(r, backoff));
             await mistralThrottle.acquire();
             continue;

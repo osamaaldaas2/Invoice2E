@@ -11,6 +11,8 @@ import {
 } from '@/lib/extraction-prompt';
 import { normalizeExtractedData, parseJsonFromAiResponse } from '@/lib/extraction-normalizer';
 import { geminiThrottle } from '@/lib/api-throttle';
+// FIX: Re-audit #7 — sanitize document text before injecting into AI prompts
+import { sanitizeDocumentContent, wrapDocumentContent } from '@/lib/ai-sanitization';
 
 export class GeminiAdapter implements IGeminiAdapter {
   private readonly configApiKey?: string;
@@ -212,8 +214,10 @@ export class GeminiAdapter implements IGeminiAdapter {
     }
 
     const hasText = !!options?.extractedText;
+    // FIX: Re-audit #7 — sanitize + wrap document text to prevent prompt injection
     const prompt = hasText
-      ? EXTRACTION_PROMPT_WITH_TEXT + options!.extractedText!.substring(0, 50000)
+      ? EXTRACTION_PROMPT_WITH_TEXT +
+        wrapDocumentContent(sanitizeDocumentContent(options!.extractedText!))
       : EXTRACTION_PROMPT_VISION;
 
     const data = await this.callGemini(model, fileBuffer, mimeType, prompt);
