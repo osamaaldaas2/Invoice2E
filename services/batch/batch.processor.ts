@@ -463,11 +463,17 @@ export class BatchProcessor {
         });
       }
 
-      // Refund credits for failed results
+      // FIX: Re-audit #41 — use idempotent refund to prevent double-crediting on retry
       let refundSucceeded = false;
       if (failCount > 0) {
         try {
-          await creditsDbService.addCredits(userId, failCount, `batch:refund:${jobId}`, jobId);
+          const refundIdempotencyKey = `batch-refund:${jobId}:${userId}:${failCount}`;
+          await creditsDbService.refundCreditsIdempotent(
+            userId,
+            failCount,
+            `batch:refund:${jobId}`,
+            refundIdempotencyKey
+          );
           refundSucceeded = true;
           logger.info('Refunded credits for failed batch files', { jobId, userId, failCount });
         } catch (refundErr) {
