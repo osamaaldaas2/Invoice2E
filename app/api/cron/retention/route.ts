@@ -16,8 +16,16 @@ import {
   RetentionEngine,
   type RetentionDatabaseAdapter,
   type RetainableEntity,
-  type RetentionLogger,
 } from '@/lib/retention';
+
+const resolveTable = (entityType: string) =>
+  entityType === 'invoice'
+    ? 'invoice_extractions'
+    : entityType === 'conversion'
+      ? 'invoice_conversions'
+      : entityType === 'audit_log'
+        ? 'audit_logs'
+        : entityType;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // FIX: Audit #023 — authenticate cron endpoint
@@ -38,9 +46,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.info('Retention check triggered', { audit: '#023' });
 
     const supabase = createAdminClient();
-    const useRetention = await isFeatureEnabled(supabase, FEATURE_FLAGS.USE_DATA_RETENTION).catch(
-      () => false
-    );
+    const useRetention = await isFeatureEnabled(
+      supabase,
+      FEATURE_FLAGS.USE_DATA_RETENTION,
+    ).catch(() => false);
 
     if (!useRetention) {
       return NextResponse.json({
@@ -50,62 +59,74 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Supabase-backed retention DB adapter
+    // S3.7: Supabase-backed retention DB adapter
     const dbAdapter: RetentionDatabaseAdapter = {
-      findExpiredEntities: async (entityType, olderThan) => {
-        const table =
-          entityType === 'invoice'
-            ? 'invoice_extractions'
-            : entityType === 'conversion'
-              ? 'invoice_conversions'
-              : entityType === 'audit_log'
-                ? 'audit_logs'
-                : entityType;
+      findExpiredEntities: async ({ entityType, olderThan, limit }) => {
         const { data } = await supabase
-          .from(table)
-          .select('id, created_at, user_id')
+          .from(resolveTable(entityType))
+          .select('id, created_at, user_id, status')
           .lt('created_at', olderThan.toISOString())
-          .limit(1000);
-        return (data ?? []).map((r: any) => ({
-          id: r.id,
-          entityType,
-          createdAt: r.created_at,
-          userId: r.user_id,
-        })) as RetainableEntity[];
+          .limit(limit);
+        return (data ?? []).map(
+          (r: Record<string, unknown>) =>
+            ({
+              id: r.id as string,
+              entityType,
+              createdAt: new Date(r.created_at as string),
+              userId: r.user_id as string,
+              country: 'DE',
+              isArchived: (r.status as string) === 'archived',
+            }) as unknown as RetainableEntity,
+        );
       },
-      deleteEntity: async (id, entityType) => {
-        const table =
-          entityType === 'invoice'
-            ? 'invoice_extractions'
-            : entityType === 'conversion'
-              ? 'invoice_conversions'
-              : entityType === 'audit_log'
-                ? 'audit_logs'
-                : entityType;
-        await supabase.from(table).delete().eq('id', id);
+      archiveEntities: async (entityIds, entityType) => {
+        await supabase
+          .from(resolveTable(entityType))
+          .update({ status: 'archived' })
+          .in('id', entityIds);
       },
-      anonymizeEntity: async (id, entityType) => {
-        const table =
-          entityType === 'invoice'
-            ? 'invoice_extractions'
-            : entityType === 'conversion'
-              ? 'invoice_conversions'
-              : entityType;
-        await supabase.from(table).update({ user_id: 'anonymized' }).eq('id', id);
+      anonymizeEntities: async (entityIds, entityType) => {
+        await supabase
+          .from(resolveTable(entityType))
+          .update({ user_id: 'anonymized' })
+          .in('id', entityIds);
       },
-      logRetentionAction: async (action) => {
-        logger.info('Retention action', action);
+      deleteEntities: async (entityIds, entityType) => {
+        await supabase.from(resolveTable(entityType)).delete().in('id', entityIds);
+      },
+      writeRetentionLog: async (entry) => {
+        await supabase.from('retention_logs').insert(entry);
+      },
+      getDueSchedules: async (asOf) => {
+        const { data } = await supabase
+          .from('retention_schedules')
+          .select('*')
+          .lte('next_run_at', asOf.toISOString())
+          .eq('enabled', true);
+        return (data ?? []) as any[];
+      },
+      updateScheduleNextRun: async (policyId, nextRunAt) => {
+        await supabase
+          .from('retention_schedules')
+          .update({ next_run_at: nextRunAt.toISOString() })
+          .eq('policy_id', policyId);
+      },
+      countRetainedEntities: async (entityType) => {
+        const { count } = await supabase
+          .from(resolveTable(entityType))
+          .select('*', { count: 'exact', head: true });
+        return count ?? 0;
       },
     };
 
-    const retentionLogger: RetentionLogger = {
-      info: (msg, meta) => logger.info(msg, meta),
-      warn: (msg, meta) => logger.warn(msg, meta),
-      error: (msg, meta) => logger.error(msg, meta),
+    const retentionLogger = {
+      info: (msg: string, meta?: Record<string, unknown>) => logger.info(msg, meta),
+      warn: (msg: string, meta?: Record<string, unknown>) => logger.warn(msg, meta),
+      error: (msg: string, meta?: Record<string, unknown>) => logger.error(msg, meta),
     };
 
-    const engine = new RetentionEngine(dbAdapter, retentionLogger);
-    const result = await engine.run();
+    const engine = new RetentionEngine({ db: dbAdapter, logger: retentionLogger });
+    const result = await engine.processRetentionSchedule();
 
     return NextResponse.json({
       success: true,
@@ -117,6 +138,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       error: error instanceof Error ? error.message : String(error),
       audit: '#023',
     });
-    return NextResponse.json({ success: false, error: 'Retention check failed' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Retention check failed' },
+      { status: 500 },
+    );
   }
 }

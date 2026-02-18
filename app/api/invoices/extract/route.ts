@@ -165,12 +165,13 @@ export async function POST(request: NextRequest) {
         storeQuarantine: async (id, buf) => {
           quarantineEntries.set(id, buf);
         },
+        readQuarantine: async (id) => quarantineEntries.get(id) as Buffer,
+        moveToProduction: async () => '',
+        deleteQuarantine: async () => {},
         insertEntry: async () => {},
         updateEntry: async () => {},
         getEntry: async (id) => quarantineEntries.get(id) as any,
-        getFile: async (id) => quarantineEntries.get(id) as Buffer,
-        promoteFile: async () => {},
-        deleteFile: async () => {},
+        getExpiredEntries: async () => [],
       });
       const entry = await quarantineSvc.quarantine(buffer, {
         originalName: file.name,
@@ -178,18 +179,14 @@ export async function POST(request: NextRequest) {
         uploadedBy: userId,
       });
       const scanResult = await quarantineSvc.scan(entry.id);
-      if (!scanResult.passed) {
-        logger.warn('File quarantine scan failed', {
-          userId,
-          fileName: file.name,
-          failures: scanResult.checks.filter((c: any) => !c.passed),
-        });
+      if (!scanResult.isClean) {
+        const failures = scanResult.checks.filter((c) => !c.passed);
+        logger.warn('File quarantine scan failed', { userId, fileName: file.name, failures });
         return NextResponse.json(
           {
             success: false,
-            error: `File rejected by quarantine scan: ${scanResult.checks
-              .filter((c: any) => !c.passed)
-              .map((c: any) => c.reason)
+            error: `File rejected by quarantine scan: ${failures
+              .map((c) => c.detail || c.name)
               .join(', ')}`,
           },
           { status: 422 }
@@ -514,11 +511,12 @@ export async function POST(request: NextRequest) {
     if (useOutbox && pendingExtractionId) {
       try {
         const { OutboxService } = await import('@/lib/outbox/outbox');
+        const { OUTBOX_EVENT_TYPES } = await import('@/lib/outbox/types');
         const outbox = new OutboxService();
         await outbox.appendEvent(userClient, {
           aggregateType: 'extraction',
           aggregateId: pendingExtractionId,
-          eventType: 'extraction.completed',
+          eventType: OUTBOX_EVENT_TYPES.INVOICE_EXTRACTED,
           payload: {
             userId,
             extractionId: pendingExtractionId,
