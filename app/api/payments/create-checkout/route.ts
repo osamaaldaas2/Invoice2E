@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
                     credits: pkg.credits.toString()
                 }
             });
-            result = session;
+            result = session as typeof result;
             providerId = session.id;
         } else {
             const order = await paypalAdapter.createOrder({
