@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
                     credits: pkg.credits
                 })
             });
-            result = { id: order.id, url: order.url };
+            result = { id: order.id, url: order.approvalUrl };
             providerId = order.id;
         }
 
