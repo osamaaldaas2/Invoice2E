@@ -3,7 +3,7 @@
   <Naglowek>
     <KodFormularza kodSystemowy="FA (2)" wersjaSchemy="1-0E">FA</KodFormularza>
     <WariantFormularza>2</WariantFormularza>
-    <DataWytworzeniaFa>2024-07-15T00:00:00</DataWytworzeniaFa>
+    <DataWytworzeniaFa>2024-07-15T00:00:00Z</DataWytworzeniaFa>
     <SystemInfo>Invoice2E</SystemInfo>
   </Naglowek>
   <Podmiot1>

@@ -8,6 +8,7 @@
 import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import { escapeXml, formatDateISO, formatAmount } from '@/lib/xml-utils';
+import { roundMoney } from '@/lib/monetary';
 
 /** Map EN 16931 document type codes to FatturaPA TipoDocumento */
 function mapTipoDocumento(code?: string | number): string {
@@ -85,6 +86,21 @@ export class FatturapaGenerator implements IFormatGenerator {
       };
     }
 
+    // Pre-generation validation: buyer must have IdFiscaleIVA or CodiceFiscale
+    const buyerHasTaxId = !!(invoice.buyer.vatId || invoice.buyer.taxNumber || invoice.buyer.taxId);
+    if (!buyerHasTaxId) {
+      return {
+        xmlContent: '',
+        fileName: '',
+        fileSize: 0,
+        validationStatus: 'invalid',
+        validationErrors: [
+          'FatturaPA requires buyer tax ID (IdFiscaleIVA or CodiceFiscale). Provide buyerVatId or buyerTaxNumber.',
+        ],
+        validationWarnings: [],
+      };
+    }
+
     const xml = this.buildXml(invoice);
     const validation = await this.validate(xml);
 
@@ -147,7 +163,7 @@ export class FatturapaGenerator implements IFormatGenerator {
       const rate = item.taxRate ?? 0;
       const existing = taxGroups.get(rate) || { taxable: 0, tax: 0 };
       existing.taxable += item.totalPrice;
-      existing.tax += item.totalPrice * (rate / 100);
+      existing.tax = roundMoney(existing.tax + item.totalPrice * (rate / 100));
       if (item.taxCategoryCode && !existing.taxCategoryCode) {
         existing.taxCategoryCode = item.taxCategoryCode;
       }
@@ -157,7 +173,7 @@ export class FatturapaGenerator implements IFormatGenerator {
     for (const [rate, adjustment] of allowanceChargeByRate) {
       const existing = taxGroups.get(rate) || { taxable: 0, tax: 0 };
       existing.taxable += adjustment;
-      existing.tax += adjustment * (rate / 100);
+      existing.tax = roundMoney(existing.tax + adjustment * (rate / 100));
       taxGroups.set(rate, existing);
     }
 
@@ -191,7 +207,13 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`          <IdCodice>${escapeXml(sellerVat.codice)}</IdCodice>`);
     lines.push(`        </IdFiscaleIVA>`);
     if (inv.seller.taxNumber) {
-      lines.push(`        <CodiceFiscale>${escapeXml(inv.seller.taxNumber)}</CodiceFiscale>`);
+      const sellerCountry = (inv.seller.countryCode || sellerVat.paese).toUpperCase();
+      if (sellerCountry === 'IT') {
+        const cf = inv.seller.taxNumber.replace(/^IT/i, '').trim();
+        if (cf) {
+          lines.push(`        <CodiceFiscale>${escapeXml(cf)}</CodiceFiscale>`);
+        }
+      }
     }
     lines.push(`        <Anagrafica>`);
     lines.push(`          <Denominazione>${escapeXml(inv.seller.name)}</Denominazione>`);
@@ -219,10 +241,15 @@ export class FatturapaGenerator implements IFormatGenerator {
       lines.push(`          <IdCodice>${escapeXml(buyerVat.codice)}</IdCodice>`);
       lines.push(`        </IdFiscaleIVA>`);
     }
-    if (inv.buyer.taxNumber) {
-      lines.push(`        <CodiceFiscale>${escapeXml(inv.buyer.taxNumber)}</CodiceFiscale>`);
-    } else if (!inv.buyer.vatId && inv.buyer.taxId) {
-      lines.push(`        <CodiceFiscale>${escapeXml(inv.buyer.taxId)}</CodiceFiscale>`);
+    const buyerCountry = (inv.buyer.countryCode || buyerVat?.paese || 'IT').toUpperCase();
+    if (buyerCountry === 'IT') {
+      const rawCF = inv.buyer.taxNumber || (!inv.buyer.vatId ? inv.buyer.taxId : null);
+      if (rawCF) {
+        const cf = rawCF.replace(/^IT/i, '').trim();
+        if (cf) {
+          lines.push(`        <CodiceFiscale>${escapeXml(cf)}</CodiceFiscale>`);
+        }
+      }
     }
     lines.push(`        <Anagrafica>`);
     lines.push(`          <Denominazione>${escapeXml(inv.buyer.name)}</Denominazione>`);

@@ -26,7 +26,7 @@ function extractNIP(party: {
 
 /** Map tax rate to KSeF P_12 value */
 function formatTaxRate(rate?: number, taxCategoryCode?: TaxCategoryCode): string {
-  if (rate === undefined || rate === null) return '23';
+  if (rate === undefined || rate === null) return '0';
   if (rate === 0 && taxCategoryCode) {
     switch (taxCategoryCode) {
       case 'E':
@@ -53,7 +53,7 @@ function formatTaxRate(rate?: number, taxCategoryCode?: TaxCategoryCode): string
 function sumByTaxRate(items: CanonicalLineItem[]): Map<number, number> {
   const map = new Map<number, number>();
   for (const item of items) {
-    const rate = item.taxRate ?? 23;
+    const rate = item.taxRate ?? 0;
     map.set(rate, (map.get(rate) || 0) + item.totalPrice);
   }
   return map;
@@ -74,6 +74,22 @@ export class KsefGenerator implements IFormatGenerator {
   readonly specDate = '2022-09-01';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
+    // Pre-generation validation: seller NIP is mandatory for KSeF
+    const sellerNIP = extractNIP(invoice.seller);
+    if (!sellerNIP) {
+      return {
+        xmlContent: '',
+        fileName: '',
+        fileSize: 0,
+        validationStatus: 'invalid',
+        validationErrors: [
+          'KSeF requires seller NIP (Polish tax identification number). Provide vatId, taxNumber, or taxId.',
+        ],
+        validationWarnings: [],
+        mimeType: 'application/xml',
+      };
+    }
+
     const xml = this.buildXml(invoice);
     const encoder = new TextEncoder();
     const fileSize = encoder.encode(xml).length;
@@ -84,7 +100,7 @@ export class KsefGenerator implements IFormatGenerator {
     // Warn about unsupported tax rates (KSeF only has fields for 23%, 8%, 5%, 22%, 7%, 0%)
     const supportedRates = new Set([23, 8, 5, 22, 7, 0]);
     for (const item of invoice.lineItems) {
-      const rate = item.taxRate ?? 23;
+      const rate = item.taxRate ?? 0;
       if (!supportedRates.has(rate)) {
         warnings.push(
           `Line "${item.description}": tax rate ${rate}% is not a standard Polish VAT rate. KSeF may reject this invoice.`
@@ -137,7 +153,7 @@ export class KsefGenerator implements IFormatGenerator {
     w('  <Naglowek>');
     w('    <KodFormularza kodSystemowy="FA (2)" wersjaSchemy="1-0E">FA</KodFormularza>');
     w('    <WariantFormularza>2</WariantFormularza>');
-    w(`    <DataWytworzeniaFa>${formatDateISO(inv.invoiceDate)}T00:00:00</DataWytworzeniaFa>`);
+    w(`    <DataWytworzeniaFa>${formatDateISO(inv.invoiceDate)}T00:00:00Z</DataWytworzeniaFa>`);
     w('    <SystemInfo>Invoice2E</SystemInfo>');
     w('  </Naglowek>');
 
@@ -189,7 +205,7 @@ export class KsefGenerator implements IFormatGenerator {
     // Apply document-level allowances/charges to rate sums
     if (inv.allowanceCharges?.length) {
       for (const ac of inv.allowanceCharges) {
-        const rate = ac.taxRate ?? 23;
+        const rate = ac.taxRate ?? 0;
         const adjustment = ac.chargeIndicator ? ac.amount : -ac.amount;
         rateSums.set(rate, (rateSums.get(rate) || 0) + adjustment);
       }

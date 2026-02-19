@@ -1,7 +1,7 @@
 /**
  * Maps various invoice data shapes to the CanonicalInvoice model.
  * Handles ExtractedInvoiceData, XRechnungInvoiceData, and raw Record<string, unknown>.
- * 
+ *
  * @module services/format/canonical-mapper
  */
 
@@ -50,7 +50,7 @@ function optNum(value: unknown): number | null {
 
 /**
  * Map input invoice data to CanonicalInvoice.
- * 
+ *
  * Handles the seller tax ID splitting logic (sellerTaxId → sellerVatId/sellerTaxNumber)
  * that currently lives in the convert route, and electronic address fallback logic.
  */
@@ -72,10 +72,6 @@ export function toCanonicalInvoice(
     }
   }
 
-  // PEPPOL-based formats use EAS code '0204' for email, not 'EM'
-  const isPeppolBased = ['peppol-bis', 'nlcius', 'cius-ro'].includes(outputFormat);
-  const emailScheme = isPeppolBased ? '0204' : 'EM';
-
   // Build seller party
   const seller: PartyInfo = {
     name: str(d.sellerName) || '',
@@ -89,7 +85,8 @@ export function toCanonicalInvoice(
     taxNumber: sellerTaxNumber,
     taxId: rawSellerTaxId,
     electronicAddress: str(d.sellerElectronicAddress) || str(d.sellerEmail),
-    electronicAddressScheme: str(d.sellerElectronicAddressScheme)?.replace(/^EM$/, emailScheme) || (str(d.sellerEmail) ? emailScheme : null),
+    electronicAddressScheme:
+      str(d.sellerElectronicAddressScheme) || (str(d.sellerEmail) ? 'EM' : null),
     contactName: str(d.sellerContactName) || str(d.sellerContact),
     taxRegime: str(d.sellerTaxRegime) || str(d.taxRegime),
   };
@@ -106,7 +103,8 @@ export function toCanonicalInvoice(
     vatId: str(d.buyerVatId),
     taxId: str(d.buyerTaxId),
     electronicAddress: str(d.buyerElectronicAddress) || str(d.buyerEmail),
-    electronicAddressScheme: str(d.buyerElectronicAddressScheme)?.replace(/^EM$/, emailScheme) || (str(d.buyerEmail) ? emailScheme : null),
+    electronicAddressScheme:
+      str(d.buyerElectronicAddressScheme) || (str(d.buyerEmail) ? 'EM' : null),
     contactName: null,
   };
 
@@ -126,7 +124,10 @@ export function toCanonicalInvoice(
     description: str(item.description) || str(item.name) || '',
     quantity: num(item.quantity) || 1,
     unitPrice: num(item.unitPrice),
-    totalPrice: num(item.totalPrice) || num(item.lineTotal) || num(item.unitPrice) * (num(item.quantity) || 1),
+    totalPrice:
+      num(item.totalPrice) ||
+      num(item.lineTotal) ||
+      num(item.unitPrice) * (num(item.quantity) || 1),
     taxRate: optNum(item.taxRate) ?? optNum(item.vatRate) ?? undefined,
     taxCategoryCode: (item.taxCategoryCode as TaxCategoryCode | undefined) || undefined,
     unitCode: str(item.unitCode) || undefined,
@@ -199,9 +200,7 @@ export function preprocessGrossToNet(invoice: CanonicalInvoice): CanonicalInvoic
   );
   if (grossAllowances <= 0 && grossCharges <= 0) return invoice;
 
-  const grossLineTotal = sumMoney(
-    items.map((item) => item.totalPrice)
-  );
+  const grossLineTotal = sumMoney(items.map((item) => item.totalPrice));
   const grossAfterAdjustments = roundMoney(grossLineTotal - grossAllowances + grossCharges);
   const providedSubtotal = invoice.totals.subtotal;
 
@@ -257,13 +256,10 @@ export function preprocessGrossToNet(invoice: CanonicalInvoice): CanonicalInvoic
 
   if (Math.abs(roundingDiff) > 0 && Math.abs(roundingDiff) <= 0.05 && netItems.length > 0) {
     const largestIdx = netItems.reduce(
-      (maxIdx, item, idx) =>
-        item.totalPrice > netItems[maxIdx]!.totalPrice ? idx : maxIdx,
+      (maxIdx, item, idx) => (item.totalPrice > netItems[maxIdx]!.totalPrice ? idx : maxIdx),
       0
     );
-    netItems[largestIdx]!.totalPrice = roundMoney(
-      netItems[largestIdx]!.totalPrice + roundingDiff
-    );
+    netItems[largestIdx]!.totalPrice = roundMoney(netItems[largestIdx]!.totalPrice + roundingDiff);
   }
 
   return {

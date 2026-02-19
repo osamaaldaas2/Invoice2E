@@ -293,6 +293,83 @@ describe('FatturaPA Additional Coverage', () => {
     generator = new FatturapaGenerator();
   });
 
+  it('omits CodiceFiscale for non-Italian buyer', async () => {
+    const invoice = makeFatturapaInvoice({
+      buyer: {
+        name: 'DK-Tech GmbH',
+        vatId: 'DE123456789',
+        taxNumber: '358337977',
+        address: 'Klingholzstr. 7',
+        city: 'Wiesbaden',
+        postalCode: '65189',
+        countryCode: 'DE',
+      },
+    });
+    const result = await generator.generate(invoice);
+    const buyerSection =
+      result.xmlContent
+        .split('<CessionarioCommittente>')[1]
+        ?.split('</CessionarioCommittente>')[0] || '';
+    expect(buyerSection).not.toContain('<CodiceFiscale>');
+  });
+
+  it('emits CodiceFiscale for Italian buyer with taxNumber', async () => {
+    const invoice = makeFatturapaInvoice({
+      buyer: {
+        name: 'Società Acquirente SPA',
+        vatId: 'IT09876543210',
+        taxNumber: 'RSSMRA80A01H501U',
+        address: 'Corso Italia 5',
+        city: 'Roma',
+        postalCode: '00185',
+        countryCode: 'IT',
+      },
+    });
+    const result = await generator.generate(invoice);
+    const buyerSection =
+      result.xmlContent
+        .split('<CessionarioCommittente>')[1]
+        ?.split('</CessionarioCommittente>')[0] || '';
+    expect(buyerSection).toContain('<CodiceFiscale>RSSMRA80A01H501U</CodiceFiscale>');
+  });
+
+  it('omits CodiceFiscale for non-Italian seller', async () => {
+    const invoice = makeFatturapaInvoice({
+      seller: {
+        name: 'German Corp GmbH',
+        vatId: 'DE999888777',
+        taxNumber: '30/123/45678',
+        address: 'Hauptstr. 1',
+        city: 'Berlin',
+        postalCode: '10115',
+        countryCode: 'DE',
+      },
+    });
+    const result = await generator.generate(invoice);
+    const sellerSection =
+      result.xmlContent.split('<CedentePrestatore>')[1]?.split('</CedentePrestatore>')[0] || '';
+    expect(sellerSection).not.toContain('<CodiceFiscale>');
+  });
+
+  it('strips IT prefix from Italian CodiceFiscale', async () => {
+    const invoice = makeFatturapaInvoice({
+      seller: {
+        name: 'Azienda Italiana SRL',
+        vatId: 'IT01234567890',
+        taxNumber: 'IT01234567890',
+        address: 'Via Roma 10',
+        city: 'Milano',
+        postalCode: '20121',
+        countryCode: 'IT',
+      },
+    });
+    const result = await generator.generate(invoice);
+    const sellerSection =
+      result.xmlContent.split('<CedentePrestatore>')[1]?.split('</CedentePrestatore>')[0] || '';
+    expect(sellerSection).toContain('<CodiceFiscale>01234567890</CodiceFiscale>');
+    expect(sellerSection).not.toContain('<CodiceFiscale>IT01234567890</CodiceFiscale>');
+  });
+
   it('generates credit note with TD04', async () => {
     const invoice = makeFatturapaInvoice({
       documentTypeCode: 381,

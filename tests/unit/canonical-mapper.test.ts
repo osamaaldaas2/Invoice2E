@@ -9,9 +9,7 @@ function createMinimalInput() {
     sellerEmail: 'seller@example.de',
     buyerName: 'Buyer GmbH',
     buyerEmail: 'buyer@example.de',
-    lineItems: [
-      { description: 'Service', quantity: 1, unitPrice: 100, totalPrice: 100 },
-    ],
+    lineItems: [{ description: 'Service', quantity: 1, unitPrice: 100, totalPrice: 100 }],
     subtotal: 100,
     taxAmount: 19,
     totalAmount: 119,
@@ -34,7 +32,12 @@ describe('toCanonicalInvoice', () => {
   });
 
   it('maps seller party', () => {
-    const input = { ...createMinimalInput(), sellerAddress: 'Str. 1', sellerCity: 'Berlin', sellerPostalCode: '10115' };
+    const input = {
+      ...createMinimalInput(),
+      sellerAddress: 'Str. 1',
+      sellerCity: 'Berlin',
+      sellerPostalCode: '10115',
+    };
     const result = toCanonicalInvoice(input);
     expect(result.seller.name).toBe('Seller AG');
     expect(result.seller.address).toBe('Str. 1');
@@ -81,11 +84,46 @@ describe('toCanonicalInvoice', () => {
     expect(result.buyer.electronicAddress).toBe('buyer@example.de');
   });
 
+  it('uses EM scheme for email addresses in peppol-bis format', () => {
+    const result = toCanonicalInvoice(createMinimalInput(), 'peppol-bis');
+    expect(result.seller.electronicAddressScheme).toBe('EM');
+    expect(result.buyer.electronicAddressScheme).toBe('EM');
+  });
+
+  it('uses EM scheme for email addresses in nlcius format', () => {
+    const result = toCanonicalInvoice(createMinimalInput(), 'nlcius');
+    expect(result.seller.electronicAddressScheme).toBe('EM');
+    expect(result.buyer.electronicAddressScheme).toBe('EM');
+  });
+
+  it('uses EM scheme for email addresses in cius-ro format', () => {
+    const result = toCanonicalInvoice(createMinimalInput(), 'cius-ro');
+    expect(result.seller.electronicAddressScheme).toBe('EM');
+    expect(result.buyer.electronicAddressScheme).toBe('EM');
+  });
+
+  it('preserves explicit non-EM scheme for peppol-bis format', () => {
+    const input = {
+      ...createMinimalInput(),
+      sellerElectronicAddress: '0204:991-01234-56',
+      sellerElectronicAddressScheme: '0204',
+    };
+    const result = toCanonicalInvoice(input, 'peppol-bis');
+    expect(result.seller.electronicAddressScheme).toBe('0204');
+  });
+
   it('maps line items', () => {
     const input = {
       ...createMinimalInput(),
       lineItems: [
-        { description: 'Item A', quantity: 2, unitPrice: 50, totalPrice: 100, taxRate: 19, unitCode: 'C62' },
+        {
+          description: 'Item A',
+          quantity: 2,
+          unitPrice: 50,
+          totalPrice: 100,
+          taxRate: 19,
+          unitCode: 'C62',
+        },
       ],
     };
     const result = toCanonicalInvoice(input);
@@ -133,9 +171,7 @@ describe('toCanonicalInvoice', () => {
   it('maps allowance charges', () => {
     const input = {
       ...createMinimalInput(),
-      allowanceCharges: [
-        { chargeIndicator: false, amount: 10, reason: 'Discount' },
-      ],
+      allowanceCharges: [{ chargeIndicator: false, amount: 10, reason: 'Discount' }],
     };
     const result = toCanonicalInvoice(input);
     expect(result.allowanceCharges).toHaveLength(1);

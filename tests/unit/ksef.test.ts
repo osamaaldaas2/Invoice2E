@@ -44,24 +44,24 @@ function makeKsefInvoice(overrides?: Partial<CanonicalInvoice>): CanonicalInvoic
       {
         description: 'Usługa doradcza',
         quantity: 10,
-        unitPrice: 100.00,
-        totalPrice: 1000.00,
+        unitPrice: 100.0,
+        totalPrice: 1000.0,
         taxRate: 23,
         unitCode: 'C62',
       },
       {
         description: 'Materiały biurowe',
         quantity: 5,
-        unitPrice: 50.00,
-        totalPrice: 250.00,
+        unitPrice: 50.0,
+        totalPrice: 250.0,
         taxRate: 23,
         unitCode: 'C62',
       },
     ],
     totals: {
-      subtotal: 1250.00,
-      taxAmount: 287.50,
-      totalAmount: 1537.50,
+      subtotal: 1250.0,
+      taxAmount: 287.5,
+      totalAmount: 1537.5,
     },
     ...overrides,
   };
@@ -177,7 +177,13 @@ describe('KsefGenerator', () => {
 
   it('should handle buyer without NIP (name only)', async () => {
     const invoice = makeKsefInvoice({
-      buyer: { name: 'Jan Kowalski', address: 'ul. Prywatna 1', city: 'Gdańsk', postalCode: '80-001', countryCode: 'PL' },
+      buyer: {
+        name: 'Jan Kowalski',
+        address: 'ul. Prywatna 1',
+        city: 'Gdańsk',
+        postalCode: '80-001',
+        countryCode: 'PL',
+      },
     });
     const result = await generator.generate(invoice);
     expect(result.xmlContent).toContain('<Nazwa>Jan Kowalski</Nazwa>');
@@ -198,7 +204,7 @@ describe('KSeF Validation Rules', () => {
       seller: { name: 'Test', vatId: null, taxNumber: null },
     });
     const errors = validateKsefRules(invoice);
-    const nipError = errors.find(e => e.ruleId === 'KSEF-01');
+    const nipError = errors.find((e) => e.ruleId === 'KSEF-01');
     expect(nipError).toBeDefined();
   });
 
@@ -207,7 +213,7 @@ describe('KSeF Validation Rules', () => {
       seller: { name: 'Test', vatId: 'PL12345' },
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-01')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-01')).toBeDefined();
   });
 
   it('should fail when buyer has no NIP and no name', () => {
@@ -215,7 +221,7 @@ describe('KSeF Validation Rules', () => {
       buyer: { name: '', vatId: null },
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-02')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-02')).toBeDefined();
   });
 
   it('should pass when buyer has name but no NIP', () => {
@@ -223,37 +229,37 @@ describe('KSeF Validation Rules', () => {
       buyer: { name: 'Jan Kowalski' },
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-02')).toBeUndefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-02')).toBeUndefined();
   });
 
   it('should fail when invoice number is missing', () => {
     const invoice = makeKsefInvoice({ invoiceNumber: '' });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-03')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-03')).toBeDefined();
   });
 
   it('should fail when invoice number exceeds 256 chars', () => {
     const invoice = makeKsefInvoice({ invoiceNumber: 'A'.repeat(257) });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-03')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-03')).toBeDefined();
   });
 
   it('should fail when issue date is missing', () => {
     const invoice = makeKsefInvoice({ invoiceDate: '' });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-04')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-04')).toBeDefined();
   });
 
   it('should fail when currency is missing', () => {
     const invoice = makeKsefInvoice({ currency: '' });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-05')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-05')).toBeDefined();
   });
 
   it('should fail when no line items', () => {
     const invoice = makeKsefInvoice({ lineItems: [] });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-06')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-06')).toBeDefined();
   });
 
   it('should fail for invalid Polish tax rate', () => {
@@ -263,7 +269,7 @@ describe('KSeF Validation Rules', () => {
       ],
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-08')).toBeDefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-08')).toBeDefined();
   });
 
   it('should accept 0% tax rate', () => {
@@ -273,17 +279,17 @@ describe('KSeF Validation Rules', () => {
       ],
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-08')).toBeUndefined();
+    expect(errors.find((e) => e.ruleId === 'KSEF-08')).toBeUndefined();
   });
 
   it('should fail when line item description is missing', () => {
     const invoice = makeKsefInvoice({
-      lineItems: [
-        { description: '', quantity: 1, unitPrice: 100, totalPrice: 100, taxRate: 23 },
-      ],
+      lineItems: [{ description: '', quantity: 1, unitPrice: 100, totalPrice: 100, taxRate: 23 }],
     });
     const errors = validateKsefRules(invoice);
-    expect(errors.find(e => e.ruleId === 'KSEF-07' && e.location.includes('description'))).toBeDefined();
+    expect(
+      errors.find((e) => e.ruleId === 'KSEF-07' && e.location.includes('description'))
+    ).toBeDefined();
   });
 });
 
@@ -333,6 +339,65 @@ describe('KSeF Additional Coverage', () => {
     const result = await generator.generate(invoice);
     expect(result.xmlContent).toBeTruthy();
     expect(result.xmlContent).toContain('<Fa>');
+  });
+
+  it('defaults undefined taxRate to 0% (not 23%)', async () => {
+    const invoice = makeKsefInvoice({
+      lineItems: [
+        {
+          description: 'No rate item',
+          quantity: 1,
+          unitPrice: 100,
+          totalPrice: 100,
+          unitCode: 'C62',
+        },
+      ],
+    });
+    const result = await generator.generate(invoice);
+    expect(result.xmlContent).toContain('<P_12>0</P_12>');
+    expect(result.xmlContent).not.toContain('<P_12>23</P_12>');
+    expect(result.xmlContent).toContain('<P_13_6_1>100.00</P_13_6_1>');
+  });
+
+  it('non-standard rate (19%) produces correct P_12 with no P_13_1/P_14_1', async () => {
+    const invoice = makeKsefInvoice({
+      lineItems: [
+        {
+          description: 'German service',
+          quantity: 1,
+          unitPrice: 500,
+          totalPrice: 500,
+          taxRate: 19,
+          unitCode: 'C62',
+        },
+      ],
+      totals: { subtotal: 500, taxAmount: 95, totalAmount: 595 },
+    });
+    const result = await generator.generate(invoice);
+    expect(result.xmlContent).toContain('<P_12>19</P_12>');
+    expect(result.xmlContent).not.toContain('<P_13_1>');
+    expect(result.xmlContent).not.toContain('<P_14_1>');
+    expect(result.xmlContent).toContain('<P_15>595.00</P_15>');
+  });
+
+  it('emits validation warning for non-standard tax rates', async () => {
+    const invoice = makeKsefInvoice({
+      lineItems: [
+        {
+          description: 'German item',
+          quantity: 1,
+          unitPrice: 100,
+          totalPrice: 100,
+          taxRate: 19,
+          unitCode: 'C62',
+        },
+      ],
+      totals: { subtotal: 100, taxAmount: 19, totalAmount: 119 },
+    });
+    const result = await generator.generate(invoice);
+    expect(result.validationWarnings.length).toBeGreaterThan(0);
+    expect(result.validationWarnings[0]).toContain('19%');
+    expect(result.validationWarnings[0]).toContain('not a standard Polish VAT rate');
   });
 
   it('handles 5% tax rate (P_13_3, P_14_3)', async () => {
