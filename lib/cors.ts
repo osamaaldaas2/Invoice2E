@@ -40,10 +40,11 @@ export const CORS_CONFIG = {
 /**
  * Check if origin is allowed
  */
+// FIX: Re-audit #30 — dynamic CORS origin check (no stale cache in long-lived processes)
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true; // Same-origin requests don't have Origin header
 
-  const allowedOrigins = CORS_CONFIG.allowedOrigins;
+  const allowedOrigins = getAllowedOrigins();
 
   // If no origins configured, allow only same-origin in production
   if (allowedOrigins.length === 0) {

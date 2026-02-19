@@ -426,6 +426,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export async function OPTIONS(): Promise<NextResponse> {
-  return NextResponse.json({}, { status: 200 });
-}
+// FIX: Re-audit #73 — removed explicit OPTIONS handler.
+// CORS preflight is handled by middleware (middleware.ts) which returns
+// proper CORS headers. The old handler returned 200 without CORS headers.
