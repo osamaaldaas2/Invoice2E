@@ -114,9 +114,12 @@ export const EXTRACTION_VALIDATION_TOLERANCE = {
 } as const;
 
 // Text extraction thresholds
+/** FIX: Re-audit #25 — document AI text truncation limit.
+ *  50,000 chars ≈ 12,500 tokens (at ~4 chars/token). Prevents excessive
+ *  token usage and stays within model context window limits. */
 export const TEXT_EXTRACTION = {
   MIN_CHARS_PER_PAGE: 50, // Below this → treat as scanned
-  MAX_TEXT_LENGTH: 50000, // Truncate extracted text beyond this
+  MAX_TEXT_LENGTH: 50_000, // Truncate extracted text beyond this
 } as const;
 
 export const GEMINI_RATE_LIMIT = {

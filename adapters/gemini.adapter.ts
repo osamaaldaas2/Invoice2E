@@ -326,8 +326,8 @@ export class GeminiAdapter implements IGeminiAdapter {
       const data = parseJsonFromAiResponse(textContent) as Record<string, unknown>;
       return normalizeExtractedData(data);
     } catch (error) {
+      // FIX: Re-audit #26 — redact AI response preview (may contain invoice PII)
       logger.warn('Gemini response parse failed', {
-        responsePreview: textContent.substring(0, 500),
         responseLength: textContent.length,
       });
       if (error instanceof AppError) throw error;

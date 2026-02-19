@@ -416,7 +416,8 @@ export class OpenAIAdapter implements IOpenAIAdapter {
       const parsed = parseJsonFromAiResponse(content) as Record<string, unknown>;
       return parsed;
     } catch {
-      logger.error('JSON parsing failed', { content: content.substring(0, 100) });
+      // FIX: Re-audit #26 — redact AI response content (may contain invoice PII)
+      logger.error('JSON parsing failed', { responseLength: content.length });
       throw new AppError('OPENAI_ERROR', 'Invalid JSON response from OpenAI', 500);
     }
   }

@@ -9,6 +9,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import { TEXT_EXTRACTION } from '@/lib/constants';
 
 /**
  * Zero-width and invisible Unicode characters that can be used
@@ -81,7 +82,10 @@ const INJECTION_PATTERNS: ReadonlyArray<RegExp> = [
  *
  * FIX: Re-audit #7
  */
-export function sanitizeDocumentContent(text: string, maxLength: number = 50000): string {
+export function sanitizeDocumentContent(
+  text: string,
+  maxLength: number = TEXT_EXTRACTION.MAX_TEXT_LENGTH
+): string {
   if (!text) return '';
 
   let sanitized = text;
