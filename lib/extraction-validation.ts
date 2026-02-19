@@ -73,7 +73,7 @@ export const ExtractedInvoiceDataSchema = z
     notes: z.string().max(5000).nullable(),
     confidence: z.number().finite().min(0).max(1).optional(),
     processingTimeMs: z.number().finite().nonnegative().optional(),
-    documentTypeCode: z.string().max(10).optional(),
+    documentTypeCode: z.coerce.string().max(10).optional(),
     buyerReference: z.string().max(500).nullable().optional(),
     sellerContactName: z.string().max(200).nullable().optional(),
     dueDate: z.string().max(50).nullable().optional(),
