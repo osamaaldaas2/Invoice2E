@@ -13,6 +13,52 @@ import { BatchResult } from './types';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// FIX: Re-audit #42 — structured retryable error detection
+// Checks status code and error code first, falls back to string matching.
+function isRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+
+  // 1. Structured: HTTP status code (provider SDKs often set .status)
+  if ('status' in error && typeof (error as Record<string, unknown>).status === 'number') {
+    const status = (error as Record<string, unknown>).status as number;
+    if (status === 429 || status === 502 || status === 503 || status === 504) return true;
+  }
+
+  // 2. Structured: error code (e.g. AppError code)
+  if ('code' in error && typeof (error as Record<string, unknown>).code === 'string') {
+    const code = ((error as Record<string, unknown>).code as string).toUpperCase();
+    const retryableCodes = [
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'RATE_LIMITED',
+      'PARSE_ERROR',
+    ];
+    if (retryableCodes.includes(code)) return true;
+  }
+
+  // 3. Fallback: string matching (brittle, but covers providers without structured errors)
+  const retryablePatterns = [
+    'rate limit',
+    '429',
+    'too many requests',
+    'timeout',
+    'timed out',
+    'etimedout',
+    'service unavailable',
+    '503',
+    'bad gateway',
+    '502',
+    'gateway timeout',
+    '504',
+    'overloaded',
+    'parse_error',
+    'failed to parse',
+  ];
+  return retryablePatterns.some((pattern) => msg.includes(pattern));
+}
+
 export class BatchProcessor {
   /**
    * Retry extraction with exponential backoff on 429/transient errors.
@@ -48,20 +94,8 @@ export class BatchProcessor {
         return await extractor.extractFromFile(fileContent, fileName, 'application/pdf');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        const errorMessage = lastError.message;
 
-        const isRetryable =
-          errorMessage.includes('429') ||
-          errorMessage.includes('rate limit') ||
-          errorMessage.includes('quota') ||
-          errorMessage.includes('RATE_LIMIT') ||
-          errorMessage.includes('Too Many Requests') ||
-          errorMessage.includes('503') ||
-          errorMessage.includes('overloaded') ||
-          errorMessage.includes('PARSE_ERROR') ||
-          errorMessage.includes('Failed to parse');
-
-        if (!isRetryable || attempt === BATCH_EXTRACTION.MAX_RETRIES) {
+        if (!isRetryableError(lastError) || attempt === BATCH_EXTRACTION.MAX_RETRIES) {
           throw lastError;
         }
 
@@ -77,7 +111,7 @@ export class BatchProcessor {
           attempt: attempt + 1,
           maxRetries: BATCH_EXTRACTION.MAX_RETRIES,
           backoffMs,
-          error: errorMessage,
+          error: lastError.message,
         });
 
         await delay(backoffMs);
