@@ -117,7 +117,6 @@ let _getTraceContext: (() => { traceId: string; spanId: string } | undefined) | 
 function tryGetTraceContext(): { traceId: string; spanId: string } | undefined {
   if (_getTraceContext !== null) return _getTraceContext();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('@/lib/telemetry-utils') as {
       getTraceContext: () => { traceId: string; spanId: string } | undefined;
     };
@@ -177,9 +176,10 @@ export const logger = {
     let errorData: LogData | undefined;
     if (errorOrData instanceof Error) {
       // FIX: Audit #039 — strip stack traces in production to avoid leaking internals
-      errorData = process.env.NODE_ENV === 'development'
-        ? { message: errorOrData.message, stack: errorOrData.stack }
-        : { message: errorOrData.message };
+      errorData =
+        process.env.NODE_ENV === 'development'
+          ? { message: errorOrData.message, stack: errorOrData.stack }
+          : { message: errorOrData.message };
     } else if (
       errorOrData !== null &&
       typeof errorOrData === 'object' &&
@@ -194,7 +194,9 @@ export const logger = {
     console.error(JSON.stringify(entry));
   },
 
+  // FIX: Re-audit #60 — add shouldLog check consistent with info/debug
   warn: (message: string, data?: LogData): void => {
+    if (!shouldLog('warn')) return;
     const entry = formatLog('warn', message, data);
     // eslint-disable-next-line no-console
     console.warn(JSON.stringify(entry));

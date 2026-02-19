@@ -220,7 +220,9 @@ async function setSessionCookieInternal(user: {
     path: '/',
   });
 
-  // Also clear any legacy session cookie
+  // FIX: Re-audit #48 — legacy session_user_id cookie migration
+  // TODO: Remove after 2026-03-19 (30 days from deployment). All 7-day sessions
+  // will have expired by then, making this backward-compat clearing unnecessary.
   cookieStore.set('session_user_id', '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -295,7 +297,8 @@ export async function clearSessionCookie(): Promise<void> {
     path: '/',
   });
 
-  // Also clear legacy cookie
+  // FIX: Re-audit #48 — legacy session_user_id cookie migration
+  // TODO: Remove after 2026-03-19 (see above)
   cookieStore.set('session_user_id', '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

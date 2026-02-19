@@ -52,7 +52,10 @@ export class GeminiAdapter implements IGeminiAdapter {
         model: this.modelName,
         generationConfig: {
           // @ts-expect-error — thinkingConfig is supported by Gemini 2.5 but not yet in SDK types (FIX: Audit #066)
-          thinkingConfig: this.enableThinking ? { thinkingBudget: 4096 } : { thinkingBudget: 0 },
+          // FIX: Re-audit #51 — configurable thinking budget via GEMINI_THINKING_BUDGET env var
+          thinkingConfig: this.enableThinking
+            ? { thinkingBudget: parseInt(process.env.GEMINI_THINKING_BUDGET || '4096', 10) }
+            : { thinkingBudget: 0 },
         },
       });
     }
