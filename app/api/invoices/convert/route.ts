@@ -15,6 +15,7 @@ import { getFormatMetadata } from '@/lib/format-registry';
 import { formatToProfileId, resolveOutputFormat, toLegacyFormat } from '@/lib/format-utils';
 import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
 import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+import { validateXmlSafety } from '@/lib/xml-security';
 import type { OutputFormat } from '@/types/canonical-invoice';
 export type ConversionFormat = 'CII' | 'UBL' | OutputFormat;
 
@@ -207,6 +208,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             'Content-Length': String(genResult.pdfContent.length),
           },
         });
+      }
+
+      // FIX: Re-audit #27 — post-generation XML safety check (defense in depth)
+      const postCheck = validateXmlSafety(genResult.xmlContent);
+      if (!postCheck.safe) {
+        logger.error('Generated XML failed post-generation safety check', {
+          format: resolvedFormat,
+          reason: postCheck.reason,
+          audit: 'Re-audit #27',
+        });
+        throw new AppError(
+          'XML_SAFETY_FAILURE',
+          `Generated invoice failed safety validation: ${postCheck.reason}`,
+          500
+        );
       }
 
       result = {
