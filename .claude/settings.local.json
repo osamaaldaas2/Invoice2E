@@ -76,7 +76,21 @@
       "Bash(npm run build:*)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__apply_migration",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(cmd /c \"mkdir \"\"c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\.claude\\\\skills\"\" 2>nul && echo created || echo exists\")",
+      "Bash(cmd /c \"cd /d \"\"c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\"\" && mkdir \"\".claude\\\\skills\"\" 2>nul & echo done\")",
+      "Bash(cmd /c \"dir \"\"c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\.claude\"\"\")",
+      "Bash(powershell -Command \"New-Item -ItemType Directory -Force -Path ''c:\\\\Users\\\\osama\\\\Desktop\\\\Invoice2E.1\\\\.claude\\\\skills'' | Out-Null; Write-Host ''done''\")",
+      "Bash(powershell -Command:*)",
+      "Bash(npx next build:*)",
+      "Bash(NEXT_TELEMETRY_DISABLED=1 npx next build:*)",
+      "Bash(npx supabase db push:*)",
+      "Bash(tee:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo view:*)",
+      "Bash(TERM=dumb cat:*)"
     ]
   }
 }
