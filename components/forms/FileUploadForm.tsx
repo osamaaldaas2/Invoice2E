@@ -41,7 +41,11 @@ const APPLYABLE_FIELDS = [
   { key: 'currency', label: 'Currency' },
 ];
 
-function DashboardApplyToAll({ extractionIds, onApplied, onClose }: {
+function DashboardApplyToAll({
+  extractionIds,
+  onApplied,
+  onClose,
+}: {
   extractionIds: string[];
   onApplied: () => void;
   onClose: () => void;
@@ -53,9 +57,7 @@ function DashboardApplyToAll({ extractionIds, onApplied, onClose }: {
 
   const handleApply = async () => {
     if (isApplyingRef.current) return;
-    const filledFields = Object.fromEntries(
-      Object.entries(fields).filter(([, v]) => v.trim())
-    );
+    const filledFields = Object.fromEntries(Object.entries(fields).filter(([, v]) => v.trim()));
     if (Object.keys(filledFields).length === 0) return;
 
     isApplyingRef.current = true;
@@ -73,8 +75,12 @@ function DashboardApplyToAll({ extractionIds, onApplied, onClose }: {
       }
       const data = await res.json();
       if (data.success) {
-        setResult(`✅ Updated ${data.data.updated} invoices (${data.data.skipped} already had values)`);
-        setTimeout(() => { onApplied(); }, 1500);
+        setResult(
+          `✅ Updated ${data.data.updated} invoices (${data.data.skipped} already had values)`
+        );
+        setTimeout(() => {
+          onApplied();
+        }, 1500);
       } else {
         setResult(`Error: ${data.error}`);
       }
@@ -89,8 +95,12 @@ function DashboardApplyToAll({ extractionIds, onApplied, onClose }: {
   return (
     <div className="p-4 glass-panel border border-sky-400/20 rounded-xl">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-sky-200">Apply to All Invoices (only fills missing fields)</h4>
-        <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">Close</button>
+        <h4 className="text-sm font-semibold text-sky-200">
+          Apply to All Invoices (only fills missing fields)
+        </h4>
+        <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">
+          Close
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {APPLYABLE_FIELDS.map(({ key, label }) => (
@@ -177,7 +187,9 @@ export default function FileUploadForm({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [extractionCache, setExtractionCache] = useState<Record<string, any>>({});
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
-  const [validationResults, setValidationResults] = useState<Record<string, { valid: boolean; errors: string[] }>>({});
+  const [validationResults, setValidationResults] = useState<
+    Record<string, { valid: boolean; errors: string[] }>
+  >({});
   const [showApplyAll, setShowApplyAll] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -328,7 +340,9 @@ export default function FileUploadForm({
   useEffect(() => {
     if (!multiResult || (state !== 'success' && state !== 'error')) return;
     if (Object.keys(validationResults).length > 0) return; // already fetched
-    const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
+    const extractionIds = multiResult.extractions
+      .filter((e) => e.extractionId)
+      .map((e) => e.extractionId!);
     if (extractionIds.length === 0) return;
 
     fetch('/api/invoices/batch-validate', {
@@ -336,8 +350,8 @@ export default function FileUploadForm({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ extractionIds }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         const results = data?.data?.results || data?.results;
         if (results) {
           const vMap: Record<string, { valid: boolean; errors: string[] }> = {};
@@ -348,7 +362,7 @@ export default function FileUploadForm({
         }
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, multiResult]);
 
   const loadExtraction = useCallback(
@@ -564,7 +578,7 @@ export default function FileUploadForm({
     // Block download if any invoices have validation errors
     const hasValidation = Object.keys(validationResults).length > 0;
     if (hasValidation) {
-      const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
+      const invalidCount = Object.values(validationResults).filter((v) => !v.valid).length;
       if (invalidCount > 0) {
         setError(t('fixErrorsBeforeDownload', { count: invalidCount }));
         setState('error');
@@ -590,7 +604,7 @@ export default function FileUploadForm({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'invoices_xrechnung.zip';
+      a.download = 'invoices_einvoice.zip';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -702,7 +716,10 @@ export default function FileUploadForm({
                 state === 'downloading'
                   ? t('generatingZip')
                   : backgroundJobId
-                    ? t('processingInvoices', { count: backgroundTotal, progress: backgroundProgress })
+                    ? t('processingInvoices', {
+                        count: backgroundTotal,
+                        progress: backgroundProgress,
+                      })
                     : state === 'uploading'
                       ? t('uploading')
                       : t('aiExtracting')
@@ -802,7 +819,10 @@ export default function FileUploadForm({
                     </span>
                   )}
                   {ext.status === 'failed' && ext.errorMessage && (
-                    <span className="text-xs text-rose-300/70 ml-auto flex-shrink-0 truncate max-w-[150px]" title={ext.errorMessage}>
+                    <span
+                      className="text-xs text-rose-300/70 ml-auto flex-shrink-0 truncate max-w-[150px]"
+                      title={ext.errorMessage}
+                    >
                       {ext.errorMessage}
                     </span>
                   )}
@@ -844,153 +864,175 @@ export default function FileUploadForm({
               {t('invoicesDetected', { count: multiResult.totalInvoices })}
             </p>
             {/* Validation summary + Apply to All for error state */}
-            {Object.keys(validationResults).length > 0 && (() => {
-              const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
-              const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
-              if (invalidCount > 0) {
-                return (
-                  <div className="mb-3 space-y-2">
-                    <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-amber-200">
-                          <strong>{invalidCount}</strong> invoices have errors — fix individually or use Apply to All.
-                        </span>
-                        <button
-                          onClick={() => setShowApplyAll(!showApplyAll)}
-                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
-                        >
-                          {showApplyAll ? t('collapse') : t('applyToAll')}
-                        </button>
+            {Object.keys(validationResults).length > 0 &&
+              (() => {
+                const invalidCount = Object.values(validationResults).filter(
+                  (v) => !v.valid
+                ).length;
+                const extractionIds = multiResult.extractions
+                  .filter((e) => e.extractionId)
+                  .map((e) => e.extractionId!);
+                if (invalidCount > 0) {
+                  return (
+                    <div className="mb-3 space-y-2">
+                      <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-amber-200">
+                            <strong>{invalidCount}</strong> invoices have errors — fix individually
+                            or use Apply to All.
+                          </span>
+                          <button
+                            onClick={() => setShowApplyAll(!showApplyAll)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
+                          >
+                            {showApplyAll ? t('collapse') : t('applyToAll')}
+                          </button>
+                        </div>
                       </div>
+                      {showApplyAll && (
+                        <DashboardApplyToAll
+                          extractionIds={extractionIds}
+                          onApplied={() => {
+                            setShowApplyAll(false);
+                            setValidationResults({});
+                          }}
+                          onClose={() => setShowApplyAll(false)}
+                        />
+                      )}
                     </div>
-                    {showApplyAll && (
-                      <DashboardApplyToAll
-                        extractionIds={extractionIds}
-                        onApplied={() => {
-                          setShowApplyAll(false);
-                          setValidationResults({});
-                        }}
-                        onClose={() => setShowApplyAll(false)}
-                      />
-                    )}
-                  </div>
-                );
-              }
-              return null;
-            })()}
-            <div className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}>
+                  );
+                }
+                return null;
+              })()}
+            <div
+              className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}
+            >
               {multiResult.extractions.map((ext, idx) => {
                 const vr = ext.extractionId ? validationResults[ext.extractionId] : null;
                 return (
-                <div key={ext.extractionId || idx}>
-                  <div className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
-                    ext.status === 'failed' ? 'border border-rose-400/30' :
-                    vr && !vr.valid ? 'border border-amber-400/30' :
-                    vr?.valid ? 'border border-emerald-400/20' : 'border border-white/5'
-                  }`}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      {ext.status === 'failed' ? (
-                        <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
-                      ) : vr && !vr.valid ? (
-                        <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
-                      ) : vr?.valid ? (
-                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
-                      ) : reviewedIds.has(ext.extractionId) ? (
-                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
-                      ) : null}
-                      <span className="text-sm font-medium text-white truncate">
-                        {ext.label || `Invoice ${idx + 1}`}
-                      </span>
-                      {ext.confidence > 0 && (
-                        <span className="text-xs text-faded flex-shrink-0">
-                          {Math.round(ext.confidence * 100)}%
+                  <div key={ext.extractionId || idx}>
+                    <div
+                      className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
+                        ext.status === 'failed'
+                          ? 'border border-rose-400/30'
+                          : vr && !vr.valid
+                            ? 'border border-amber-400/30'
+                            : vr?.valid
+                              ? 'border border-emerald-400/20'
+                              : 'border border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {ext.status === 'failed' ? (
+                          <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
+                        ) : vr && !vr.valid ? (
+                          <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
+                        ) : vr?.valid ? (
+                          <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                        ) : reviewedIds.has(ext.extractionId) ? (
+                          <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                        ) : null}
+                        <span className="text-sm font-medium text-white truncate">
+                          {ext.label || `Invoice ${idx + 1}`}
                         </span>
-                      )}
-                      {vr && !vr.valid && (
-                        <span className="text-xs text-amber-300/80 flex-shrink-0">
-                          ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                        {ext.confidence > 0 && (
+                          <span className="text-xs text-faded flex-shrink-0">
+                            {Math.round(ext.confidence * 100)}%
+                          </span>
+                        )}
+                        {vr && !vr.valid && (
+                          <span className="text-xs text-amber-300/80 flex-shrink-0">
+                            ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                          </span>
+                        )}
+                        {vr?.valid && (
+                          <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
+                        )}
+                      </div>
+                      {ext.extractionId ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (expandedId === ext.extractionId) {
+                              setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                              setExpandedId(null);
+                            } else {
+                              setExpandedId(ext.extractionId);
+                              loadExtraction(ext.extractionId);
+                            }
+                          }}
+                          className={
+                            vr && !vr.valid
+                              ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                              : reviewedIds.has(ext.extractionId)
+                                ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                                : 'bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+                          }
+                        >
+                          {vr && !vr.valid
+                            ? t('fixErrors')
+                            : reviewedIds.has(ext.extractionId)
+                              ? t('reviewed')
+                              : expandedId === ext.extractionId
+                                ? t('collapse')
+                                : t('reviewAndEdit')}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-rose-300" title={ext.errorMessage}>
+                          {ext.errorMessage || t('extractionFailed')}
                         </span>
-                      )}
-                      {vr?.valid && (
-                        <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
                       )}
                     </div>
-                    {ext.extractionId ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (expandedId === ext.extractionId) {
-                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
-                            setExpandedId(null);
-                          } else {
-                            setExpandedId(ext.extractionId);
-                            loadExtraction(ext.extractionId);
-                          }
-                        }}
-                        className={
-                          vr && !vr.valid
-                            ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
-                            : reviewedIds.has(ext.extractionId)
-                              ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
-                              : 'bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
-                        }
-                      >
-                        {vr && !vr.valid
-                          ? t('fixErrors')
-                          : reviewedIds.has(ext.extractionId)
-                            ? t('reviewed')
-                            : expandedId === ext.extractionId
-                              ? t('collapse')
-                              : t('reviewAndEdit')}
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-rose-300" title={ext.errorMessage}>
-                        {ext.errorMessage || t('extractionFailed')}
-                      </span>
+                    {/* Show validation errors inline */}
+                    {vr && !vr.valid && expandedId !== ext.extractionId && (
+                      <div className="ml-6 mt-1 space-y-0.5">
+                        {vr.errors.slice(0, 3).map((err, i) => (
+                          <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>
+                            {err}
+                          </p>
+                        ))}
+                        {vr.errors.length > 3 && (
+                          <p className="text-[11px] text-amber-400/50">
+                            +{vr.errors.length - 3} more
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {expandedId === ext.extractionId && (
+                      <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
+                        {extractionCache[ext.extractionId] ? (
+                          <InvoiceReviewForm
+                            extractionId={ext.extractionId}
+                            userId={userId || ''}
+                            initialData={
+                              extractionCache[ext.extractionId].extractionData ||
+                              extractionCache[ext.extractionId]
+                            }
+                            confidence={
+                              extractionCache[ext.extractionId].confidenceScore ||
+                              ext.confidence ||
+                              0
+                            }
+                            compact
+                            onSubmitSuccess={() => {
+                              setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                              setExpandedId(null);
+                              // Re-validate after fix
+                              setValidationResults({});
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
+                            <span className="ml-3 text-sm text-faded">
+                              {t('loading') || 'Loading...'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {/* Show validation errors inline */}
-                  {vr && !vr.valid && expandedId !== ext.extractionId && (
-                    <div className="ml-6 mt-1 space-y-0.5">
-                      {vr.errors.slice(0, 3).map((err, i) => (
-                        <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>{err}</p>
-                      ))}
-                      {vr.errors.length > 3 && (
-                        <p className="text-[11px] text-amber-400/50">+{vr.errors.length - 3} more</p>
-                      )}
-                    </div>
-                  )}
-                  {expandedId === ext.extractionId && (
-                    <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
-                      {extractionCache[ext.extractionId] ? (
-                        <InvoiceReviewForm
-                          extractionId={ext.extractionId}
-                          userId={userId || ''}
-                          initialData={
-                            extractionCache[ext.extractionId].extractionData ||
-                            extractionCache[ext.extractionId]
-                          }
-                          confidence={
-                            extractionCache[ext.extractionId].confidenceScore || ext.confidence || 0
-                          }
-                          compact
-                          onSubmitSuccess={() => {
-                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
-                            setExpandedId(null);
-                            // Re-validate after fix
-                            setValidationResults({});
-                          }}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
-                          <span className="ml-3 text-sm text-faded">{t('loading') || 'Loading...'}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
                 );
               })}
             </div>
@@ -998,7 +1040,10 @@ export default function FileUploadForm({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => { setValidationResults({}); setState('success'); }}
+              onClick={() => {
+                setValidationResults({});
+                setState('success');
+              }}
               className="flex-1 px-4 py-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 text-white font-semibold hover:brightness-110 transition-colors"
             >
               {t('retryDownload')}
@@ -1058,51 +1103,57 @@ export default function FileUploadForm({
               );
             })()}
           {/* Validation summary banner */}
-          {Object.keys(validationResults).length > 0 && (() => {
-            const invalidCount = Object.values(validationResults).filter(v => !v.valid).length;
-            const totalValidated = Object.keys(validationResults).length;
-            const extractionIds = multiResult.extractions.filter(e => e.extractionId).map(e => e.extractionId!);
-            if (invalidCount > 0) {
-              return (
-                <div className="mb-3 space-y-2">
-                  <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-400">⚠</span>
-                        <span className="text-sm text-amber-200">
-                          <strong>{invalidCount}</strong> of {totalValidated} invoices have validation errors.
-                        </span>
+          {Object.keys(validationResults).length > 0 &&
+            (() => {
+              const invalidCount = Object.values(validationResults).filter((v) => !v.valid).length;
+              const totalValidated = Object.keys(validationResults).length;
+              const extractionIds = multiResult.extractions
+                .filter((e) => e.extractionId)
+                .map((e) => e.extractionId!);
+              if (invalidCount > 0) {
+                return (
+                  <div className="mb-3 space-y-2">
+                    <div className="p-3 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-400">⚠</span>
+                          <span className="text-sm text-amber-200">
+                            <strong>{invalidCount}</strong> of {totalValidated} invoices have
+                            validation errors.
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setShowApplyAll(!showApplyAll)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
+                        >
+                          {showApplyAll ? t('collapse') : t('applyToAll')}
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setShowApplyAll(!showApplyAll)}
-                        className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25"
-                      >
-                        {showApplyAll ? t('collapse') : t('applyToAll')}
-                      </button>
                     </div>
+                    {showApplyAll && (
+                      <DashboardApplyToAll
+                        extractionIds={extractionIds}
+                        onApplied={() => {
+                          setShowApplyAll(false);
+                          setValidationResults({});
+                        }}
+                        onClose={() => setShowApplyAll(false)}
+                      />
+                    )}
                   </div>
-                  {showApplyAll && (
-                    <DashboardApplyToAll
-                      extractionIds={extractionIds}
-                      onApplied={() => {
-                        setShowApplyAll(false);
-                        setValidationResults({});
-                      }}
-                      onClose={() => setShowApplyAll(false)}
-                    />
-                  )}
+                );
+              }
+              return (
+                <div className="mb-3 p-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400">✓</span>
+                    <span className="text-sm text-emerald-200">
+                      All {totalValidated} invoices passed validation.
+                    </span>
+                  </div>
                 </div>
               );
-            }
-            return (
-              <div className="mb-3 p-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400">✓</span>
-                  <span className="text-sm text-emerald-200">All {totalValidated} invoices passed validation.</span>
-                </div>
-              </div>
-            );
-          })()}
+            })()}
           <div
             ref={listScrollRef}
             className={`space-y-2 pr-1 ${multiResult.extractions.length > 5 ? 'max-h-[70vh] overflow-y-auto scrollbar-thin' : ''}`}
@@ -1110,131 +1161,141 @@ export default function FileUploadForm({
             {multiResult.extractions.map((ext, idx) => {
               const vr = ext.extractionId ? validationResults[ext.extractionId] : null;
               return (
-              <div key={ext.extractionId || idx}>
-                <div className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
-                  ext.status === 'failed' ? 'border border-rose-400/30' :
-                  vr && !vr.valid ? 'border border-amber-400/30' :
-                  vr?.valid ? 'border border-emerald-400/20' : ''
-                }`}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    {ext.status === 'failed' ? (
-                      <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
-                    ) : vr && !vr.valid ? (
-                      <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
-                    ) : vr?.valid ? (
-                      <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
-                    ) : reviewedIds.has(ext.extractionId) ? (
-                      <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
-                    ) : null}
-                    <span className="text-sm font-medium text-white truncate">
-                      {ext.label || `Invoice ${idx + 1}`}
-                    </span>
-                    {ext.confidence > 0 && (
-                      <span className="text-xs text-faded flex-shrink-0">
-                        {Math.round(ext.confidence * 100)}%
+                <div key={ext.extractionId || idx}>
+                  <div
+                    className={`flex items-center justify-between glass-panel p-2.5 rounded-lg ${
+                      ext.status === 'failed'
+                        ? 'border border-rose-400/30'
+                        : vr && !vr.valid
+                          ? 'border border-amber-400/30'
+                          : vr?.valid
+                            ? 'border border-emerald-400/20'
+                            : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ext.status === 'failed' ? (
+                        <span className="text-rose-400 text-sm flex-shrink-0">✗</span>
+                      ) : vr && !vr.valid ? (
+                        <span className="text-amber-400 text-sm flex-shrink-0">⚠</span>
+                      ) : vr?.valid ? (
+                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                      ) : reviewedIds.has(ext.extractionId) ? (
+                        <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>
+                      ) : null}
+                      <span className="text-sm font-medium text-white truncate">
+                        {ext.label || `Invoice ${idx + 1}`}
                       </span>
-                    )}
-                    {vr && !vr.valid && (
-                      <span className="text-xs text-amber-300/80 flex-shrink-0">
-                        ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                      {ext.confidence > 0 && (
+                        <span className="text-xs text-faded flex-shrink-0">
+                          {Math.round(ext.confidence * 100)}%
+                        </span>
+                      )}
+                      {vr && !vr.valid && (
+                        <span className="text-xs text-amber-300/80 flex-shrink-0">
+                          ⚠ {vr.errors.length} {vr.errors.length === 1 ? 'error' : 'errors'}
+                        </span>
+                      )}
+                      {vr?.valid && (
+                        <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
+                      )}
+                    </div>
+                    {ext.extractionId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const isCollapsing = expandedId === ext.extractionId;
+                          if (isCollapsing) {
+                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                            setExpandedId(null);
+                            requestAnimationFrame(() => {
+                              if (listScrollRef.current) {
+                                listScrollRef.current.scrollTop = savedScrollPos.current;
+                              }
+                            });
+                          } else {
+                            if (listScrollRef.current) {
+                              savedScrollPos.current = listScrollRef.current.scrollTop;
+                            }
+                            setExpandedId(ext.extractionId);
+                            loadExtraction(ext.extractionId);
+                          }
+                        }}
+                        className={
+                          vr && !vr.valid
+                            ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+                            : reviewedIds.has(ext.extractionId)
+                              ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                              : expandedId === ext.extractionId
+                                ? 'bg-white/10 text-slate-200 hover:bg-white/15'
+                                : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                        }
+                      >
+                        {vr && !vr.valid
+                          ? t('fixErrors')
+                          : reviewedIds.has(ext.extractionId)
+                            ? t('reviewed')
+                            : expandedId === ext.extractionId
+                              ? t('collapse')
+                              : t('reviewAndEdit')}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-rose-300" title={ext.errorMessage}>
+                        {ext.errorMessage || tCommon('error')}
                       </span>
-                    )}
-                    {vr?.valid && (
-                      <span className="text-xs text-emerald-300/80 flex-shrink-0">✓ valid</span>
                     )}
                   </div>
-                  {ext.extractionId ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const isCollapsing = expandedId === ext.extractionId;
-                        if (isCollapsing) {
-                          setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
-                          setExpandedId(null);
-                          requestAnimationFrame(() => {
-                            if (listScrollRef.current) {
-                              listScrollRef.current.scrollTop = savedScrollPos.current;
-                            }
-                          });
-                        } else {
-                          if (listScrollRef.current) {
-                            savedScrollPos.current = listScrollRef.current.scrollTop;
+                  {/* Show validation errors inline when not expanded */}
+                  {vr && !vr.valid && expandedId !== ext.extractionId && (
+                    <div className="ml-6 mt-1 space-y-0.5">
+                      {vr.errors.slice(0, 3).map((err, i) => (
+                        <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>
+                          {err}
+                        </p>
+                      ))}
+                      {vr.errors.length > 3 && (
+                        <p className="text-[11px] text-amber-400/50">
+                          +{vr.errors.length - 3} more
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {expandedId === ext.extractionId && (
+                    <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
+                      {extractionCache[ext.extractionId] ? (
+                        <InvoiceReviewForm
+                          extractionId={ext.extractionId}
+                          userId={userId || ''}
+                          initialData={
+                            extractionCache[ext.extractionId].extractionData ||
+                            extractionCache[ext.extractionId]
                           }
-                          setExpandedId(ext.extractionId);
-                          loadExtraction(ext.extractionId);
-                        }
-                      }}
-                      className={
-                        vr && !vr.valid
-                          ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
-                          : reviewedIds.has(ext.extractionId)
-                            ? 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
-                            : expandedId === ext.extractionId
-                              ? 'bg-white/10 text-slate-200 hover:bg-white/15'
-                              : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
-                      }
-                    >
-                      {vr && !vr.valid
-                        ? t('fixErrors')
-                        : reviewedIds.has(ext.extractionId)
-                          ? t('reviewed')
-                          : expandedId === ext.extractionId
-                            ? t('collapse')
-                            : t('reviewAndEdit')}
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-rose-300" title={ext.errorMessage}>
-                      {ext.errorMessage || tCommon('error')}
-                    </span>
+                          confidence={
+                            extractionCache[ext.extractionId].confidenceScore || ext.confidence || 0
+                          }
+                          compact
+                          onSubmitSuccess={() => {
+                            setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
+                            setExpandedId(null);
+                            // Re-validate after fix
+                            setValidationResults({});
+                            requestAnimationFrame(() => {
+                              if (listScrollRef.current) {
+                                listScrollRef.current.scrollTop = savedScrollPos.current;
+                              }
+                            });
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
+                          <span className="ml-3 text-sm text-faded">{tCommon('loading')}</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                {/* Show validation errors inline when not expanded */}
-                {vr && !vr.valid && expandedId !== ext.extractionId && (
-                  <div className="ml-6 mt-1 space-y-0.5">
-                    {vr.errors.slice(0, 3).map((err, i) => (
-                      <p key={i} className="text-[11px] text-amber-400/70 truncate" title={err}>{err}</p>
-                    ))}
-                    {vr.errors.length > 3 && (
-                      <p className="text-[11px] text-amber-400/50">+{vr.errors.length - 3} more</p>
-                    )}
-                  </div>
-                )}
-                {expandedId === ext.extractionId && (
-                  <div className="mt-2 p-4 glass-panel rounded-xl border border-white/10">
-                    {extractionCache[ext.extractionId] ? (
-                      <InvoiceReviewForm
-                        extractionId={ext.extractionId}
-                        userId={userId || ''}
-                        initialData={
-                          extractionCache[ext.extractionId].extractionData ||
-                          extractionCache[ext.extractionId]
-                        }
-                        confidence={
-                          extractionCache[ext.extractionId].confidenceScore || ext.confidence || 0
-                        }
-                        compact
-                        onSubmitSuccess={() => {
-                          setReviewedIds((prev) => new Set(prev).add(ext.extractionId));
-                          setExpandedId(null);
-                          // Re-validate after fix
-                          setValidationResults({});
-                          requestAnimationFrame(() => {
-                            if (listScrollRef.current) {
-                              listScrollRef.current.scrollTop = savedScrollPos.current;
-                            }
-                          });
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-400 border-t-transparent" />
-                        <span className="ml-3 text-sm text-faded">{tCommon('loading')}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
               );
             })}
           </div>
@@ -1271,9 +1332,12 @@ export default function FileUploadForm({
             <Button variant="outline" onClick={() => router.push('/dashboard/history')}>
               {tCommon('viewHistory') || 'View in History'}
             </Button>
-            <Button variant="outline" onClick={() => {
-              if (window.confirm(t('confirmNewUpload'))) resetForm();
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (window.confirm(t('confirmNewUpload'))) resetForm();
+              }}
+            >
               {t('newUpload')}
             </Button>
           </div>

@@ -169,6 +169,24 @@ describe('CIUS-RO Validation Rules', () => {
     expect(vatError).toBeDefined();
   });
 
+  it('EM scheme for email-based endpoints passes PEPPOL rules inherited by CIUS-RO', () => {
+    const invoice = makeCIUSROInvoice({
+      seller: {
+        ...makeCIUSROInvoice().seller,
+        electronicAddress: 'facturi@rotech.ro',
+        electronicAddressScheme: 'EM',
+      },
+      buyer: {
+        ...makeCIUSROInvoice().buyer,
+        electronicAddress: 'ap@hungarian.hu',
+        electronicAddressScheme: 'EM',
+      },
+    });
+    const errors = validateCIUSRORules(invoice);
+    expect(errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R010-SCHEME')).toBe(false);
+    expect(errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R020-SCHEME')).toBe(false);
+  });
+
   it('should include PEPPOL rules (missing endpoint)', () => {
     const invoice = makeCIUSROInvoice({
       seller: {

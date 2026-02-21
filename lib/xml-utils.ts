@@ -1,7 +1,7 @@
 /**
  * Shared XML utilities for all format generators.
  * Extracted from UBLService and XRechnungBuilder to avoid duplication.
- * 
+ *
  * @module lib/xml-utils
  */
 
@@ -9,22 +9,38 @@ import { roundMoney } from '@/lib/monetary';
 import { logger } from '@/lib/logger';
 
 // Re-export XML security utilities for consumers that import from xml-utils
-export { sanitizeXml, validateXmlSafety, parseXmlSafe, ALLOWED_NAMESPACES } from '@/lib/xml-security';
+export {
+  sanitizeXml,
+  validateXmlSafety,
+  parseXmlSafe,
+  ALLOWED_NAMESPACES,
+} from '@/lib/xml-security';
 export type { XmlSafetyOptions, XmlSafetyResult } from '@/lib/xml-security';
 export { XmlSecurityError } from '@/lib/xml-security';
 
 /**
  * Escape XML special characters and strip invalid control characters.
  */
+/**
+ * FIX: Audit V2 [F-012] — also strip Unicode non-characters and unpaired surrogates.
+ */
 export function escapeXml(text: string): string {
   if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  return (
+    text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      // Strip XML 1.0 invalid control characters
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+      // Strip Unicode non-characters (invalid in XML 1.0)
+      .replace(/[\uFFFE\uFFFF]/g, '')
+      // Strip unpaired surrogates (invalid in any encoding)
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+  );
 }
 
 /**
@@ -60,13 +76,12 @@ export function formatDateISO(date: string): string {
     throw new Error(`Ambiguous date format "${date}". Use ISO (YYYY-MM-DD) or German (DD.MM.YYYY)`);
   }
 
-  const d = new Date(date);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0] || '';
-  }
-
-  logger.warn('xml-utils: Could not parse date', { date });
-  throw new Error(`Invalid date format "${date}". Use ISO (YYYY-MM-DD) or German (DD.MM.YYYY)`);
+  // FIX: Audit V2 [F-013] — removed new Date() fallback (locale-dependent, ambiguous).
+  // Only accept the three explicit formats above.
+  logger.warn('xml-utils: Unrecognized date format rejected', { date });
+  throw new Error(
+    `Unrecognized date format "${date}". Expected YYYY-MM-DD, DD.MM.YYYY, or YYYYMMDD.`
+  );
 }
 
 /**
@@ -99,24 +114,17 @@ export function formatDateCII(dateString: string): string {
   // Reject ambiguous slash formats
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
     logger.warn('xml-utils: Ambiguous date format rejected', { date: dateString });
-    throw new Error(`Ambiguous date format "${dateString}". Use ISO (YYYY-MM-DD) or German (DD.MM.YYYY)`);
+    throw new Error(
+      `Ambiguous date format "${dateString}". Use ISO (YYYY-MM-DD) or German (DD.MM.YYYY)`
+    );
   }
 
-  // Last resort: parse as Date
-  try {
-    const d = new Date(dateString);
-    if (!isNaN(d.getTime())) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}${month}${day}`;
-    }
-  } catch {
-    // Fall through
-  }
-
-  logger.warn('xml-utils: Could not parse date', { date: dateString });
-  throw new Error(`Invalid date format "${dateString}". Use ISO (YYYY-MM-DD) or German (DD.MM.YYYY)`);
+  // FIX: Audit V2 [F-013] — removed new Date() fallback (locale-dependent, ambiguous).
+  // Only accept the three explicit formats above.
+  logger.warn('xml-utils: Unrecognized date format rejected (CII)', { date: dateString });
+  throw new Error(
+    `Unrecognized date format "${dateString}". Expected YYYY-MM-DD, DD.MM.YYYY, or YYYYMMDD.`
+  );
 }
 
 /**

@@ -24,8 +24,11 @@ type CheckKey =
   | 'checkSellerStreet'
   | 'checkSellerCity'
   | 'checkSellerPostal'
+  | 'checkSellerElectronicAddress'
+  | 'checkSellerTaxId'
   | 'checkBuyerEmail'
   | 'checkBuyerCountry'
+  | 'checkBuyerTaxId'
   | 'checkIban'
   | 'checkPaymentTerms'
   | 'checkLineItems'
@@ -79,7 +82,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkLineItems',
     'checkMonetary',
   ],
-  // PEPPOL/NLCIUS/CIUS-RO: address + buyer electronic address, no IBAN/phone
+  // PEPPOL/NLCIUS/CIUS-RO: seller+buyer electronic address mandatory (BT-34/BT-49)
   'peppol-bis': [
     'checkInvoiceNumber',
     'checkInvoiceDate',
@@ -87,6 +90,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
+    'checkSellerElectronicAddress',
     'checkBuyerEmail',
     'checkBuyerCountry',
     'checkLineItems',
@@ -99,6 +103,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
+    'checkSellerElectronicAddress',
     'checkBuyerEmail',
     'checkBuyerCountry',
     'checkLineItems',
@@ -111,6 +116,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
+    'checkSellerElectronicAddress',
     'checkBuyerEmail',
     'checkBuyerCountry',
     'checkLineItems',
@@ -139,7 +145,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkLineItems',
     'checkMonetary',
   ],
-  // FatturaPA: seller address + buyer country
+  // FatturaPA: seller address + buyer tax ID mandatory (IdFiscaleIVA or CodiceFiscale)
   fatturapa: [
     'checkInvoiceNumber',
     'checkInvoiceDate',
@@ -148,10 +154,11 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerCity',
     'checkSellerPostal',
     'checkBuyerCountry',
+    'checkBuyerTaxId',
     'checkLineItems',
     'checkMonetary',
   ],
-  // KSeF: minimal — basics + seller address + line items
+  // KSeF: seller NIP (tax ID) mandatory
   ksef: [
     'checkInvoiceNumber',
     'checkInvoiceDate',
@@ -159,6 +166,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
+    'checkSellerTaxId',
     'checkLineItems',
     'checkMonetary',
   ],
@@ -185,8 +193,11 @@ export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control, outputF
   const sellerStreet = useWatch({ control, name: 'sellerParsedAddress.street' });
   const sellerCity = useWatch({ control, name: 'sellerParsedAddress.city' });
   const sellerPostal = useWatch({ control, name: 'sellerParsedAddress.postalCode' });
+  const sellerElectronicAddress = useWatch({ control, name: 'sellerElectronicAddress' });
+  const sellerTaxId = useWatch({ control, name: 'sellerTaxId' });
   const buyerEmail = useWatch({ control, name: 'buyerEmail' });
   const buyerCountry = useWatch({ control, name: 'buyerParsedAddress.country' });
+  const buyerTaxId = useWatch({ control, name: 'buyerTaxId' });
   const buyerReference = useWatch({ control, name: 'buyerReference' });
   const sellerIban = useWatch({ control, name: 'sellerIban' });
   const paymentTerms = useWatch({ control, name: 'paymentTerms' });
@@ -215,8 +226,14 @@ export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control, outputF
       checkSellerStreet: !!sellerStreet?.trim(),
       checkSellerCity: !!sellerCity?.trim(),
       checkSellerPostal: !!sellerPostal?.trim(),
+      // BT-34: seller electronic address — satisfied by dedicated Peppol ID or email
+      checkSellerElectronicAddress: !!(sellerElectronicAddress?.trim() || sellerEmail?.trim()),
+      // KSeF: seller tax ID (NIP)
+      checkSellerTaxId: !!sellerTaxId?.trim(),
       checkBuyerEmail: !!buyerEmail?.trim(),
       checkBuyerCountry: !!buyerCountry?.trim(),
+      // FatturaPA: buyer tax ID (IdFiscaleIVA or CodiceFiscale)
+      checkBuyerTaxId: !!buyerTaxId?.trim(),
       checkIban: !!ibanClean && IBAN_PATTERN.test(ibanClean),
       checkPaymentTerms: !!paymentTerms?.trim(),
       checkLineItems: Array.isArray(items) && items.length > 0,
@@ -249,8 +266,11 @@ export const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ control, outputF
     sellerStreet,
     sellerCity,
     sellerPostal,
+    sellerElectronicAddress,
+    sellerTaxId,
     buyerEmail,
     buyerCountry,
+    buyerTaxId,
     buyerReference,
     sellerIban,
     paymentTerms,

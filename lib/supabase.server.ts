@@ -23,6 +23,11 @@ const getSupabaseUrl = () => {
  * F1: Admin client using service-role key.
  * BYPASSES RLS - Use ONLY for admin operations, background jobs, or system-level tasks.
  * NEVER use for user-facing data access.
+ *
+ * Connection pooling: Supabase cloud uses Supavisor (connection pooler) by default.
+ * The SUPABASE_URL automatically routes through the pooler. For serverless (Vercel),
+ * each function invocation creates a new client, which is appropriate as Supavisor
+ * handles pooling server-side. See docs/SECURITY_DECISIONS.md AR-19.
  */
 export const createAdminClient = (): SupabaseClient => {
   if (adminClient) {

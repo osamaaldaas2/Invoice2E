@@ -15,6 +15,7 @@ import { createError, type ValidationError } from './validation-result';
  * Codes 0217-0221 were added in the 2023-2024 cycle.
  */
 const VALID_ENDPOINT_SCHEME_IDS = new Set([
+  'EM', // Email address (BT-34 / BT-49 electronic address scheme)
   '0002',
   '0007',
   '0009',
@@ -160,88 +161,9 @@ const VALID_ENDPOINT_SCHEME_IDS = new Set([
 /** PEPPOL allowed tax category codes */
 const PEPPOL_TAX_CATEGORIES = new Set(['S', 'Z', 'E', 'AE', 'K', 'G', 'O', 'L', 'M']);
 
-/** PEPPOL UNCL4461 payment means code subset */
-const PEPPOL_PAYMENT_MEANS_CODES = new Set([
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  '9',
-  '10',
-  '11',
-  '12',
-  '13',
-  '14',
-  '15',
-  '17',
-  '18',
-  '19',
-  '20',
-  '21',
-  '22',
-  '23',
-  '24',
-  '25',
-  '26',
-  '27',
-  '28',
-  '29',
-  '30',
-  '31',
-  '32',
-  '33',
-  '34',
-  '35',
-  '36',
-  '37',
-  '38',
-  '39',
-  '40',
-  '41',
-  '42',
-  '43',
-  '44',
-  '45',
-  '46',
-  '47',
-  '48',
-  '49',
-  '50',
-  '51',
-  '52',
-  '53',
-  '54',
-  '55',
-  '56',
-  '57',
-  '58',
-  '59',
-  '60',
-  '61',
-  '62',
-  '63',
-  '64',
-  '65',
-  '66',
-  '67',
-  '68',
-  '69',
-  '70',
-  '74',
-  '75',
-  '76',
-  '77',
-  '78',
-  '91',
-  '92',
-  '93',
-  '94',
-  '95',
-  '96',
-  '97',
-  'ZZZ',
-]);
+// PEPPOL UNCL4461 payment means codes — kept as reference for future use
+// when payment means code is added to the canonical model.
+// Codes: 1-70, 74-78, 91-97, ZZZ (see Peppol BIS 3.0 v3.0.20)
 
 /** ISO 3166-1 alpha-2 country code pattern */
 const ISO_COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
@@ -317,20 +239,9 @@ export function validatePeppolRules(data: CanonicalInvoice): ValidationError[] {
     }
   }
 
-  // PEPPOL payment means code validation
-  // Payment means code is not in PaymentInfo; skip for now
-  // (payment means type code is set during XML generation, not in canonical model)
-  const paymentMeansCode: string | undefined = undefined;
-  if (paymentMeansCode && !PEPPOL_PAYMENT_MEANS_CODES.has(paymentMeansCode)) {
-    errors.push(
-      createError(
-        'PEPPOL-EN16931-CL002',
-        'invoice.payment.meansCode',
-        `Payment means code "${paymentMeansCode}" is not in the PEPPOL UNCL4461 subset`,
-        { actual: paymentMeansCode }
-      )
-    );
-  }
+  // Payment means code validation: skipped — code is determined during XML generation
+  // (TypeCode 58 for SEPA CT, etc.), not in the canonical model. Validated post-generation
+  // by the structural XML checks in each generator.
 
   // Country code validation (ISO 3166-1 alpha-2)
   const countryChecks: Array<{ value?: string; field: string; label: string }> = [

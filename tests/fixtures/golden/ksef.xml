@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Faktura xmlns="http://crd.gov.pl/wzor/2023/06/29/12648/">
+<Faktura xmlns="http://crd.gov.pl/wzor/2025/06/25/13775/">
   <Naglowek>
-    <KodFormularza kodSystemowy="FA (2)" wersjaSchemy="1-0E">FA</KodFormularza>
-    <WariantFormularza>2</WariantFormularza>
+    <KodFormularza kodSystemowy="FA (3)" wersjaSchemy="1-0E">FA</KodFormularza>
+    <WariantFormularza>3</WariantFormularza>
     <DataWytworzeniaFa>2024-07-15T00:00:00Z</DataWytworzeniaFa>
     <SystemInfo>Invoice2E</SystemInfo>
   </Naglowek>
@@ -16,7 +16,10 @@
       <AdresL1>Hauptstraße 42</AdresL1>
       <AdresL2>10115 Berlin</AdresL2>
     </Adres>
-    <NazwaHandlowa>Golden Seller GmbH</NazwaHandlowa>
+    <DaneKontaktowe>
+      <Email>seller@golden.de</Email>
+      <Telefon>+49 30 12345678</Telefon>
+    </DaneKontaktowe>
   </Podmiot1>
   <Podmiot2>
     <DaneIdentyfikacyjne>
@@ -28,12 +31,38 @@
       <AdresL1>Keizersgracht 200</AdresL1>
       <AdresL2>1015 AA Amsterdam</AdresL2>
     </Adres>
+    <DaneKontaktowe>
+      <Email>buyer@golden.nl</Email>
+    </DaneKontaktowe>
+    <JST>2</JST>
+    <GV>2</GV>
   </Podmiot2>
   <Fa>
     <KodWaluty>EUR</KodWaluty>
     <P_1>2024-07-15</P_1>
     <P_2>GOLDEN-2024-001</P_2>
+    <OkresFa>
+      <P_6_Od>2024-07-01</P_6_Od>
+      <P_6_Do>2024-07-31</P_6_Do>
+    </OkresFa>
     <P_15>2380.00</P_15>
+    <Adnotacje>
+      <P_16>2</P_16>
+      <P_17>2</P_17>
+      <P_18>2</P_18>
+      <P_18A>2</P_18A>
+      <Zwolnienie>
+        <P_19N>1</P_19N>
+      </Zwolnienie>
+      <NoweSrodkiTransportu>
+        <P_22N>1</P_22N>
+      </NoweSrodkiTransportu>
+      <P_23>2</P_23>
+      <PMarzy>
+        <P_PMarzyN>1</P_PMarzyN>
+      </PMarzy>
+    </Adnotacje>
+    <RodzajFaktury>VAT</RodzajFaktury>
     <FaWiersz>
       <NrWierszaFa>1</NrWierszaFa>
       <P_7>Consulting Services</P_7>
@@ -59,7 +88,5 @@
         <NrRB>DE89370400440532013000</NrRB>
       </RachunekBankowy>
     </Platnosc>
-    <P_16>2</P_16>
-    <P_17>2</P_17>
   </Fa>
 </Faktura>

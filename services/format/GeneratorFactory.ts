@@ -1,7 +1,7 @@
 /**
  * Factory for format generators.
  * Follows the ExtractorFactory pattern — cached singleton instances selected by OutputFormat.
- * 
+ *
  * @module services/format/GeneratorFactory
  */
 
@@ -67,8 +67,22 @@ export class GeneratorFactory {
     return generator;
   }
 
-  /** Formats that have a working generator (not throwing "not yet implemented"). */
-  private static readonly implementedFormats: OutputFormat[] = ['xrechnung-cii', 'xrechnung-ubl', 'peppol-bis', 'facturx-en16931', 'facturx-basic', 'fatturapa', 'ksef', 'nlcius', 'cius-ro'];
+  /**
+   * All implemented formats. This list must match the OutputFormat union exactly.
+   * The exhaustive switch in create() ensures compile-time safety for new formats,
+   * but this array must also be updated when adding a new format.
+   */
+  private static readonly implementedFormats: readonly OutputFormat[] = [
+    'xrechnung-cii',
+    'xrechnung-ubl',
+    'peppol-bis',
+    'facturx-en16931',
+    'facturx-basic',
+    'fatturapa',
+    'ksef',
+    'nlcius',
+    'cius-ro',
+  ] as const satisfies readonly OutputFormat[];
 
   /**
    * Get all currently available output formats.

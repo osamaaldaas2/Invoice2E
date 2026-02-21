@@ -219,17 +219,6 @@ async function setSessionCookieInternal(user: {
     maxAge: SESSION_MAX_AGE,
     path: '/',
   });
-
-  // FIX: Re-audit #48 — legacy session_user_id cookie migration
-  // TODO: Remove after 2026-03-19 (30 days from deployment). All 7-day sessions
-  // will have expired by then, making this backward-compat clearing unnecessary.
-  cookieStore.set('session_user_id', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 0,
-    path: '/',
-  });
 }
 
 /**
@@ -252,6 +241,8 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
     const now = Math.floor(Date.now() / 1000);
     const halfTtl = SESSION_MAX_AGE / 2;
     if (now - session.issuedAt > halfTtl) {
+      // FIX: Audit V2 [F-003] — invalidate profile cache on renewal
+      _profileCache.delete(session.userId);
       try {
         const freshToken = createSessionToken({
           id: session.userId,
@@ -296,16 +287,6 @@ export async function clearSessionCookie(): Promise<void> {
     maxAge: 0,
     path: '/',
   });
-
-  // FIX: Re-audit #48 — legacy session_user_id cookie migration
-  // TODO: Remove after 2026-03-19 (see above)
-  cookieStore.set('session_user_id', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 0,
-    path: '/',
-  });
 }
 
 // ============================================
@@ -314,11 +295,21 @@ export async function clearSessionCookie(): Promise<void> {
 // ============================================
 
 /** Cached profile data fetched from DB for the current session. */
+// FIX: Audit V2 [F-014] — bounded cache to prevent memory leak
+const MAX_PROFILE_CACHE_SIZE = 1000;
 const _profileCache = new Map<
   string,
   { email: string; firstName: string; lastName: string; fetchedAt: number }
 >();
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Evict oldest entry if cache is full */
+function _evictCacheIfNeeded(): void {
+  if (_profileCache.size >= MAX_PROFILE_CACHE_SIZE) {
+    const firstKey = _profileCache.keys().next().value;
+    if (firstKey) _profileCache.delete(firstKey);
+  }
+}
 
 /**
  * FIX: Audit #011 — Fetch user profile (email, name) from database.
@@ -356,6 +347,7 @@ export async function fetchSessionProfile(userId: string): Promise<{
       lastName: data.last_name as string,
       fetchedAt: Date.now(),
     };
+    _evictCacheIfNeeded();
     _profileCache.set(userId, profile);
 
     return { email: profile.email, firstName: profile.firstName, lastName: profile.lastName };

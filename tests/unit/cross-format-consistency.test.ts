@@ -8,9 +8,15 @@ import { GeneratorFactory } from '@/services/format/GeneratorFactory';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 
 const ALL_FORMATS: OutputFormat[] = [
-  'xrechnung-cii', 'xrechnung-ubl', 'peppol-bis',
-  'facturx-en16931', 'facturx-basic',
-  'fatturapa', 'ksef', 'nlcius', 'cius-ro',
+  'xrechnung-cii',
+  'xrechnung-ubl',
+  'peppol-bis',
+  'facturx-en16931',
+  'facturx-basic',
+  'fatturapa',
+  'ksef',
+  'nlcius',
+  'cius-ro',
 ];
 
 function makeConsistencyInvoice(outputFormat: OutputFormat): CanonicalInvoice {
@@ -108,8 +114,9 @@ function extractInvoiceNumber(xml: string, _formatId: OutputFormat): string | nu
   }
   // KSeF
   if (xml.includes('Faktura')) {
-    return extractTag(xml, /<NrFaktury>([^<]+)<\/NrFaktury>/) 
-      || extractTag(xml, /<P_2>([^<]+)<\/P_2>/);
+    return (
+      extractTag(xml, /<NrFaktury>([^<]+)<\/NrFaktury>/) || extractTag(xml, /<P_2>([^<]+)<\/P_2>/)
+    );
   }
   return null;
 }
@@ -122,7 +129,9 @@ function extractSellerName(xml: string, _formatId: OutputFormat): string | null 
   }
   // UBL
   if (xml.includes('AccountingSupplierParty')) {
-    const m = xml.match(/<cac:AccountingSupplierParty>[\s\S]*?<cbc:RegistrationName>([^<]+)<\/cbc:RegistrationName>/);
+    const m = xml.match(
+      /<cac:AccountingSupplierParty>[\s\S]*?<cbc:RegistrationName>([^<]+)<\/cbc:RegistrationName>/
+    );
     if (m) return m[1]!.trim();
     const m2 = xml.match(/<cac:AccountingSupplierParty>[\s\S]*?<cbc:Name>([^<]+)<\/cbc:Name>/);
     return m2 ? m2[1]!.trim() : null;
@@ -131,9 +140,12 @@ function extractSellerName(xml: string, _formatId: OutputFormat): string | null 
   if (xml.includes('FatturaElettronica')) {
     return extractTag(xml, /<Denominazione>([^<]+)<\/Denominazione>/);
   }
-  // KSeF
-  return extractTag(xml, /<NazwaHandlowa>([^<]+)<\/NazwaHandlowa>/)
-    || extractTag(xml, /<PelnaNazwa>([^<]+)<\/PelnaNazwa>/);
+  // KSeF — FA(3) uses DaneIdentyfikacyjne > Nazwa (no NazwaHandlowa)
+  return (
+    extractTag(xml, /<NazwaHandlowa>([^<]+)<\/NazwaHandlowa>/) ||
+    extractTag(xml, /<PelnaNazwa>([^<]+)<\/PelnaNazwa>/) ||
+    extractTag(xml, /<Podmiot1>[\s\S]*?<Nazwa>([^<]+)<\/Nazwa>/)
+  );
 }
 
 function extractBuyerName(xml: string, _formatId: OutputFormat): string | null {
@@ -144,7 +156,9 @@ function extractBuyerName(xml: string, _formatId: OutputFormat): string | null {
   }
   // UBL
   if (xml.includes('AccountingCustomerParty')) {
-    const m = xml.match(/<cac:AccountingCustomerParty>[\s\S]*?<cbc:RegistrationName>([^<]+)<\/cbc:RegistrationName>/);
+    const m = xml.match(
+      /<cac:AccountingCustomerParty>[\s\S]*?<cbc:RegistrationName>([^<]+)<\/cbc:RegistrationName>/
+    );
     if (m) return m[1]!.trim();
     const m2 = xml.match(/<cac:AccountingCustomerParty>[\s\S]*?<cbc:Name>([^<]+)<\/cbc:Name>/);
     return m2 ? m2[1]!.trim() : null;
@@ -180,13 +194,15 @@ function extractTotalAmount(xml: string, _formatId: OutputFormat): number | null
   let val: string | null = null;
   // CII
   if (xml.includes('CrossIndustryInvoice') || xml.includes('rsm:')) {
-    val = extractTag(xml, /<ram:DuePayableAmount>([^<]+)<\/ram:DuePayableAmount>/)
-      || extractTag(xml, /<ram:GrandTotalAmount>([^<]+)<\/ram:GrandTotalAmount>/);
+    val =
+      extractTag(xml, /<ram:DuePayableAmount>([^<]+)<\/ram:DuePayableAmount>/) ||
+      extractTag(xml, /<ram:GrandTotalAmount>([^<]+)<\/ram:GrandTotalAmount>/);
   }
   // UBL
   else if (xml.includes('cbc:PayableAmount') || xml.includes('cbc:TaxInclusiveAmount')) {
-    val = extractTag(xml, /<cbc:PayableAmount[^>]*>([^<]+)<\/cbc:PayableAmount>/)
-      || extractTag(xml, /<cbc:TaxInclusiveAmount[^>]*>([^<]+)<\/cbc:TaxInclusiveAmount>/);
+    val =
+      extractTag(xml, /<cbc:PayableAmount[^>]*>([^<]+)<\/cbc:PayableAmount>/) ||
+      extractTag(xml, /<cbc:TaxInclusiveAmount[^>]*>([^<]+)<\/cbc:TaxInclusiveAmount>/);
   }
   // FatturaPA
   else if (xml.includes('ImportoTotaleDocumento')) {
@@ -268,14 +284,14 @@ describe('Cross-Format Consistency', () => {
       if (xml.includes('CrossIndustryInvoice') || xml.includes('rsm:')) {
         count = (xml.match(/<ram:IncludedSupplyChainTradeLineItem>/g) || []).length;
       } else if (xml.includes('cac:InvoiceLine') || xml.includes('cac:CreditNoteLine')) {
-        count = (xml.match(/<cac:InvoiceLine>/g) || []).length
-          + (xml.match(/<cac:CreditNoteLine>/g) || []).length;
+        count =
+          (xml.match(/<cac:InvoiceLine>/g) || []).length +
+          (xml.match(/<cac:CreditNoteLine>/g) || []).length;
       } else if (xml.includes('DettaglioLinee')) {
         count = (xml.match(/<DettaglioLinee>/g) || []).length;
       } else {
         // KSeF or other — count line item patterns
-        count = (xml.match(/<FakturaWiersz>/g) || []).length
-          || (xml.match(/<P_7>/g) || []).length;
+        count = (xml.match(/<FakturaWiersz>/g) || []).length || (xml.match(/<P_7>/g) || []).length;
       }
       expect(count).toBe(2);
     });

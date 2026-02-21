@@ -348,6 +348,43 @@ These are scaffolded and tested but inactive in production.
 
 ---
 
+### AR-18: No Runtime XSD Validation for Generated Invoices
+
+| Field       | Value                         |
+| ----------- | ----------------------------- |
+| Finding     | F-024 (Audit V2)              |
+| Location    | `services/format/` generators |
+| Review date | 2026-06-01                    |
+
+**Risk:** Generated XML invoices are not validated against XSD schemas at runtime before delivery. Malformed XML could pass structural checks but fail schema validation.
+
+**Mitigations in place:**
+
+- Structural element checks in each format generator ensure required elements are present
+- KoSIT Schematron validation is available for XRechnung when enabled
+- CI test suite validates golden file outputs against expected structure
+- Post-generation XML safety check (`validateXmlSafety`) catches injection and structural issues
+
+**Conditions to revisit:** When adding new formats, or if customer complaints about validation failures exceed 1%. Target: add CI-level XSD validation for all formats.
+
+---
+
+### AR-19: Database Connection Pooling
+
+| Field       | Value                    |
+| ----------- | ------------------------ |
+| Finding     | F-028 (Audit V2)         |
+| Location    | `lib/supabase.server.ts` |
+| Review date | 2026-08-01               |
+
+**Risk:** Application-level connection pooling is not explicitly configured. Each serverless function invocation creates a new Supabase client.
+
+**Rationale:** Supabase cloud uses Supavisor (connection pooler) by default. The `NEXT_PUBLIC_SUPABASE_URL` automatically routes through the pooler. No additional pooling needed at application level for Vercel serverless deployments.
+
+**Conditions to revisit:** If moving to self-hosted Supabase, or if connection exhaustion errors appear in logs.
+
+---
+
 ## Operational Actions
 
 ### OPS-1: Enable CodeQL as Required Status Check

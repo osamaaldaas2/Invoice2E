@@ -1,7 +1,7 @@
 /**
  * Factory for profile validators.
  * Returns the appropriate IProfileValidator for a given profile ID.
- * 
+ *
  * @module validation/ProfileValidatorFactory
  */
 
@@ -193,8 +193,25 @@ export function getProfileValidator(profileId: ProfileId): IProfileValidator {
 }
 
 /**
+ * All available profile IDs. Must match the ProfileId union type.
+ * TypeScript will error if a value is not a valid ProfileId.
+ */
+const ALL_PROFILES = [
+  'xrechnung-cii',
+  'xrechnung-ubl',
+  'peppol-bis',
+  'facturx-en16931',
+  'facturx-basic',
+  'fatturapa',
+  'ksef',
+  'nlcius',
+  'cius-ro',
+  'en16931-base',
+] as const satisfies readonly ProfileId[];
+
+/**
  * Get all available profile IDs.
  */
 export function getAvailableProfiles(): ProfileId[] {
-  return ['xrechnung-cii', 'xrechnung-ubl', 'peppol-bis', 'facturx-en16931', 'facturx-basic', 'fatturapa', 'ksef', 'nlcius', 'cius-ro', 'en16931-base'];
+  return [...ALL_PROFILES];
 }

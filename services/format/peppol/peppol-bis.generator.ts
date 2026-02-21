@@ -96,6 +96,32 @@ export class PeppolBISGenerator implements IFormatGenerator {
   readonly specDate = '2024-10-09';
 
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
+    // Pre-generation validation: EndpointID (BT-34/BT-49) is mandatory (cardinality 1..1)
+    if (!invoice.seller.electronicAddress && !invoice.seller.email) {
+      return {
+        xmlContent: '',
+        fileName: '',
+        fileSize: 0,
+        validationStatus: 'invalid',
+        validationErrors: [
+          'PEPPOL BIS 3.0 requires seller EndpointID (BT-34). Provide seller email or electronic address.',
+        ],
+        validationWarnings: [],
+      };
+    }
+    if (!invoice.buyer.electronicAddress && !invoice.buyer.email) {
+      return {
+        xmlContent: '',
+        fileName: '',
+        fileSize: 0,
+        validationStatus: 'invalid',
+        validationErrors: [
+          'PEPPOL BIS 3.0 requires buyer EndpointID (BT-49). Provide buyer email or electronic address.',
+        ],
+        validationWarnings: [],
+      };
+    }
+
     const data = toUBLData(invoice);
     let xml = await ublService.generate(data);
     xml = replaceCustomizationId(xml);
@@ -106,7 +132,7 @@ export class PeppolBISGenerator implements IFormatGenerator {
       xmlContent: xml,
       fileName: `${invoice.invoiceNumber || 'invoice'}_peppol.xml`,
       fileSize: new TextEncoder().encode(xml).length,
-      validationStatus: validation.valid ? 'valid' : 'warnings',
+      validationStatus: validation.valid ? 'valid' : 'invalid',
       validationErrors: validation.errors,
       validationWarnings: [],
     };

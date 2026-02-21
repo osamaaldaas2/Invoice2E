@@ -27,6 +27,11 @@ export class CIUSROGenerator implements IFormatGenerator {
   async generate(invoice: CanonicalInvoice): Promise<GenerationResult> {
     const result = await this.peppolGenerator.generate(invoice);
 
+    // Propagate early failure from PEPPOL pre-checks (e.g. missing EndpointID)
+    if (result.validationStatus === 'invalid') {
+      return { ...result, fileName: `${invoice.invoiceNumber || 'invoice'}_ciusro.xml` };
+    }
+
     let xml = result.xmlContent;
     xml = xml.replace(PEPPOL_CUSTOMIZATION_ID, CIUSRO_CUSTOMIZATION_ID);
 
@@ -37,7 +42,7 @@ export class CIUSROGenerator implements IFormatGenerator {
       xmlContent: xml,
       fileName: `${invoice.invoiceNumber || 'invoice'}_ciusro.xml`,
       fileSize: new TextEncoder().encode(xml).length,
-      validationStatus: validation.valid ? 'valid' : 'warnings',
+      validationStatus: validation.valid ? 'valid' : 'invalid',
       validationErrors: validation.errors,
     };
   }

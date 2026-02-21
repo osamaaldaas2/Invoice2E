@@ -6,6 +6,8 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { createUserScopedClient } from '@/lib/supabase.server';
+import { toLegacyFormat } from '@/lib/format-utils';
+import type { OutputFormat } from '@/types/canonical-invoice';
 import { z } from 'zod';
 
 const BulkReviewItemSchema = z.object({
@@ -85,32 +87,45 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           _originalExtraction: extractionData,
         };
 
-        await invoiceDbService.updateExtraction(item.extractionId, {
-          extractionData: persistData,
-        }, userClient);
+        await invoiceDbService.updateExtraction(
+          item.extractionId,
+          {
+            extractionData: persistData,
+          },
+          userClient
+        );
 
         const invoiceNumber = String(reviewedData.invoiceNumber || '');
         const buyerName = String(reviewedData.buyerName || '');
 
+        // Resolve output format from reviewed data, fallback to xrechnung-cii
+        const itemOutputFormat = (reviewedData.outputFormat as OutputFormat) || 'xrechnung-cii';
         const existingConversion = await invoiceDbService.getConversionByExtractionId(
           item.extractionId,
           userClient
         );
         const conversion = existingConversion
-          ? await invoiceDbService.updateConversion(existingConversion.id, {
-              invoiceNumber,
-              buyerName,
-              conversionFormat: 'XRechnung',
-              conversionStatus: 'draft',
-            }, userClient)
-          : await invoiceDbService.createConversion({
-              userId: user.id,
-              extractionId: item.extractionId,
-              invoiceNumber,
-              buyerName,
-              conversionFormat: 'XRechnung',
-              conversionStatus: 'draft',
-            }, userClient);
+          ? await invoiceDbService.updateConversion(
+              existingConversion.id,
+              {
+                invoiceNumber,
+                buyerName,
+                conversionFormat: toLegacyFormat(itemOutputFormat),
+                conversionStatus: 'draft',
+              },
+              userClient
+            )
+          : await invoiceDbService.createConversion(
+              {
+                userId: user.id,
+                extractionId: item.extractionId,
+                invoiceNumber,
+                buyerName,
+                conversionFormat: toLegacyFormat(itemOutputFormat),
+                conversionStatus: 'draft',
+              },
+              userClient
+            );
 
         results.push({
           extractionId: item.extractionId,

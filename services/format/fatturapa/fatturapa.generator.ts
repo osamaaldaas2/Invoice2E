@@ -8,7 +8,7 @@
 import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import { escapeXml, formatDateISO, formatAmount } from '@/lib/xml-utils';
-import { roundMoney } from '@/lib/monetary';
+import { roundMoney, sumMoney } from '@/lib/monetary';
 
 /** Map EN 16931 document type codes to FatturaPA TipoDocumento */
 function mapTipoDocumento(code?: string | number): string {
@@ -177,6 +177,14 @@ export class FatturapaGenerator implements IFormatGenerator {
       taxGroups.set(rate, existing);
     }
 
+    // Derive document total from computed tax groups for consistency
+    // (ensures ImportoTotaleDocumento == Σ ImponibileImporto + Σ Imposta)
+    const groupValues = Array.from(taxGroups.values());
+    const computedDocTotal = roundMoney(
+      sumMoney(groupValues.map((g) => roundMoney(g.taxable))) +
+        sumMoney(groupValues.map((g) => roundMoney(g.tax)))
+    );
+
     const lines: string[] = [];
     lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
     lines.push(
@@ -223,9 +231,9 @@ export class FatturapaGenerator implements IFormatGenerator {
     );
     lines.push(`      </DatiAnagrafici>`);
     lines.push(`      <Sede>`);
-    lines.push(`        <Indirizzo>${escapeXml(inv.seller.address || 'N/A')}</Indirizzo>`);
+    lines.push(`        <Indirizzo>${escapeXml(inv.seller.address || '')}</Indirizzo>`);
     lines.push(`        <CAP>${escapeXml(inv.seller.postalCode || '00000')}</CAP>`);
-    lines.push(`        <Comune>${escapeXml(inv.seller.city || 'N/A')}</Comune>`);
+    lines.push(`        <Comune>${escapeXml(inv.seller.city || '')}</Comune>`);
     lines.push(
       `        <Nazione>${escapeXml(inv.seller.countryCode || sellerVat.paese)}</Nazione>`
     );
@@ -256,9 +264,9 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`        </Anagrafica>`);
     lines.push(`      </DatiAnagrafici>`);
     lines.push(`      <Sede>`);
-    lines.push(`        <Indirizzo>${escapeXml(inv.buyer.address || 'N/A')}</Indirizzo>`);
+    lines.push(`        <Indirizzo>${escapeXml(inv.buyer.address || '')}</Indirizzo>`);
     lines.push(`        <CAP>${escapeXml(inv.buyer.postalCode || '00000')}</CAP>`);
-    lines.push(`        <Comune>${escapeXml(inv.buyer.city || 'N/A')}</Comune>`);
+    lines.push(`        <Comune>${escapeXml(inv.buyer.city || '')}</Comune>`);
     lines.push(
       `        <Nazione>${escapeXml(inv.buyer.countryCode || buyerVat?.paese || 'IT')}</Nazione>`
     );
@@ -289,11 +297,9 @@ export class FatturapaGenerator implements IFormatGenerator {
         lines.push(`        </ScontoMaggiorazione>`);
       }
     }
-    if (inv.totals.totalAmount != null) {
-      lines.push(
-        `        <ImportoTotaleDocumento>${formatAmount(inv.totals.totalAmount)}</ImportoTotaleDocumento>`
-      );
-    }
+    lines.push(
+      `        <ImportoTotaleDocumento>${computedDocTotal.toFixed(2)}</ImportoTotaleDocumento>`
+    );
     lines.push(`      </DatiGeneraliDocumento>`);
     // Credit note: link to preceding invoice
     if (tipoDoc === 'TD04' && inv.precedingInvoiceReference) {
@@ -338,7 +344,7 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`    </DatiBeniServizi>`);
 
     // DatiPagamento
-    if (inv.payment.iban || inv.totals.totalAmount) {
+    if (inv.payment.iban || computedDocTotal > 0) {
       // TP02 = complete payment in single installment (standard B2B default)
       lines.push(`    <DatiPagamento>`);
       lines.push(`      <CondizioniPagamento>TP02</CondizioniPagamento>`);
@@ -346,9 +352,7 @@ export class FatturapaGenerator implements IFormatGenerator {
       // MP05 = bank transfer (when IBAN present), MP01 = cash (generic fallback)
       const modalitaPagamento = inv.payment.iban ? 'MP05' : 'MP01';
       lines.push(`        <ModalitaPagamento>${modalitaPagamento}</ModalitaPagamento>`);
-      lines.push(
-        `        <ImportoPagamento>${formatAmount(inv.totals.totalAmount)}</ImportoPagamento>`
-      );
+      lines.push(`        <ImportoPagamento>${computedDocTotal.toFixed(2)}</ImportoPagamento>`);
       if (inv.payment.dueDate) {
         lines.push(
           `        <DataScadenzaPagamento>${fpaDate(inv.payment.dueDate)}</DataScadenzaPagamento>`

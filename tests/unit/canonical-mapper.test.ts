@@ -45,10 +45,12 @@ describe('toCanonicalInvoice', () => {
     expect(result.seller.postalCode).toBe('10115');
   });
 
-  it('defaults country code to DE', () => {
+  it('does not default country code (validation catches missing values)', () => {
     const result = toCanonicalInvoice(createMinimalInput());
-    expect(result.seller.countryCode).toBe('DE');
-    expect(result.buyer.countryCode).toBe('DE');
+    // Country code should not default to any value — the validation pipeline
+    // catches missing country codes rather than masking the issue with wrong defaults.
+    expect(result.seller.countryCode).toBeFalsy();
+    expect(result.buyer.countryCode).toBeFalsy();
   });
 
   it('splits EU VAT ID from sellerTaxId', () => {

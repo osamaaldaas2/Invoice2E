@@ -1,6 +1,9 @@
 /**
- * KSeF FA(2) profile-specific validation rules.
- * Polish national e-invoicing business rules.
+ * KSeF FA(3) profile-specific validation rules.
+ * Polish national e-invoicing business rules for KSeF 2.0.
+ *
+ * FA(3) is mandatory since 1 February 2026 (KSeF 2.0 production).
+ * FA(2) is no longer accepted.
  */
 
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
@@ -10,13 +13,17 @@ const VALID_POLISH_TAX_RATES = [23, 22, 8, 7, 5, 0];
 const VALID_POLISH_TAX_RATE_STRINGS = ['23', '22', '8', '7', '5', '0', 'zw', 'np', 'oo'];
 
 /** Extract NIP digits from vatId/taxNumber */
-function extractNIPDigits(party: { vatId?: string | null; taxNumber?: string | null; taxId?: string | null }): string {
+function extractNIPDigits(party: {
+  vatId?: string | null;
+  taxNumber?: string | null;
+  taxId?: string | null;
+}): string {
   const raw = party.taxNumber || party.vatId || party.taxId || '';
   return raw.replace(/^PL/i, '').replace(/\D/g, '');
 }
 
 /**
- * Run all KSeF FA(2) profile validation rules.
+ * Run all KSeF FA(3) profile validation rules.
  */
 export function validateKsefRules(data: CanonicalInvoice): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -37,13 +44,7 @@ export function validateKsefRules(data: CanonicalInvoice): ValidationError[] {
   // KSEF-02: Buyer NIP or name required
   const buyerNIP = extractNIPDigits(data.buyer);
   if (!buyerNIP && !data.buyer?.name?.trim()) {
-    errors.push(
-      createError(
-        'KSEF-02',
-        'invoice.buyer',
-        'Buyer NIP or name is required for KSeF'
-      )
-    );
+    errors.push(createError('KSEF-02', 'invoice.buyer', 'Buyer NIP or name is required for KSeF'));
   }
 
   // KSEF-03: Invoice number required (max 256 chars)
@@ -53,7 +54,11 @@ export function validateKsefRules(data: CanonicalInvoice): ValidationError[] {
     );
   } else if (data.invoiceNumber.length > 256) {
     errors.push(
-      createError('KSEF-03', 'invoice.invoiceNumber', 'Invoice number must not exceed 256 characters')
+      createError(
+        'KSEF-03',
+        'invoice.invoiceNumber',
+        'Invoice number must not exceed 256 characters'
+      )
     );
   }
 
@@ -84,25 +89,42 @@ export function validateKsefRules(data: CanonicalInvoice): ValidationError[] {
       const loc = `invoice.lineItems[${idx}]`;
 
       if (!item.description?.trim()) {
-        errors.push(createError('KSEF-07', `${loc}.description`, `Line item ${idx + 1}: description is required`));
+        errors.push(
+          createError(
+            'KSEF-07',
+            `${loc}.description`,
+            `Line item ${idx + 1}: description is required`
+          )
+        );
       }
 
       if (item.quantity === undefined || item.quantity === null) {
-        errors.push(createError('KSEF-07', `${loc}.quantity`, `Line item ${idx + 1}: quantity is required`));
+        errors.push(
+          createError('KSEF-07', `${loc}.quantity`, `Line item ${idx + 1}: quantity is required`)
+        );
       }
 
       if (item.unitPrice === undefined || item.unitPrice === null) {
-        errors.push(createError('KSEF-07', `${loc}.unitPrice`, `Line item ${idx + 1}: unit price is required`));
+        errors.push(
+          createError('KSEF-07', `${loc}.unitPrice`, `Line item ${idx + 1}: unit price is required`)
+        );
       }
 
       if (item.taxRate === undefined || item.taxRate === null) {
-        errors.push(createError('KSEF-07', `${loc}.taxRate`, `Line item ${idx + 1}: tax rate is required`));
-      } else if (!VALID_POLISH_TAX_RATES.includes(item.taxRate) && !VALID_POLISH_TAX_RATE_STRINGS.includes(String(item.taxRate))) {
+        errors.push(
+          createError('KSEF-07', `${loc}.taxRate`, `Line item ${idx + 1}: tax rate is required`)
+        );
+      } else if (
+        !VALID_POLISH_TAX_RATES.includes(item.taxRate) &&
+        !VALID_POLISH_TAX_RATE_STRINGS.includes(String(item.taxRate))
+      ) {
+        // FA(3) supports non-standard rates via P_13_11/P_14_11, but they are unusual.
+        // Still flag as a warning-level error for review (not blocking).
         errors.push(
           createError(
             'KSEF-08',
             `${loc}.taxRate`,
-            `Line item ${idx + 1}: invalid Polish tax rate`,
+            `Line item ${idx + 1}: non-standard Polish tax rate (will be mapped to P_13_11/P_14_11)`,
             { expected: '23, 22, 8, 7, 5, 0, zw, or np', actual: String(item.taxRate) }
           )
         );

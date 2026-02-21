@@ -13,6 +13,7 @@ interface BatchResultItem {
   status: string;
   invoiceNumber?: string;
   extractionId?: string;
+  output_format?: string;
 }
 
 interface ValidationResult {
@@ -31,6 +32,7 @@ interface BatchValidation {
   results: ValidationResult[];
 }
 
+// FIX: Audit V2 [F-030] — add conversion_format for legacy data compatibility
 interface Conversion {
   id: string;
   invoice_number: string;
@@ -38,6 +40,7 @@ interface Conversion {
   status: string;
   created_at: string;
   output_format: string;
+  conversion_format?: string;
   processing_time_ms: number;
   record_type?: 'conversion' | 'extraction' | 'batch';
   extraction_id?: string;
@@ -341,7 +344,9 @@ function BatchRow({
           </span>
         </td>
         <td className="px-4 py-3 text-sm text-slate-300">{t('batchUpload')}</td>
-        <td className="px-4 py-3 text-sm text-slate-300">XRechnung</td>
+        <td className="px-4 py-3 text-sm text-slate-300">
+          {conversion.output_format || conversion.conversion_format || 'e-Invoice'}
+        </td>
         <td className="px-4 py-3">
           <span
             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(conversion.status)}`}
@@ -504,7 +509,9 @@ function BatchRow({
               >
                 {result.filename}
               </td>
-              <td className="px-4 py-2 text-sm text-slate-400">XRechnung</td>
+              <td className="px-4 py-2 text-sm text-slate-400">
+                {result.output_format || 'e-Invoice'}
+              </td>
               <td className="px-4 py-2">
                 {vResult ? (
                   vResult.valid ? (
@@ -947,7 +954,7 @@ export default function ConversionHistory({ limit = 10, showPagination = true }:
                         {conversion.record_type === 'extraction' &&
                         conversion.status !== 'completed'
                           ? '-'
-                          : conversion.output_format || 'XRechnung'}
+                          : conversion.output_format || conversion.conversion_format || 'e-Invoice'}
                       </td>
                       <td className="px-4 py-3">
                         <span

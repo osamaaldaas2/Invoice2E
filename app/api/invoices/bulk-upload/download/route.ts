@@ -97,7 +97,10 @@ export async function GET(req: NextRequest) {
         }
 
         // PERF-2: Check for cached XML first
-        const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
+        const existingConversion = await invoiceDbService.getConversionByExtractionId(
+          extractionId,
+          userClient
+        );
         const cachedXml = (existingConversion as Record<string, unknown> | null)?.xml_content as
           | string
           | undefined;
@@ -140,10 +143,14 @@ export async function GET(req: NextRequest) {
 
           // Cache the generated XML
           if (existingConversion) {
-            await invoiceDbService.updateConversion(existingConversion.id, {
-              xmlContent,
-              xmlFileName,
-            }, userClient);
+            await invoiceDbService.updateConversion(
+              existingConversion.id,
+              {
+                xmlContent,
+                xmlFileName,
+              },
+              userClient
+            );
           }
         }
 
@@ -161,10 +168,14 @@ export async function GET(req: NextRequest) {
 
         // Update extraction + conversion status to completed
         if (existingConversion) {
-          await invoiceDbService.updateConversion(existingConversion.id, {
-            conversionStatus: 'completed',
-            ...(validationStatus ? { validationStatus } : {}),
-          }, userClient);
+          await invoiceDbService.updateConversion(
+            existingConversion.id,
+            {
+              conversionStatus: 'completed',
+              ...(validationStatus ? { validationStatus } : {}),
+            },
+            userClient
+          );
         }
         await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
       } catch (err) {
@@ -176,7 +187,7 @@ export async function GET(req: NextRequest) {
 
     if (successCount === 0) {
       return NextResponse.json(
-        { error: 'No invoices could be converted to XRechnung XML', details: errors },
+        { error: 'No invoices could be converted to e-invoice format', details: errors },
         { status: 422 }
       );
     }

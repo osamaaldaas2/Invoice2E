@@ -52,6 +52,7 @@ export const ALLOWED_NAMESPACES: ReadonlySet<string> = new Set([
 
   // --- KSeF (Polish) ---
   'http://crd.gov.pl/wzor/2023/06/29/12648/',
+  'http://crd.gov.pl/wzor/2025/06/25/13775/',
 
   // --- Factur-X / ZUGFeRD ---
   'urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0',
@@ -140,10 +141,7 @@ export function sanitizeXml(xml: string): string {
  * @param options - Optional overrides
  * @returns Safety result
  */
-export function validateXmlSafety(
-  xml: string,
-  options: XmlSafetyOptions = {}
-): XmlSafetyResult {
+export function validateXmlSafety(xml: string, options: XmlSafetyOptions = {}): XmlSafetyResult {
   const maxSize = options.maxSizeBytes ?? MAX_XML_SIZE_BYTES;
   const maxEntities = options.maxEntityReferences ?? MAX_ENTITY_REFERENCES;
 
@@ -213,10 +211,7 @@ export function validateXmlSafety(
  * @returns Sanitized XML string
  * @throws {XmlSecurityError} If any security check fails
  */
-export function parseXmlSafe(
-  xml: string,
-  options: XmlSafetyOptions = {}
-): string {
+export function parseXmlSafe(xml: string, options: XmlSafetyOptions = {}): string {
   if (!xml || xml.trim().length === 0) {
     throw new XmlSecurityError('XML input is empty', 'EMPTY_XML');
   }
@@ -256,10 +251,12 @@ function hasDoctypeDeclaration(xml: string): boolean {
  */
 function hasExternalEntityPattern(xml: string): boolean {
   // SYSTEM or PUBLIC inside a declaration context
-  return /<!ENTITY[^>]*\bSYSTEM\b/i.test(xml)
-    || /<!ENTITY[^>]*\bPUBLIC\b/i.test(xml)
-    || /<!DOCTYPE[^>]*\bSYSTEM\b/i.test(xml)
-    || /<!DOCTYPE[^>]*\bPUBLIC\b/i.test(xml);
+  return (
+    /<!ENTITY[^>]*\bSYSTEM\b/i.test(xml) ||
+    /<!ENTITY[^>]*\bPUBLIC\b/i.test(xml) ||
+    /<!DOCTYPE[^>]*\bSYSTEM\b/i.test(xml) ||
+    /<!DOCTYPE[^>]*\bPUBLIC\b/i.test(xml)
+  );
 }
 
 /**

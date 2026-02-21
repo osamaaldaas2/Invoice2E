@@ -100,10 +100,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const invoiceData = parsed.data.invoiceData;
     const outputFormat = parsed.data.format;
 
-    logger.info('Starting XRechnung conversion', {
+    logger.info('Starting e-invoice conversion', {
       extractionId,
       invoiceNumber: invoiceData.invoiceNumber,
       userId,
+      format: outputFormat,
     });
 
     // Map input data to canonical invoice model (handles sellerTaxId splitting,
@@ -132,9 +133,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const errorMessages = preValidation.errors.map(
           (e: { ruleId: string; message: string }) => `[${e.ruleId}] ${e.message}`
         );
+        const formatMeta = getFormatMetadata(resolvedFormat);
         throw new ValidationError(
-          `${resolvedFormat === 'xrechnung-ubl' ? 'UBL' : 'XRechnung'} validation failed:\n` +
-            errorMessages.join('\n'),
+          `${formatMeta.displayName} validation failed:\n` + errorMessages.join('\n'),
           { structuredErrors: preValidation.errors as unknown as Record<string, unknown> }
         );
       }
@@ -289,9 +290,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (!result || !result.xmlContent) {
-      logger.error('XRechnung result is invalid', { result });
+      logger.error('Conversion result is invalid', { result, format: resolvedFormat });
       return NextResponse.json(
-        { success: false, error: 'Failed to generate XRechnung XML' },
+        { success: false, error: 'Failed to generate e-invoice output' },
         { status: 500 }
       );
     }
@@ -408,10 +409,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    logger.info('XRechnung conversion completed successfully', {
+    logger.info('E-invoice conversion completed successfully', {
       extractionId,
       fileName: result.fileName,
       validationStatus: result.validationStatus,
+      format: resolvedFormat,
     });
 
     const formatMeta = getFormatMetadata(resolvedFormat);

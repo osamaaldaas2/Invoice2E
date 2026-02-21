@@ -123,11 +123,16 @@ describe('monetary utilities', () => {
       expect(moneyEqual(100.0, 100.0)).toBe(true);
     });
 
-    it('treats 0.01 difference as equal (default tolerance)', () => {
-      expect(moneyEqual(100.0, 100.01)).toBe(true);
+    // FIX: Audit V2 [F-011] — default tolerance is now 0 (strict comparison)
+    it('treats 0.01 difference as NOT equal (strict default)', () => {
+      expect(moneyEqual(100.0, 100.01)).toBe(false);
     });
 
-    it('treats 0.02 difference as NOT equal (default tolerance)', () => {
+    it('treats 0.01 difference as equal with explicit tolerance', () => {
+      expect(moneyEqual(100.0, 100.01, 0.01)).toBe(true);
+    });
+
+    it('treats 0.02 difference as NOT equal (strict default)', () => {
       expect(moneyEqual(100.0, 100.02)).toBe(false);
     });
 

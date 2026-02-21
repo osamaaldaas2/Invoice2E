@@ -82,10 +82,12 @@ export default function middleware(request: NextRequest) {
 
   if (!isValidLocale) {
     const response = NextResponse.next();
+    // FIX: Audit V2 [F-021] — add secure flag to prevent cookie over HTTP
     response.cookies.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
       path: '/',
       maxAge: 60 * 60 * 24 * 365, // 1 year
       sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
     });
     return addSecurityHeaders(response);
   }

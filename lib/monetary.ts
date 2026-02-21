@@ -10,10 +10,34 @@
 
 /**
  * Convert an amount (e.g. 19.99) to integer cents (1999).
- * Handles floating-point imprecision by rounding after multiplication.
+ *
+ * Uses string-based decomposition for 3+ decimal inputs to avoid IEEE 754
+ * precision loss. E.g. `10.005 * 100 = 1000.4999...` in IEEE 754, which
+ * `Math.round` incorrectly resolves to 1000 instead of 1001.
+ *
+ * FIX: Audit V2 [F-001] — string-based rounding for precision safety.
  */
 export function toCents(amount: number): number {
-  return Math.round(amount * 100);
+  if (amount === 0) return 0;
+  const negative = amount < 0;
+  const abs = Math.abs(amount);
+  const str = String(abs);
+  const dotIdx = str.indexOf('.');
+
+  if (dotIdx === -1 || str.length - dotIdx - 1 <= 2) {
+    // 0–2 decimal places: standard approach with epsilon correction
+    const cents = Math.round((abs + Number.EPSILON) * 100);
+    return negative ? -cents : cents;
+  }
+
+  // 3+ decimal places: string-based decomposition to avoid IEEE 754 drift
+  const [intPart = '0', decPart = ''] = str.split('.');
+  const paddedDec = (decPart + '000').slice(0, 3); // take 3 digits for rounding
+  const centsStr = intPart + paddedDec.slice(0, 2);
+  const thirdDigit = parseInt(paddedDec[2] || '0', 10);
+  const baseCents = parseInt(centsStr, 10);
+  const cents = thirdDigit >= 5 ? baseCents + 1 : baseCents;
+  return negative ? -cents : cents;
 }
 
 /**
@@ -71,10 +95,12 @@ export function sumMoney(amounts: number[]): number {
 
 /**
  * Check if two monetary amounts are equal within a tolerance.
- * Default tolerance is 0.01 (1 cent) to account for rounding differences
- * in multi-step calculations.
+ * Default tolerance is 0 (exact match). Pass explicit tolerance only
+ * where rounding differences are expected (e.g., AI-extracted vs calculated).
+ *
+ * FIX: Audit V2 [F-011] — strict default prevents masking real errors.
  */
-export function moneyEqual(a: number, b: number, tolerance = 0.01): boolean {
+export function moneyEqual(a: number, b: number, tolerance = 0): boolean {
   // Compare in cents to avoid floating-point comparison issues
   const diffCents = Math.abs(toCents(a) - toCents(b));
   const toleranceCents = Math.round(tolerance * 100);

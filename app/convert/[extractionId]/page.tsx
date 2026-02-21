@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -31,6 +31,33 @@ export default function ConvertPage() {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('xrechnung-cii');
 
+  // Read selected format from sessionStorage on mount (set by FormatSelector during review)
+  useEffect(() => {
+    const globalPref = sessionStorage.getItem('invoice2e_output_format') as OutputFormat | null;
+    if (globalPref) {
+      setOutputFormat(globalPref);
+      return;
+    }
+    // Fallback: read from review data
+    const reviewData = sessionStorage.getItem(`review_${extractionId}`);
+    if (reviewData) {
+      try {
+        const parsed = JSON.parse(reviewData);
+        if (parsed.outputFormat) setOutputFormat(parsed.outputFormat);
+      } catch {
+        /* ignore parse errors */
+      }
+    }
+  }, [extractionId]);
+
+  // Format metadata for dynamic i18n interpolation
+  const currentFormatMeta = getFormatMetadata(outputFormat);
+  const fmt = {
+    formatName: currentFormatMeta.displayName,
+    formatDescription: currentFormatMeta.description,
+    fileExtension: currentFormatMeta.fileExtension.replace('.', '').toUpperCase(),
+  };
+
   const handleConvert = async () => {
     setConverting(true);
     setError('');
@@ -58,7 +85,12 @@ export default function ConvertPage() {
       }
 
       const invoiceData = JSON.parse(reviewData);
-      const selectedFormat: OutputFormat = invoiceData.outputFormat || 'xrechnung-cii';
+      // Prefer the global format preference (updated synchronously by FormatSelector)
+      // over the per-extraction value which may be stale after back-navigation.
+      const globalPref = sessionStorage.getItem('invoice2e_output_format') as OutputFormat | null;
+      const selectedFormat: OutputFormat =
+        globalPref || invoiceData.outputFormat || 'xrechnung-cii';
+      invoiceData.outputFormat = selectedFormat;
       setOutputFormat(selectedFormat);
       const formatMeta = getFormatMetadata(selectedFormat);
 
@@ -84,7 +116,7 @@ export default function ConvertPage() {
         }
         const blob = await response.blob();
         setPdfBlob(blob);
-        setSuccess(t('success'));
+        setSuccess(t('success', fmt));
         return;
       }
 
@@ -99,7 +131,7 @@ export default function ConvertPage() {
       }
 
       setXmlContent(data.data.xmlContent);
-      setSuccess(t('success'));
+      setSuccess(t('success', fmt));
 
       // Show warnings on success if present
       if (Array.isArray(data.validationWarnings) && data.validationWarnings.length > 0) {
@@ -205,17 +237,19 @@ export default function ConvertPage() {
           <div className="container mx-auto px-4 py-8">
             <div className="max-w-2xl mx-auto">
               <div className="mb-8 text-center">
-                <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{t('title')}</h1>
-                <p className="text-faded">{t('subtitle')}</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                  {t('title', fmt)}
+                </h1>
+                <p className="text-faded">{t('subtitle', fmt)}</p>
               </div>
 
               <div className="glass-card p-4 sm:p-8">
                 <div className="space-y-6">
                   <div className="p-4 glass-panel rounded-lg border border-white/10">
                     <h3 className="font-semibold text-sky-200 flex items-center gap-2">
-                      ℹ️ {t('whatIsXrechnung')}
+                      ℹ️ {t('formatInfo', fmt)}
                     </h3>
-                    <p className="text-sm text-faded mt-2">{t('whatIsXrechnungDesc')}</p>
+                    <p className="text-sm text-faded mt-2">{t('formatInfoDesc', fmt)}</p>
                   </div>
 
                   {error && (
@@ -260,7 +294,10 @@ export default function ConvertPage() {
                           🔄 {t('retry')}
                         </button>
                         <button
-                          onClick={() => router.push(`/review/${extractionId}`)}
+                          onClick={() => {
+                            sessionStorage.removeItem(`review_${extractionId}`);
+                            router.push(`/review/${extractionId}`);
+                          }}
                           className="px-4 py-2 bg-white/5 text-slate-200 border border-white/10 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors"
                         >
                           ← {t('goBackAndFix')}
@@ -315,11 +352,14 @@ export default function ConvertPage() {
                                 {t('generating')}
                               </span>
                             ) : (
-                              t('convertButton')
+                              t('convertButton', fmt)
                             )}
                           </button>
                           <button
-                            onClick={() => router.push(`/review/${extractionId}`)}
+                            onClick={() => {
+                              sessionStorage.removeItem(`review_${extractionId}`);
+                              router.push(`/review/${extractionId}`);
+                            }}
                             disabled={converting}
                             className="w-full px-6 py-3 bg-white/5 text-slate-100 border border-white/10 rounded-full font-semibold hover:bg-white/10 disabled:opacity-50 transition-colors"
                           >
@@ -359,7 +399,8 @@ export default function ConvertPage() {
                         onClick={handleDownload}
                         className="w-full px-6 py-4 bg-gradient-to-r from-emerald-400 to-green-500 text-white rounded-full font-bold text-lg hover:brightness-110 transition-colors shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                       >
-                        📥 {pdfBlob ? t('downloadXml').replace('XML', 'PDF') : t('downloadXml')}
+                        📥{' '}
+                        {t('downloadXml', { fileExtension: pdfBlob ? 'PDF' : fmt.fileExtension })}
                       </button>
 
                       <button

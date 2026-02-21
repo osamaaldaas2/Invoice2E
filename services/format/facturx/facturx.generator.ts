@@ -19,7 +19,7 @@ import {
 } from 'pdf-lib';
 import type { IFormatGenerator, GenerationResult } from '../IFormatGenerator';
 import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
-import type { XRechnungInvoiceData } from '@/services/xrechnung/types';
+import { toXRechnungData } from '../shared/canonical-to-xrechnung';
 import { xrechnungBuilder } from '@/services/xrechnung/builder';
 import { validateXmlStructure } from '@/services/xrechnung/validator';
 import { escapeXml } from '@/lib/xml-utils';
@@ -44,75 +44,6 @@ const FACTURX_SPECS: Record<
 
 /** XRechnung specification ID to replace in generated XML */
 const XRECHNUNG_SPEC_ID = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
-
-/**
- * Convert CanonicalInvoice to XRechnungInvoiceData (same mapping as CII generator).
- */
-function toXRechnungData(invoice: CanonicalInvoice): XRechnungInvoiceData {
-  return {
-    invoiceNumber: invoice.invoiceNumber,
-    invoiceDate: invoice.invoiceDate,
-    documentTypeCode: invoice.documentTypeCode,
-    currency: invoice.currency,
-    buyerReference: invoice.buyerReference,
-    notes: invoice.notes,
-    precedingInvoiceReference: invoice.precedingInvoiceReference,
-    billingPeriodStart: invoice.billingPeriodStart,
-    billingPeriodEnd: invoice.billingPeriodEnd,
-    sellerName: invoice.seller.name,
-    sellerEmail: invoice.seller.email,
-    sellerAddress: invoice.seller.address,
-    sellerCity: invoice.seller.city,
-    sellerPostalCode: invoice.seller.postalCode,
-    sellerCountryCode: invoice.seller.countryCode,
-    sellerVatId: invoice.seller.vatId,
-    sellerTaxNumber: invoice.seller.taxNumber,
-    sellerTaxId: invoice.seller.taxId,
-    sellerElectronicAddress: invoice.seller.electronicAddress,
-    sellerElectronicAddressScheme: invoice.seller.electronicAddressScheme,
-    sellerContactName: invoice.seller.contactName,
-    sellerPhone: invoice.seller.phone,
-    sellerIban: invoice.payment.iban,
-    sellerBic: invoice.payment.bic,
-    buyerName: invoice.buyer.name,
-    buyerEmail: invoice.buyer.email,
-    buyerAddress: invoice.buyer.address,
-    buyerCity: invoice.buyer.city,
-    buyerPostalCode: invoice.buyer.postalCode,
-    buyerCountryCode: invoice.buyer.countryCode,
-    buyerVatId: invoice.buyer.vatId,
-    buyerTaxId: invoice.buyer.taxId,
-    buyerElectronicAddress: invoice.buyer.electronicAddress,
-    buyerElectronicAddressScheme: invoice.buyer.electronicAddressScheme,
-    lineItems: invoice.lineItems.map((item) => ({
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      taxRate: item.taxRate,
-      taxCategoryCode: item.taxCategoryCode,
-      unitCode: item.unitCode,
-    })),
-    subtotal: invoice.totals.subtotal,
-    taxRate: invoice.taxRate,
-    taxAmount: invoice.totals.taxAmount,
-    totalAmount: invoice.totals.totalAmount,
-    paymentTerms: invoice.payment.paymentTerms,
-    paymentDueDate: invoice.payment.dueDate,
-    dueDate: invoice.payment.dueDate,
-    prepaidAmount: invoice.payment.prepaidAmount,
-    allowanceCharges: invoice.allowanceCharges?.map((ac) => ({
-      chargeIndicator: ac.chargeIndicator,
-      amount: ac.amount,
-      baseAmount: ac.baseAmount ?? undefined,
-      percentage: ac.percentage ?? undefined,
-      reason: ac.reason ?? undefined,
-      reasonCode: ac.reasonCode ?? undefined,
-      taxRate: ac.taxRate ?? undefined,
-      taxCategoryCode: ac.taxCategoryCode ?? undefined,
-    })),
-  };
-}
 
 /**
  * Generate CII XML with Factur-X SpecificationID by reusing XRechnungBuilder
@@ -338,11 +269,8 @@ async function buildPdf(
     color: rgb(0.5, 0.5, 0.5),
   });
 
-  // Embed CII XML as attachment — use base64 string for compatibility
-  const xmlBase64 =
-    typeof btoa === 'function'
-      ? btoa(unescape(encodeURIComponent(xmlString)))
-      : Buffer.from(xmlString, 'utf-8').toString('base64');
+  // Embed CII XML as attachment — always use Buffer for reliable UTF-8 base64 on Node.js
+  const xmlBase64 = Buffer.from(xmlString, 'utf-8').toString('base64');
   await doc.attach(xmlBase64, 'factur-x.xml', {
     mimeType: 'text/xml',
     description: 'Factur-X CII XML Invoice',

@@ -96,8 +96,12 @@ describe('PeppolBISGenerator', () => {
 
   it('generates valid UBL 2.1 XML', async () => {
     const result = await generator.generate(makePeppolInvoice());
-    expect(result.xmlContent).toContain('xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"');
-    expect(result.xmlContent).toContain('xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"');
+    expect(result.xmlContent).toContain(
+      'xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"'
+    );
+    expect(result.xmlContent).toContain(
+      'xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"'
+    );
   });
 
   it('has correct PEPPOL CustomizationID', async () => {
@@ -116,9 +120,7 @@ describe('PeppolBISGenerator', () => {
 
   it('has correct ProfileID', async () => {
     const result = await generator.generate(makePeppolInvoice());
-    expect(result.xmlContent).toContain(
-      'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0'
-    );
+    expect(result.xmlContent).toContain('urn:fdc:peppol.eu:2017:poacc:billing:01:1.0');
   });
 
   it('does NOT include Leitweg-ID', async () => {
@@ -257,6 +259,28 @@ describe('PEPPOL BIS validation rules', () => {
     expect(result.errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R010-SCHEME')).toBe(true);
   });
 
+  it('EM scheme for email-based buyer endpoint passes validation', () => {
+    const invoice = makePeppolInvoice();
+    invoice.buyer = {
+      ...invoice.buyer,
+      electronicAddress: 'buyer@example.com',
+      electronicAddressScheme: 'EM',
+    };
+    const result = validateForProfile(invoice, 'peppol-bis');
+    expect(result.errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R010-SCHEME')).toBe(false);
+  });
+
+  it('EM scheme for email-based seller endpoint passes validation', () => {
+    const invoice = makePeppolInvoice();
+    invoice.seller = {
+      ...invoice.seller,
+      electronicAddress: 'seller@example.com',
+      electronicAddressScheme: 'EM',
+    };
+    const result = validateForProfile(invoice, 'peppol-bis');
+    expect(result.errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R020-SCHEME')).toBe(false);
+  });
+
   it('non-EUR currency PASSES (unlike XRechnung)', () => {
     const invoice = makePeppolInvoice({ currency: 'GBP' });
     const result = validateForProfile(invoice, 'peppol-bis');
@@ -273,7 +297,14 @@ describe('PEPPOL BIS validation rules', () => {
   it('PEPPOL-EN16931-CL001: invalid tax category code fails', () => {
     const invoice = makePeppolInvoice();
     invoice.lineItems = [
-      { description: 'Item', quantity: 1, unitPrice: 100, totalPrice: 100, taxRate: 19, taxCategoryCode: 'XX' as any },
+      {
+        description: 'Item',
+        quantity: 1,
+        unitPrice: 100,
+        totalPrice: 100,
+        taxRate: 19,
+        taxCategoryCode: 'XX' as any,
+      },
     ];
     const result = validateForProfile(invoice, 'peppol-bis');
     expect(result.errors.some((e) => e.ruleId === 'PEPPOL-EN16931-CL001')).toBe(true);
@@ -281,7 +312,12 @@ describe('PEPPOL BIS validation rules', () => {
 
   it('PEPPOL-EN16931-R004: missing all seller tax identifiers fails', () => {
     const invoice = makePeppolInvoice();
-    invoice.seller = { ...invoice.seller, vatId: undefined, taxNumber: undefined, taxId: undefined };
+    invoice.seller = {
+      ...invoice.seller,
+      vatId: undefined,
+      taxNumber: undefined,
+      taxId: undefined,
+    };
     const result = validateForProfile(invoice, 'peppol-bis');
     expect(result.errors.some((e) => e.ruleId === 'PEPPOL-EN16931-R004')).toBe(true);
   });
@@ -305,7 +341,13 @@ describe('PEPPOL BIS validation rules', () => {
 
   it('collects multiple PEPPOL errors in one pass', () => {
     const invoice = makePeppolInvoice();
-    invoice.seller = { ...invoice.seller, electronicAddress: undefined, vatId: undefined, taxId: undefined, taxNumber: undefined };
+    invoice.seller = {
+      ...invoice.seller,
+      electronicAddress: undefined,
+      vatId: undefined,
+      taxId: undefined,
+      taxNumber: undefined,
+    };
     invoice.buyer = { ...invoice.buyer, electronicAddress: undefined };
     const result = validateForProfile(invoice, 'peppol-bis');
     expect(result.errors.length).toBeGreaterThanOrEqual(3);

@@ -24,7 +24,7 @@ function buildTestInvoice(format: OutputFormat): CanonicalInvoice {
     outputFormat: format,
     invoiceNumber: `TEST-${format.toUpperCase()}-001`,
     invoiceDate: '2026-02-17',
-    documentTypeCode: '380',
+    documentTypeCode: 380,
     currency: 'EUR',
     buyerReference: 'BUYER-REF-001',
     notes: 'Schematron CI test invoice',

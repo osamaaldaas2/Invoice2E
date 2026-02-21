@@ -1,5 +1,5 @@
 /**
- * KSeF FA(2) — comprehensive unit tests.
+ * KSeF FA(3) — comprehensive unit tests.
  * Covers: generator output, validation rules, factory registration.
  */
 
@@ -81,20 +81,41 @@ describe('KsefGenerator', () => {
     expect(generator.formatName).toContain('KSeF');
   });
 
-  it('should generate valid XML with correct namespace', async () => {
+  it('should generate valid XML with FA(3) namespace', async () => {
     const result = await generator.generate(makeKsefInvoice());
     expect(result.xmlContent).toContain('<?xml version="1.0"');
-    expect(result.xmlContent).toContain('xmlns="http://crd.gov.pl/wzor/2023/06/29/12648/"');
+    expect(result.xmlContent).toContain('xmlns="http://crd.gov.pl/wzor/2025/06/25/13775/"');
     expect(result.validationStatus).toBe('valid');
   });
 
-  it('should include Naglowek with FA(2) header', async () => {
+  it('should include Naglowek with FA(3) header', async () => {
     const result = await generator.generate(makeKsefInvoice());
     expect(result.xmlContent).toContain('<Naglowek>');
     expect(result.xmlContent).toContain('<KodFormularza');
+    expect(result.xmlContent).toContain('kodSystemowy="FA (3)"');
     expect(result.xmlContent).toContain('>FA</KodFormularza>');
-    expect(result.xmlContent).toContain('<WariantFormularza>2</WariantFormularza>');
+    expect(result.xmlContent).toContain('<WariantFormularza>3</WariantFormularza>');
     expect(result.xmlContent).toContain('<SystemInfo>Invoice2E</SystemInfo>');
+  });
+
+  it('should include RodzajFaktury after Adnotacje (required in FA(3))', async () => {
+    const result = await generator.generate(makeKsefInvoice());
+    expect(result.xmlContent).toContain('<RodzajFaktury>VAT</RodzajFaktury>');
+    // RodzajFaktury must come after Adnotacje
+    const adnotacjeIdx = result.xmlContent.indexOf('</Adnotacje>');
+    const rodzajIdx = result.xmlContent.indexOf('<RodzajFaktury>');
+    expect(rodzajIdx).toBeGreaterThan(adnotacjeIdx);
+  });
+
+  it('should map credit note to KOR RodzajFaktury', async () => {
+    const invoice = makeKsefInvoice({
+      documentTypeCode: 381,
+      precedingInvoiceReference: 'FV/2024/000',
+    });
+    const result = await generator.generate(invoice);
+    expect(result.xmlContent).toContain('<RodzajFaktury>KOR</RodzajFaktury>');
+    expect(result.xmlContent).toContain('<DaneFaKorygowanej>');
+    expect(result.xmlContent).toContain('<NrFaKorygowanej>FV/2024/000</NrFaKorygowanej>');
   });
 
   it('should include Podmiot1 (seller) with NIP', async () => {
@@ -105,11 +126,14 @@ describe('KsefGenerator', () => {
     expect(result.xmlContent).toContain('<KodKraju>PL</KodKraju>');
   });
 
-  it('should include Podmiot2 (buyer) with NIP', async () => {
+  it('should include Podmiot2 (buyer) with NIP, JST, and GV', async () => {
     const result = await generator.generate(makeKsefInvoice());
     expect(result.xmlContent).toContain('<Podmiot2>');
     expect(result.xmlContent).toContain('<NIP>9876543210</NIP>');
     expect(result.xmlContent).toContain('<Nazwa>Odbiorca Test S.A.</Nazwa>');
+    // JST and GV are required in FA(3)
+    expect(result.xmlContent).toContain('<JST>2</JST>');
+    expect(result.xmlContent).toContain('<GV>2</GV>');
   });
 
   it('should include Fa section with invoice data', async () => {
@@ -157,10 +181,17 @@ describe('KsefGenerator', () => {
     expect(result.xmlContent).toContain('<NrRB>PL61109010140000071219812874</NrRB>');
   });
 
-  it('should include P_16 and P_17 flags', async () => {
+  it('should include Adnotacje with P_16, P_17 and required sub-elements', async () => {
     const result = await generator.generate(makeKsefInvoice());
+    expect(result.xmlContent).toContain('<Adnotacje>');
     expect(result.xmlContent).toContain('<P_16>2</P_16>');
     expect(result.xmlContent).toContain('<P_17>2</P_17>');
+    expect(result.xmlContent).toContain('<P_18>2</P_18>');
+    expect(result.xmlContent).toContain('<P_18A>2</P_18A>');
+    expect(result.xmlContent).toContain('<P_19N>1</P_19N>');
+    expect(result.xmlContent).toContain('<P_22N>1</P_22N>');
+    expect(result.xmlContent).toContain('<P_23>2</P_23>');
+    expect(result.xmlContent).toContain('<P_PMarzyN>1</P_PMarzyN>');
   });
 
   it('should generate correct filename', async () => {
@@ -309,7 +340,9 @@ describe('KSeF Additional Coverage', () => {
     });
     const result = await generator.generate(invoice);
     expect(result.xmlContent).toBeTruthy();
-    // Should still produce valid XML
+    expect(result.xmlContent).toContain('<RodzajFaktury>KOR</RodzajFaktury>');
+    expect(result.xmlContent).toContain('<DaneFaKorygowanej>');
+    expect(result.xmlContent).toContain('<NrFaKorygowanej>FV/2024/000</NrFaKorygowanej>');
     expect(result.xmlContent).toContain('<Fa>');
   });
 
@@ -359,7 +392,7 @@ describe('KSeF Additional Coverage', () => {
     expect(result.xmlContent).toContain('<P_13_6_1>100.00</P_13_6_1>');
   });
 
-  it('non-standard rate (19%) produces correct P_12 with no P_13_1/P_14_1', async () => {
+  it('non-standard rate (19%) does not emit P_13/P_14 but still computes P_15', async () => {
     const invoice = makeKsefInvoice({
       lineItems: [
         {

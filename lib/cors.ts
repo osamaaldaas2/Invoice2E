@@ -42,7 +42,9 @@ export const CORS_CONFIG = {
  */
 // FIX: Re-audit #30 — dynamic CORS origin check (no stale cache in long-lived processes)
 export function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return true; // Same-origin requests don't have Origin header
+  // FIX: Audit V2 [F-005] — reject null/missing origin in production.
+  // Same-origin browser requests may omit Origin, but so do non-browser tools.
+  if (!origin) return process.env.NODE_ENV !== 'production';
 
   const allowedOrigins = getAllowedOrigins();
 

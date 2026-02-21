@@ -36,7 +36,8 @@ export interface ConversionHistoryItem {
 
 export interface HistoryFilters {
   format?: 'CII' | 'UBL';
-  status?: 'valid' | 'invalid' | 'draft' | 'completed';
+  // FIX: Audit V2 [F-034] — include 'failed' as valid status filter
+  status?: 'valid' | 'invalid' | 'draft' | 'completed' | 'failed';
   startDate?: string;
   endDate?: string;
 }
@@ -79,7 +80,10 @@ export class AnalyticsService {
    * Analytics methods MUST provide a SupabaseClient.
    * If client is missing, throws an error instead of silently bypassing RLS.
    */
-  private assertClientProvided(client: SupabaseClient | undefined, methodName: string): asserts client is SupabaseClient {
+  private assertClientProvided(
+    client: SupabaseClient | undefined,
+    methodName: string
+  ): asserts client is SupabaseClient {
     if (!client) {
       throw new AppError(
         'MISSING_CLIENT',
@@ -130,8 +134,10 @@ export class AnalyticsService {
       statusFilter === 'completed' ||
       statusFilter === 'draft' ||
       statusFilter === 'valid' ||
-      statusFilter === 'invalid';
-    const wantsBatches = !statusFilter || statusFilter === 'completed';
+      statusFilter === 'invalid' ||
+      statusFilter === 'failed';
+    // FIX: Audit V2 [F-034] — include failed batches when filtering by 'failed'
+    const wantsBatches = !statusFilter || statusFilter === 'completed' || statusFilter === 'failed';
 
     const mapConversion = (row: any): ConversionHistoryItem => ({
       id: row.id,
@@ -178,7 +184,8 @@ export class AnalyticsService {
         id: row.id as string,
         invoice_number: `Batch (${row.total_files} files)`,
         file_name: 'ZIP Upload',
-        output_format: 'XRechnung',
+        output_format:
+          (row.output_format as string) || (row.conversion_format as string) || 'XRechnung',
         status: row.status as string,
         credits_used: (row.completed_files as number) || 0,
         created_at: row.created_at as string,
@@ -206,6 +213,13 @@ export class AnalyticsService {
         }
         if (filters?.status === 'valid' || filters?.status === 'invalid') {
           conversionQuery = conversionQuery.eq('validation_status', filters.status);
+        } else if (filters?.status === 'completed') {
+          conversionQuery = conversionQuery.eq('conversion_status', 'completed');
+        } else if (filters?.status === 'draft') {
+          conversionQuery = conversionQuery.eq('conversion_status', 'draft');
+        } else if (filters?.status === 'failed') {
+          // FIX: Audit V2 [F-034] — add missing 'failed' status filter
+          conversionQuery = conversionQuery.eq('conversion_status', 'failed');
         }
         if (filters?.startDate) {
           conversionQuery = conversionQuery.gte('created_at', filters.startDate);

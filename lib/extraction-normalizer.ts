@@ -403,7 +403,14 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
     currency: (data.currency as string) || 'EUR',
     paymentTerms: (data.paymentTerms as string) || null,
     notes: (data.notes as string) || null,
-    confidence: Number(data.confidence) || 0.7,
+    // FIX: Audit V2 [F-009] — normalize AI confidence to 0-1 range
+    confidence: (() => {
+      const raw = Number(data.confidence);
+      if (isNaN(raw) || raw < 0) return 0.7;
+      if (raw > 1 && raw <= 100) return raw / 100;
+      if (raw > 100) return 0.7;
+      return raw;
+    })(),
     // EN 16931 new fields (additive, all optional)
     ...normalizeVatIds(data),
     ...normalizeElectronicAddresses(data),
