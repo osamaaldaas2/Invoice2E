@@ -99,17 +99,7 @@ export default async function BlogPostPage({ params }: Props) {
       </header>
 
       {/* Content */}
-      <article
-        className="prose prose-invert prose-lg max-w-none
-          prose-headings:font-display prose-headings:text-white
-          prose-p:text-slate-300 prose-li:text-slate-300
-          prose-a:text-sky-400 prose-a:no-underline hover:prose-a:underline
-          prose-strong:text-white prose-code:text-sky-300
-          prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
-          prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-3
-          prose-ul:my-4 prose-ol:my-4 prose-li:my-1"
-        dangerouslySetInnerHTML={{ __html: translation.content }}
-      />
+      <article className="blog-content" dangerouslySetInnerHTML={{ __html: translation.content }} />
 
       {/* CTA */}
       <div className="mt-16 glass-panel rounded-xl p-8 text-center border border-sky-500/20">

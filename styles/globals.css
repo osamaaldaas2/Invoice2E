@@ -2,6 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Blog article styling */
+.blog-content {
+  font-size: 1.125rem;
+  line-height: 1.8;
+  color: #cbd5e1; /* slate-300 */
+}
+
+.blog-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-display);
+}
+
+.blog-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f1f5f9; /* slate-100 */
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  font-family: var(--font-display);
+}
+
+.blog-content p {
+  margin-bottom: 1.25rem;
+}
+
+.blog-content ul,
+.blog-content ol {
+  margin: 1rem 0 1.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.blog-content ul {
+  list-style-type: disc;
+}
+
+.blog-content ol {
+  list-style-type: decimal;
+}
+
+.blog-content li {
+  margin-bottom: 0.5rem;
+  padding-left: 0.25rem;
+}
+
+.blog-content strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.blog-content a {
+  color: #38bdf8; /* sky-400 */
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.blog-content a:hover {
+  color: #7dd3fc; /* sky-300 */
+  text-decoration: underline;
+}
+
+.blog-content code {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+}
+
+.blog-content em {
+  color: #e2e8f0; /* slate-200 */
+}
+
 /* Hide number input spinner arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
