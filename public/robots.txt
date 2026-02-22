@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /convert
+Disallow: /review
+Disallow: /checkout
+Disallow: /invoices
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /api
+
+Sitemap: https://invoice2e.eu/sitemap.xml
