@@ -187,7 +187,7 @@
     "logoutFailed": "Logout failed. Please try again."
   },
   "footer": {
-    "copyright": "\u00a9 2024 Invoice2E. All rights reserved.",
+    "copyright": "© 2024 Invoice2E. All rights reserved.",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "contact": "Contact"
@@ -702,5 +702,14 @@
       "name": "CIUS-RO",
       "description": "Romanian CIUS of EN 16931 based on UBL for the RO e-Factura system."
     }
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Expert guides on XRechnung, ZUGFeRD, and e-invoicing in Germany",
+    "minRead": "min read",
+    "backToBlog": "Back to Blog",
+    "ctaTitle": "Ready to Convert Your Invoices?",
+    "ctaDescription": "Start converting PDF invoices to XRechnung in under 2 minutes. Free credits on signup.",
+    "ctaButton": "Start Free"
   }
 }

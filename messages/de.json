@@ -187,7 +187,7 @@
     "logoutFailed": "Abmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
   },
   "footer": {
-    "copyright": "\u00a9 2024 Invoice2E. Alle Rechte vorbehalten.",
+    "copyright": "© 2024 Invoice2E. Alle Rechte vorbehalten.",
     "privacy": "Datenschutz",
     "terms": "Nutzungsbedingungen",
     "contact": "Kontakt"
@@ -568,7 +568,7 @@
     "iban": "IBAN",
     "ibanHint": "(BR-DE-23-a)",
     "ibanRequired": "IBAN ist für Banküberweisungen erforderlich (BR-DE-23-a)",
-    "ibanChecksumInvalid": "IBAN-Pr\u00fcfsumme ist ung\u00fcltig \u2014 bitte \u00fcberpr\u00fcfen Sie die Ziffern",
+    "ibanChecksumInvalid": "IBAN-Prüfsumme ist ungültig — bitte überprüfen Sie die Ziffern",
     "ibanInvalid": "Ungültiges IBAN-Format (z.B. DE89370400440532013000)",
     "bic": "BIC (Swift)",
     "bankName": "Bankname",
@@ -702,5 +702,14 @@
       "name": "CIUS-RO",
       "description": "Rumänische CIUS von EN 16931 basierend auf UBL für das RO e-Factura System."
     }
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Expertenleitfäden zu XRechnung, ZUGFeRD und E-Rechnungen in Deutschland",
+    "minRead": "Min. Lesezeit",
+    "backToBlog": "Zurück zum Blog",
+    "ctaTitle": "Bereit, Ihre Rechnungen zu konvertieren?",
+    "ctaDescription": "Konvertieren Sie PDF-Rechnungen in XRechnung in unter 2 Minuten. Kostenlose Credits bei der Anmeldung.",
+    "ctaButton": "Jetzt kostenlos starten"
   }
 }
