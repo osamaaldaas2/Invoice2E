@@ -12,7 +12,7 @@ export const API_TIMEOUTS = {
   BOUNDARY_DETECTION: 30000, // 30 seconds (lighter AI call)
   STRIPE_API: 30000, // 30 seconds (payment processing)
   PAYPAL_API: 30000, // 30 seconds (payment processing)
-  SENDGRID_API: 10000, // 10 seconds (email sending)
+  BREVO_API: 10000, // 10 seconds (email sending)
   DATABASE_QUERY: 10000, // 10 seconds (database operations)
   DEFAULT: 30000, // 30 seconds (fallback)
 } as const;

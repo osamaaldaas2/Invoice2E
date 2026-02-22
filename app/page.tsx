@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import HeroActions from '@/components/home/HeroActions';
 import Validation3DIllustration from '@/components/validation/Validation3DIllustration';
 import ValidationPipeline from '@/components/home/ValidationPipeline';
@@ -7,11 +8,36 @@ import Success3DIcon from '@/components/home/Success3DIcon';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
+
 export default async function Home() {
   const t = await getTranslations('home');
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Invoice2E',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: 'https://invoice2e.eu',
+    description:
+      'AI-powered invoice conversion to XRechnung, ZUGFeRD, and other e-invoice formats.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'EUR',
+      description: 'Free trial available',
+    },
+  };
+
   return (
     <div className="relative overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Background Effects */}
       <div className="absolute -top-40 left-0 h-96 w-96 rounded-full bg-sky-500/20 blur-[160px]" />
       <div className="absolute -top-20 right-0 h-80 w-80 rounded-full bg-orange-500/20 blur-[140px]" />
