@@ -21,7 +21,7 @@ export default async function Home() {
     name: 'Invoice2E',
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
-    url: 'https://invoice2e.eu',
+    url: 'https://www.invoice2e.eu',
     description:
       'AI-powered invoice conversion to XRechnung, ZUGFeRD, and other e-invoice formats.',
     offers: {
@@ -32,11 +32,81 @@ export default async function Home() {
     },
   };
 
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'Is the AI-extracted data accurate?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Our AI achieves 95%+ accuracy on average. You always review and edit the extracted data before final conversion, ensuring 100% accuracy.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Is the generated XRechnung legally compliant?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes. Every invoice is validated against EN 16931 (European standard) and XRechnung 3.0.2 (German implementation) using the official KoSIT validator. We check over 200 business rules.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How secure is my data?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'We use industry-standard encryption (HTTPS, encrypted database storage). Your invoice data is processed securely and deleted after 90 days. We never share your data with third parties.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I process multiple invoices at once?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes! Upload a ZIP file with up to 100 invoices via our bulk upload feature. Review each invoice individually or save all at once. Download all XRechnung files as a single ZIP.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What happens if the conversion fails?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "If the AI extraction fails or the invoice doesn't pass validation, you'll see detailed error messages. You can edit the data to fix issues, and we only charge credits for successful conversions. Failed extractions are free.",
+        },
+      },
+    ],
+  };
+
+  const orgJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Invoice2E',
+    url: 'https://www.invoice2e.eu',
+    logo: 'https://www.invoice2e.eu/opengraph-image',
+    description:
+      'AI-powered e-invoice conversion platform. Convert PDF invoices to XRechnung, ZUGFeRD, and more.',
+    areaServed: {
+      '@type': 'GeoCircle',
+      geoMidpoint: { '@type': 'GeoCoordinates', latitude: 51.1657, longitude: 10.4515 },
+      geoRadius: '1000 km',
+    },
+  };
+
   return (
     <div className="relative overflow-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
       />
       {/* Background Effects */}
       <div className="absolute -top-40 left-0 h-96 w-96 rounded-full bg-sky-500/20 blur-[160px]" />

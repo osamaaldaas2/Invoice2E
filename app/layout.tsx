@@ -47,14 +47,19 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Invoice2E' }],
   creator: 'Invoice2E',
-  metadataBase: new URL('https://invoice2e.eu'),
+  metadataBase: new URL('https://www.invoice2e.eu'),
   alternates: {
     canonical: '/',
+    languages: {
+      en: '/',
+      de: '/',
+      'x-default': '/',
+    },
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://invoice2e.eu',
+    url: 'https://www.invoice2e.eu',
     siteName: 'Invoice2E',
     title: 'Invoice2E – Convert Invoices to XRechnung & E-Invoice Formats',
     description:

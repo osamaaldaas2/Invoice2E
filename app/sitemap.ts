@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://invoice2e.eu';
+  const baseUrl = 'https://www.invoice2e.eu';
 
   return [
     {
