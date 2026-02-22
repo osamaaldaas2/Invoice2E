@@ -61,7 +61,7 @@ export const metadata: Metadata = {
       'Convert PDF invoices to XRechnung, ZUGFeRD, and other e-invoice formats with AI. Fast, affordable, DSGVO-compliant.',
     images: [
       {
-        url: '/og-image.png',
+        url: '/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'Invoice2E – AI-Powered Invoice Conversion',
@@ -73,7 +73,7 @@ export const metadata: Metadata = {
     title: 'Invoice2E – Convert Invoices to XRechnung & E-Invoice Formats',
     description:
       'Convert PDF invoices to XRechnung, ZUGFeRD, and other e-invoice formats with AI. Fast, affordable, DSGVO-compliant.',
-    images: ['/og-image.png'],
+    images: ['/opengraph-image'],
   },
   robots: {
     index: true,
