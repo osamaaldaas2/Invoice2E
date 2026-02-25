@@ -35,15 +35,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { extractionIds } = body;
-
-    if (!Array.isArray(extractionIds) || extractionIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'extractionIds array is required' },
-        { status: 400 }
-      );
+    const { batchDownloadSchema, parseBody } = await import('@/lib/api-schemas');
+    const parsed = await parseBody(request, batchDownloadSchema);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
     }
+    const { extractionIds } = parsed.data;
 
     if (extractionIds.length > 500) {
       return NextResponse.json(

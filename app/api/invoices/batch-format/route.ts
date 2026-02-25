@@ -40,19 +40,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { extractionIds, outputFormat } = body as {
-      extractionIds?: unknown;
-      outputFormat?: unknown;
-    };
-
-    // Validate extractionIds
-    if (!Array.isArray(extractionIds) || extractionIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'extractionIds array is required' },
-        { status: 400 }
-      );
+    const { batchFormatSchema, parseBody } = await import('@/lib/api-schemas');
+    const parsed = await parseBody(request, batchFormatSchema);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
     }
+    const { extractionIds, outputFormat } = parsed.data;
+
     if (extractionIds.length > 500) {
       return NextResponse.json(
         { success: false, error: 'Maximum 500 extractions per request' },

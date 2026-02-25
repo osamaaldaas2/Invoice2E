@@ -50,17 +50,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return jsonResponse({ error: 'Authentication required' }, 401);
     }
 
-    const body = (await request.json()) as CreateApiKeyRequest;
-
-    // Validate request body
-    if (!body.name || typeof body.name !== 'string') {
-      return jsonResponse({ error: 'name is required and must be a string' }, 400);
+    const { createApiKeySchema, parseBody } = await import('@/lib/api-schemas');
+    const parsed = await parseBody(request, createApiKeySchema);
+    if (!parsed.success) {
+      return jsonResponse({ error: parsed.error }, 400);
     }
+    const body = parsed.data as CreateApiKeyRequest;
 
-    if (!Array.isArray(body.scopes) || body.scopes.length === 0) {
-      return jsonResponse({ error: 'scopes must be a non-empty array' }, 400);
-    }
-
+    // Validate scopes against allowed list
     for (const scope of body.scopes) {
       if (!VALID_SCOPES.includes(scope as ApiKeyScope)) {
         return jsonResponse({ error: `Invalid scope: ${scope}` }, 400);

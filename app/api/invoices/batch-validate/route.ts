@@ -10,7 +10,11 @@ import { validateForProfile } from '@/validation/validation-pipeline';
 import { formatToProfileId } from '@/lib/format-utils';
 import { detectFormatFromData } from '@/lib/format-field-config';
 import { FORMAT_FIELD_CONFIG, type FormatFieldConfig } from '@/lib/format-field-config';
-import { recomputeTotals, type MonetaryLineItem, type MonetaryAllowanceCharge } from '@/lib/monetary-validator';
+import {
+  recomputeTotals,
+  type MonetaryLineItem,
+  type MonetaryAllowanceCharge,
+} from '@/lib/monetary-validator';
 import { roundMoney, moneyEqual } from '@/lib/monetary';
 import type { OutputFormat } from '@/types/canonical-invoice';
 
@@ -32,20 +36,20 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+        {
+          success: false,
+          error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.`,
+        },
         { status: 429, headers: { 'Retry-After': String(rateLimit.resetInSeconds) } }
       );
     }
 
-    const body = await request.json();
-    const { extractionIds } = body;
-
-    if (!Array.isArray(extractionIds) || extractionIds.length === 0 || extractionIds.length > 500) {
-      return NextResponse.json(
-        { success: false, error: 'extractionIds array required (1-500)' },
-        { status: 400 }
-      );
+    const { batchValidateSchema, parseBody } = await import('@/lib/api-schemas');
+    const parsed = await parseBody(request, batchValidateSchema);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
     }
+    const { extractionIds } = parsed.data;
 
     const userClient = await createUserScopedClient(user.id);
     const results: Array<{
@@ -73,19 +77,29 @@ export async function POST(request: NextRequest) {
           'xrechnung-cii';
 
         // Auto-recompute totals from line items to fix AI extraction rounding errors
-        const rawItems = Array.isArray(data.lineItems) ? data.lineItems as Record<string, unknown>[]
-          : Array.isArray(data.line_items) ? data.line_items as Record<string, unknown>[] : [];
+        const rawItems = Array.isArray(data.lineItems)
+          ? (data.lineItems as Record<string, unknown>[])
+          : Array.isArray(data.line_items)
+            ? (data.line_items as Record<string, unknown>[])
+            : [];
 
         const dataCopy = { ...data };
         if (rawItems.length > 0) {
           dataCopy.lineItems = rawItems;
-          const monetaryLines: MonetaryLineItem[] = rawItems.map((item: Record<string, unknown>) => ({
-            netAmount: roundMoney(Number(item.totalPrice ?? item.lineTotal ?? 0) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
-            taxRate: Number(item.taxRate ?? item.vatRate ?? data.taxRate ?? 19),
-            taxCategoryCode: item.taxCategoryCode as string | undefined,
-          }));
+          const monetaryLines: MonetaryLineItem[] = rawItems.map(
+            (item: Record<string, unknown>) => ({
+              netAmount: roundMoney(
+                Number(item.totalPrice ?? item.lineTotal ?? 0) ||
+                  Number(item.unitPrice || 0) * Number(item.quantity || 1)
+              ),
+              taxRate: Number(item.taxRate ?? item.vatRate ?? data.taxRate ?? 19),
+              taxCategoryCode: item.taxCategoryCode as string | undefined,
+            })
+          );
 
-          const acList = Array.isArray(data.allowanceCharges) ? data.allowanceCharges as any[] : [];
+          const acList = Array.isArray(data.allowanceCharges)
+            ? (data.allowanceCharges as any[])
+            : [];
 
           const monetaryAC: MonetaryAllowanceCharge[] = acList.map((ac: any) => ({
             chargeIndicator: Boolean(ac.chargeIndicator),
@@ -118,8 +132,8 @@ export async function POST(request: NextRequest) {
         const profileId = formatToProfileId(outputFormat);
         const validationResult = validateForProfile(canonical, profileId);
 
-        const errors = validationResult.errors.map(e => `[${e.ruleId}] ${e.message}`);
-        const warnings = (validationResult.warnings ?? []).map(w => `[${w.ruleId}] ${w.message}`);
+        const errors = validationResult.errors.map((e) => `[${e.ruleId}] ${e.message}`);
+        const warnings = (validationResult.warnings ?? []).map((w) => `[${w.ruleId}] ${w.message}`);
 
         // Determine missing fields based on format-specific requirements
         const missingFields = computeMissingFields(data, outputFormat);
@@ -150,8 +164,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const allValid = results.every(r => r.valid);
-    const errorCount = results.filter(r => !r.valid).length;
+    const allValid = results.every((r) => r.valid);
+    const errorCount = results.filter((r) => !r.valid).length;
 
     return NextResponse.json({
       success: true,
@@ -172,7 +186,8 @@ export async function POST(request: NextRequest) {
  * Uses FORMAT_FIELD_CONFIG to check which fields are 'required' for the given format.
  */
 function computeMissingFields(data: Record<string, unknown>, outputFormat: OutputFormat): string[] {
-  const config: FormatFieldConfig = FORMAT_FIELD_CONFIG[outputFormat] ?? FORMAT_FIELD_CONFIG['xrechnung-cii'];
+  const config: FormatFieldConfig =
+    FORMAT_FIELD_CONFIG[outputFormat] ?? FORMAT_FIELD_CONFIG['xrechnung-cii'];
   const missing: string[] = [];
 
   // Map config keys to data keys and check presence
@@ -204,7 +219,12 @@ function computeMissingFields(data: Record<string, unknown>, outputFormat: Outpu
       const altKey = dataKey === 'sellerPhone' ? 'sellerPhoneNumber' : null;
       const altVal = altKey ? data[altKey] : null;
       // For sellerStreet, also check sellerAddress
-      const altKey2 = dataKey === 'sellerStreet' ? 'sellerAddress' : dataKey === 'buyerStreet' ? 'buyerAddress' : null;
+      const altKey2 =
+        dataKey === 'sellerStreet'
+          ? 'sellerAddress'
+          : dataKey === 'buyerStreet'
+            ? 'buyerAddress'
+            : null;
       const altVal2 = altKey2 ? data[altKey2] : null;
 
       if (!val && !altVal && !altVal2) {

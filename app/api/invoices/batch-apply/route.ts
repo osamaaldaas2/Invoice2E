@@ -12,13 +12,32 @@ import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
  * line items) are intentionally excluded.
  */
 const ALLOWED_FIELDS = new Set([
-  'sellerName', 'sellerEmail', 'sellerPhone',
-  'sellerAddress', 'sellerStreet', 'sellerCity', 'sellerPostalCode', 'sellerCountryCode',
-  'sellerTaxId', 'sellerTaxNumber', 'sellerVatId', 'sellerIban', 'sellerBic',
+  'sellerName',
+  'sellerEmail',
+  'sellerPhone',
+  'sellerAddress',
+  'sellerStreet',
+  'sellerCity',
+  'sellerPostalCode',
+  'sellerCountryCode',
+  'sellerTaxId',
+  'sellerTaxNumber',
+  'sellerVatId',
+  'sellerIban',
+  'sellerBic',
   'sellerContactName',
-  'buyerName', 'buyerEmail', 'buyerAddress', 'buyerStreet', 'buyerCity',
-  'buyerPostalCode', 'buyerCountryCode', 'buyerTaxId', 'buyerReference',
-  'paymentTerms', 'paymentInstructions', 'currency',
+  'buyerName',
+  'buyerEmail',
+  'buyerAddress',
+  'buyerStreet',
+  'buyerCity',
+  'buyerPostalCode',
+  'buyerCountryCode',
+  'buyerTaxId',
+  'buyerReference',
+  'paymentTerms',
+  'paymentInstructions',
+  'currency',
 ]);
 
 export async function POST(request: NextRequest) {
@@ -32,25 +51,22 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkRateLimitAsync(rateLimitId, 'api');
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { success: false, error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.` },
+        {
+          success: false,
+          error: `Too many requests. Try again in ${rateLimit.resetInSeconds} seconds.`,
+        },
         { status: 429, headers: { 'Retry-After': String(rateLimit.resetInSeconds) } }
       );
     }
 
-    const body = await request.json();
-    const { extractionIds, fields } = body as {
-      extractionIds: string[];
-      fields: Record<string, string>;
-    };
-
-    if (!Array.isArray(extractionIds) || extractionIds.length === 0 || extractionIds.length > 500) {
-      return NextResponse.json(
-        { success: false, error: 'extractionIds array required (1-500)' },
-        { status: 400 }
-      );
+    const { batchApplySchema, parseBody } = await import('@/lib/api-schemas');
+    const parsed = await parseBody(request, batchApplySchema);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
     }
+    const { extractionIds, fields } = parsed.data;
 
-    if (!fields || typeof fields !== 'object' || Object.keys(fields).length === 0) {
+    if (Object.keys(fields).length === 0) {
       return NextResponse.json(
         { success: false, error: 'fields object is required' },
         { status: 400 }
