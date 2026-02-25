@@ -840,7 +840,7 @@
     },
     "xrechnungCii": {
       "meta": {
-        "title": "PDF zu XRechnung konvertieren – kostenlos & sofort | Invoice2E",
+        "title": "PDF zu XRechnung konvertieren – kostenlos & sofort",
         "desc": "Wandeln Sie PDF-Rechnungen in XRechnung XML (CII) um. KI-gestützt, EN 16931 konform, KoSIT-validiert. Kostenlos testen."
       },
       "hero": {
@@ -898,7 +898,7 @@
     },
     "xrechnungUbl": {
       "meta": {
-        "title": "PDF zu XRechnung UBL konvertieren – kostenlos | Invoice2E",
+        "title": "PDF zu XRechnung UBL konvertieren – kostenlos",
         "desc": "Konvertieren Sie PDF-Rechnungen in XRechnung UBL 2.1 Format. EN 16931 konform, KoSIT-validiert. Jetzt kostenlos testen."
       },
       "hero": {
@@ -952,7 +952,7 @@
     },
     "zugferd": {
       "meta": {
-        "title": "PDF zu ZUGFeRD konvertieren – Hybrid-Rechnung erstellen | Invoice2E",
+        "title": "PDF zu ZUGFeRD konvertieren – Hybrid-Rechnung erstellen",
         "desc": "Erstellen Sie ZUGFeRD / Factur-X EN 16931 Hybrid-Rechnungen. PDF + eingebettetes XML. KI-gestützt, DSGVO-konform."
       },
       "hero": {
@@ -1008,7 +1008,7 @@
     },
     "facturx": {
       "meta": {
-        "title": "PDF to Factur-X Basic konvertieren | Invoice2E",
+        "title": "PDF to Factur-X Basic konvertieren",
         "desc": "Erstellen Sie Factur-X Basic Hybrid-Rechnungen (PDF + XML). Ideal für den französischen Markt. Kostenlos testen."
       },
       "hero": {
@@ -1060,7 +1060,7 @@
     },
     "peppol": {
       "meta": {
-        "title": "PDF zu PEPPOL BIS 3.0 konvertieren | Invoice2E",
+        "title": "PDF zu PEPPOL BIS 3.0 konvertieren",
         "desc": "Konvertieren Sie PDF-Rechnungen in PEPPOL BIS 3.0 UBL Format. Für das pan-europäische E-Rechnungsnetzwerk. Kostenlos testen."
       },
       "hero": {
@@ -1112,7 +1112,7 @@
     },
     "fatturapa": {
       "meta": {
-        "title": "PDF zu FatturaPA konvertieren – Italienische E-Rechnung | Invoice2E",
+        "title": "PDF zu FatturaPA konvertieren – Italienische E-Rechnung",
         "desc": "Konvertieren Sie PDF-Rechnungen in FatturaPA XML für das italienische SDI-System. KI-gestützt, kostenlos testen."
       },
       "hero": {
@@ -1165,7 +1165,7 @@
     },
     "ksef": {
       "meta": {
-        "title": "PDF zu KSeF konvertieren – Polnische E-Rechnung | Invoice2E",
+        "title": "PDF zu KSeF konvertieren – Polnische E-Rechnung",
         "desc": "Konvertieren Sie PDF-Rechnungen in KSeF FA(3) Format für das polnische Krajowy System e-Faktur. Kostenlos testen."
       },
       "hero": {
@@ -1218,7 +1218,7 @@
     },
     "nlcius": {
       "meta": {
-        "title": "PDF zu NLCIUS / SI-UBL 2.0 konvertieren | Invoice2E",
+        "title": "PDF zu NLCIUS / SI-UBL 2.0 konvertieren",
         "desc": "Konvertieren Sie PDF-Rechnungen in das niederländische NLCIUS / SI-UBL 2.0 Format. EN 16931 konform. Kostenlos testen."
       },
       "hero": {
@@ -1270,7 +1270,7 @@
     },
     "ciusRo": {
       "meta": {
-        "title": "PDF zu CIUS-RO konvertieren – Rumänische E-Rechnung | Invoice2E",
+        "title": "PDF zu CIUS-RO konvertieren – Rumänische E-Rechnung",
         "desc": "Konvertieren Sie PDF-Rechnungen in das rumänische CIUS-RO Format für das RO e-Factura System. Kostenlos testen."
       },
       "hero": {

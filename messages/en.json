@@ -840,7 +840,7 @@
     },
     "xrechnungCii": {
       "meta": {
-        "title": "Convert PDF to XRechnung – Free & Instant | Invoice2E",
+        "title": "Convert PDF to XRechnung – Free & Instant",
         "desc": "Convert PDF invoices to XRechnung XML (CII). AI-powered, EN 16931 compliant, KoSIT-validated. Try free."
       },
       "hero": {
@@ -898,7 +898,7 @@
     },
     "xrechnungUbl": {
       "meta": {
-        "title": "Convert PDF to XRechnung UBL – Free | Invoice2E",
+        "title": "Convert PDF to XRechnung UBL – Free",
         "desc": "Convert PDF invoices to XRechnung UBL 2.1 format. EN 16931 compliant, KoSIT-validated. Try free now."
       },
       "hero": {
@@ -952,7 +952,7 @@
     },
     "zugferd": {
       "meta": {
-        "title": "Convert PDF to ZUGFeRD – Create Hybrid Invoices | Invoice2E",
+        "title": "Convert PDF to ZUGFeRD – Create Hybrid Invoices",
         "desc": "Create ZUGFeRD / Factur-X EN 16931 hybrid invoices. PDF + embedded XML. AI-powered, GDPR-compliant."
       },
       "hero": {
@@ -1008,7 +1008,7 @@
     },
     "facturx": {
       "meta": {
-        "title": "Convert PDF to Factur-X Basic | Invoice2E",
+        "title": "Convert PDF to Factur-X Basic",
         "desc": "Create Factur-X Basic hybrid invoices (PDF + XML). Ideal for the French market. Try free."
       },
       "hero": {
@@ -1060,7 +1060,7 @@
     },
     "peppol": {
       "meta": {
-        "title": "Convert PDF to PEPPOL BIS 3.0 | Invoice2E",
+        "title": "Convert PDF to PEPPOL BIS 3.0",
         "desc": "Convert PDF invoices to PEPPOL BIS 3.0 UBL format. For the pan-European e-invoicing network. Try free."
       },
       "hero": {
@@ -1112,7 +1112,7 @@
     },
     "fatturapa": {
       "meta": {
-        "title": "Convert PDF to FatturaPA – Italian E-Invoice | Invoice2E",
+        "title": "Convert PDF to FatturaPA – Italian E-Invoice",
         "desc": "Convert PDF invoices to FatturaPA XML for the Italian SDI system. AI-powered, try free."
       },
       "hero": {
@@ -1165,7 +1165,7 @@
     },
     "ksef": {
       "meta": {
-        "title": "Convert PDF to KSeF – Polish E-Invoice | Invoice2E",
+        "title": "Convert PDF to KSeF – Polish E-Invoice",
         "desc": "Convert PDF invoices to KSeF FA(3) format for the Polish Krajowy System e-Faktur. Try free."
       },
       "hero": {
@@ -1218,7 +1218,7 @@
     },
     "nlcius": {
       "meta": {
-        "title": "Convert PDF to NLCIUS / SI-UBL 2.0 | Invoice2E",
+        "title": "Convert PDF to NLCIUS / SI-UBL 2.0",
         "desc": "Convert PDF invoices to the Dutch NLCIUS / SI-UBL 2.0 format. EN 16931 compliant. Try free."
       },
       "hero": {
@@ -1270,7 +1270,7 @@
     },
     "ciusRo": {
       "meta": {
-        "title": "Convert PDF to CIUS-RO – Romanian E-Invoice | Invoice2E",
+        "title": "Convert PDF to CIUS-RO – Romanian E-Invoice",
         "desc": "Convert PDF invoices to Romanian CIUS-RO format for the RO e-Factura system. Try free."
       },
       "hero": {

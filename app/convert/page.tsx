@@ -7,7 +7,7 @@ import { getFormatMetadata } from '@/lib/format-registry';
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('formatPages.common');
   return {
-    title: t('allFormatsTitle') + ' | Invoice2E',
+    title: t('allFormatsTitle'),
     description: t('allFormatsSubtitle'),
     alternates: { canonical: '/convert' },
   };
