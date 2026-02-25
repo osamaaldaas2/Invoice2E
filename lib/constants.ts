@@ -31,7 +31,7 @@ export const FILE_LIMITS = {
 
 // Credit system
 export const CREDITS_PER_CONVERSION = 1;
-export const DEFAULT_CREDITS_ON_SIGNUP = 0;
+export const DEFAULT_CREDITS_ON_SIGNUP = 1;
 
 // PDF boundary detection
 export const MAX_PAGES_FOR_BOUNDARY_DETECTION = 50;
