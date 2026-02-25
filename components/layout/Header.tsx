@@ -105,15 +105,15 @@ export default function Header(): React.ReactElement {
     <>
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
         <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link
-            href="/"
-            className="text-2xl font-semibold font-display tracking-tight gradient-text hover:opacity-90 transition-opacity"
-          >
-            {APP_NAME}
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img src="/images/logo.png" alt={APP_NAME} className="h-8 w-8" />
+            <span className="text-xl font-semibold font-display tracking-tight gradient-text">
+              {APP_NAME}
+            </span>
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
             {/* Formats dropdown */}
             <div className="relative group">
               <button
@@ -197,20 +197,59 @@ export default function Header(): React.ReactElement {
             {user ? (
               <>
                 <Link
-                  href="/dashboard/profile"
-                  className={`nav-pill ${pathname === '/dashboard/profile' ? 'nav-pill-active' : ''}`}
-                >
-                  {t('profile')}
-                </Link>
-                <Link
                   href="/dashboard"
-                  className={`nav-pill ${pathname === '/dashboard' ? 'nav-pill-active' : ''}`}
+                  className={`nav-pill ${pathname?.startsWith('/dashboard') ? 'nav-pill-active' : ''}`}
                 >
                   Dashboard
                 </Link>
-                <Button variant="ghost" size="sm" onClick={handleLogout} disabled={loggingOut}>
-                  {loggingOut ? t('loading') : t('logout')}
-                </Button>
+                <div className="relative group">
+                  <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                      {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                    </div>
+                    <svg
+                      className="w-3 h-3 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                  <div className="absolute top-full right-0 mt-1 w-48 py-2 bg-slate-950/95 border border-white/10 rounded-xl backdrop-blur-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="px-4 py-2 border-b border-white/10">
+                      <p className="text-sm text-white font-medium">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-xs text-faded truncate">{user.email}</p>
+                    </div>
+                    <Link
+                      href="/dashboard/profile"
+                      className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      {t('profile')}
+                    </Link>
+                    <Link
+                      href="/dashboard/credits"
+                      className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      {t('credits') || 'Credits'}
+                    </Link>
+                    <div className="border-t border-white/10 my-1" />
+                    <button
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors"
+                    >
+                      {loggingOut ? t('loading') : t('logout')}
+                    </button>
+                  </div>
+                </div>
               </>
             ) : (
               <>
