@@ -24,7 +24,7 @@ export default function Footer(): React.ReactElement {
               {t('terms')}
             </a>
             <a
-              href="mailto:support@invoice2e.com"
+              href="mailto:mail@invoice2e.eu"
               className="text-faded hover:text-white transition-colors"
             >
               {t('contact')}
