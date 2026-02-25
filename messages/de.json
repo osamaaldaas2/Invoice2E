@@ -172,7 +172,8 @@
     "passwordsNoMatch": "Passwörter stimmen nicht überein",
     "passwordMinLength": "Passwort muss mindestens 8 Zeichen lang sein",
     "passwordMinChars": "Mindestens 8 Zeichen",
-    "passwordRequirements": "Mind. 8 Zeichen, mit Groß-/Kleinbuchstaben und einer Zahl."
+    "passwordRequirements": "Mind. 8 Zeichen, mit Groß-/Kleinbuchstaben und einer Zahl.",
+    "privacyConsent": "Ich habe die <link>Datenschutzerklärung</link> gelesen und stimme zu."
   },
   "errors": {
     "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
@@ -190,7 +191,8 @@
     "copyright": "© 2024 Invoice2E. Alle Rechte vorbehalten.",
     "privacy": "Datenschutz",
     "terms": "Nutzungsbedingungen",
-    "contact": "Kontakt"
+    "contact": "Kontakt",
+    "impressum": "Impressum"
   },
   "dashboard": {
     "pageTitle": "Dashboard",
@@ -468,7 +470,8 @@
     "creditsAdded": "{credits} Credits wurden Ihrem Konto gutgeschrieben.",
     "goToDashboard": "Zum Dashboard",
     "convertInvoice": "Rechnung konvertieren",
-    "receiptSent": "Eine Quittung wurde an Ihre E-Mail gesendet.",
+    "receiptSent": "Eine Rechnung wurde an Ihre E-Mail gesendet.",
+    "downloadInvoice": "Rechnung herunterladen",
     "verifying": "Zahlung wird verifiziert...",
     "cancelTitle": "Zahlung abgebrochen",
     "cancelDesc": "Die Zahlung wurde abgebrochen. Es wurden keine Kosten berechnet."
@@ -711,5 +714,53 @@
     "ctaTitle": "Bereit, Ihre Rechnungen zu konvertieren?",
     "ctaDescription": "Konvertieren Sie PDF-Rechnungen in XRechnung in unter 2 Minuten. Kostenlose Credits bei der Anmeldung.",
     "ctaButton": "Jetzt kostenlos starten"
+  },
+  "privacy": {
+    "title": "Datenschutzerklärung",
+    "lastUpdated": "Stand: Februar 2026",
+    "section1Title": "1. Verantwortlicher",
+    "section1Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg\nE-Mail: mail@invoice2e.eu",
+    "section2Title": "2. Erhebung und Speicherung personenbezogener Daten",
+    "section2Content": "Beim Besuch unserer Website werden automatisch Informationen durch den Hosting-Anbieter Vercel erfasst (sog. Server-Logfiles). Diese umfassen: IP-Adresse, Browsertyp und -version, Betriebssystem, Referrer-URL, Zeitpunkt des Zugriffs. Diese Daten werden auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse) erhoben und dienen der Sicherstellung eines störungsfreien Betriebs.",
+    "section3Title": "3. Registrierung und Nutzerkonto",
+    "section3Content": "Bei der Registrierung erheben wir: Vor- und Nachname, E-Mail-Adresse, Adresse, Telefonnummer und ein Passwort. Diese Daten werden in unserer Datenbank (Supabase) gespeichert und sind für die Vertragserfüllung erforderlich (Art. 6 Abs. 1 lit. b DSGVO).",
+    "section4Title": "4. Rechnungsverarbeitung und KI-Dienste",
+    "section4Content": "Zur Konvertierung Ihrer Rechnungen nutzen wir KI-Dienste von Mistral AI (Frankreich), OpenAI (USA) und Google Gemini (USA). Hochgeladene Rechnungsdaten werden temporär an diese Dienste übermittelt und nach der Verarbeitung gelöscht. Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Für Datenübermittlungen in die USA gelten EU-Standardvertragsklauseln.",
+    "section5Title": "5. Zahlungsabwicklung",
+    "section5Content": "Wir nutzen Stripe (Stripe Inc., USA) und PayPal (PayPal (Europe) S.à r.l. et Cie, Luxemburg) zur Zahlungsabwicklung. Zahlungsdaten werden direkt an den jeweiligen Zahlungsanbieter übermittelt und nicht auf unseren Servern gespeichert. Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung).",
+    "section6Title": "6. Cookies",
+    "section6Content": "Unsere Website verwendet ausschließlich technisch notwendige Cookies: Ein Session-Cookie für den Login-Status und ein Locale-Cookie für Ihre Sprachpräferenz. Diese Cookies sind für den Betrieb der Website erforderlich und bedürfen keiner Einwilligung (Art. 6 Abs. 1 lit. f DSGVO).",
+    "section7Title": "7. Hosting",
+    "section7Content": "Diese Website wird bei Vercel Inc. (USA) gehostet. Vercel verarbeitet die oben genannten Zugriffsdaten. Die Datenübermittlung in die USA erfolgt auf Grundlage von EU-Standardvertragsklauseln. Weitere Informationen finden Sie in der Datenschutzerklärung von Vercel: https://vercel.com/legal/privacy-policy",
+    "section8Title": "8. Kontaktformular",
+    "section8Content": "Wenn Sie uns über das Kontaktformular kontaktieren, werden folgende Daten erhoben: Name, E-Mail-Adresse, Betreff, Nachricht und ggf. Ihre User-ID. Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Anfragen) bzw. Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Beantwortung).",
+    "section9Title": "9. Google Fonts",
+    "section9Content": "Diese Website nutzt die Schriftarten Sora und Manrope von Google Fonts. Die Schriftarten werden lokal über next/font eingebunden und nicht von Google-Servern geladen. Es findet keine Datenübermittlung an Google statt.",
+    "section10Title": "10. Ihre Rechte",
+    "section10Content": "Sie haben das Recht auf: Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO), Widerspruch (Art. 21 DSGVO). Zur Ausübung Ihrer Rechte wenden Sie sich an: mail@invoice2e.eu",
+    "section11Title": "11. Beschwerderecht",
+    "section11Content": "Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren. Die für uns zuständige Aufsichtsbehörde ist: Unabhängiges Landeszentrum für Datenschutz Schleswig-Holstein (ULD), Holstenstraße 98, 24103 Kiel, https://www.datenschutzzentrum.de",
+    "section12Title": "12. SSL-Verschlüsselung",
+    "section12Content": "Diese Website nutzt aus Sicherheitsgründen eine SSL- bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung erkennen Sie daran, dass die Adresszeile des Browsers von \"http://\" auf \"https://\" wechselt und an dem Schloss-Symbol in Ihrer Browserzeile.",
+    "section13Title": "13. Änderungen dieser Datenschutzerklärung",
+    "section13Content": "Wir behalten uns vor, diese Datenschutzerklärung anzupassen, damit sie stets den aktuellen rechtlichen Anforderungen entspricht oder um Änderungen unserer Leistungen umzusetzen. Für Ihren erneuten Besuch gilt dann die neue Datenschutzerklärung."
+  },
+  "impressum": {
+    "title": "Impressum",
+    "lastUpdated": "Stand: Februar 2026",
+    "section1Title": "Angaben gemäß § 5 TMG",
+    "section1Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg\nDeutschland",
+    "section2Title": "Kontakt",
+    "section2Content": "E-Mail: mail@invoice2e.eu",
+    "section3Title": "Umsatzsteuer-Identifikationsnummer",
+    "section3Content": "Umsatzsteuer-Identifikationsnummer gemäß § 27a Umsatzsteuergesetz: DE358337977",
+    "section4Title": "Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV",
+    "section4Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg",
+    "section5Title": "EU-Streitschlichtung",
+    "section5Content": "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/. Unsere E-Mail-Adresse finden Sie oben im Impressum. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.",
+    "section6Title": "Haftung für Inhalte",
+    "section6Content": "Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.",
+    "section7Title": "Haftung für Links",
+    "section7Content": "Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen."
   }
 }

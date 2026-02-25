@@ -1,9 +1,9 @@
 import { useTranslations } from 'next-intl';
 
-const SECTION_COUNT = 13;
+const SECTION_COUNT = 7;
 
-export default function PrivacyPage(): React.ReactElement {
-  const t = useTranslations('privacy');
+export default function ImpressumPage(): React.ReactElement {
+  const t = useTranslations('impressum');
 
   const sections = Array.from({ length: SECTION_COUNT }, (_, i) => i + 1);
 

@@ -172,7 +172,8 @@
     "passwordsNoMatch": "Passwords do not match",
     "passwordMinLength": "Password must be at least 8 characters",
     "passwordMinChars": "Minimum 8 characters",
-    "passwordRequirements": "Min 8 characters, with uppercase, lowercase, and a number."
+    "passwordRequirements": "Min 8 characters, with uppercase, lowercase, and a number.",
+    "privacyConsent": "I have read and agree to the <link>Privacy Policy</link>."
   },
   "errors": {
     "generic": "An error occurred. Please try again.",
@@ -190,7 +191,8 @@
     "copyright": "© 2024 Invoice2E. All rights reserved.",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
-    "contact": "Contact"
+    "contact": "Contact",
+    "impressum": "Legal Notice"
   },
   "dashboard": {
     "pageTitle": "Dashboard",
@@ -468,7 +470,8 @@
     "creditsAdded": "{credits} credits have been added to your account.",
     "goToDashboard": "Go to Dashboard",
     "convertInvoice": "Convert Invoice",
-    "receiptSent": "A receipt has been sent to your email.",
+    "receiptSent": "An invoice has been sent to your email.",
+    "downloadInvoice": "Download Invoice",
     "verifying": "Verifying payment...",
     "cancelTitle": "Payment Cancelled",
     "cancelDesc": "The payment was cancelled. No charges were made."
@@ -711,5 +714,53 @@
     "ctaTitle": "Ready to Convert Your Invoices?",
     "ctaDescription": "Start converting PDF invoices to XRechnung in under 2 minutes. Free credits on signup.",
     "ctaButton": "Start Free"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last updated: February 2026",
+    "section1Title": "1. Data Controller",
+    "section1Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg\nEmail: mail@invoice2e.eu",
+    "section2Title": "2. Collection and Storage of Personal Data",
+    "section2Content": "When you visit our website, information is automatically collected by our hosting provider Vercel (server log files). This includes: IP address, browser type and version, operating system, referrer URL, time of access. This data is collected on the basis of Art. 6(1)(f) GDPR (legitimate interest) to ensure trouble-free operation of the website.",
+    "section3Title": "3. Registration and User Account",
+    "section3Content": "When registering, we collect: first and last name, email address, address, phone number, and a password. This data is stored in our database (Supabase) and is necessary for contract fulfillment (Art. 6(1)(b) GDPR).",
+    "section4Title": "4. Invoice Processing and AI Services",
+    "section4Content": "To convert your invoices, we use AI services from Mistral AI (France), OpenAI (USA), and Google Gemini (USA). Uploaded invoice data is temporarily transmitted to these services and deleted after processing. Processing is based on Art. 6(1)(b) GDPR (contract fulfillment). EU Standard Contractual Clauses apply for data transfers to the USA.",
+    "section5Title": "5. Payment Processing",
+    "section5Content": "We use Stripe (Stripe Inc., USA) and PayPal (PayPal (Europe) S.à r.l. et Cie, Luxembourg) for payment processing. Payment data is transmitted directly to the respective payment provider and is not stored on our servers. Processing is based on Art. 6(1)(b) GDPR (contract fulfillment).",
+    "section6Title": "6. Cookies",
+    "section6Content": "Our website uses only technically necessary cookies: a session cookie for login status and a locale cookie for your language preference. These cookies are required for the operation of the website and do not require consent (Art. 6(1)(f) GDPR).",
+    "section7Title": "7. Hosting",
+    "section7Content": "This website is hosted by Vercel Inc. (USA). Vercel processes the access data mentioned above. Data transfer to the USA is based on EU Standard Contractual Clauses. For more information, see Vercel's privacy policy: https://vercel.com/legal/privacy-policy",
+    "section8Title": "8. Contact Form",
+    "section8Content": "When you contact us via the contact form, the following data is collected: name, email address, subject, message, and if applicable, your user ID. Processing is based on Art. 6(1)(b) GDPR (pre-contractual inquiries) or Art. 6(1)(f) GDPR (legitimate interest in responding to your inquiry).",
+    "section9Title": "9. Google Fonts",
+    "section9Content": "This website uses the fonts Sora and Manrope from Google Fonts. The fonts are loaded locally via next/font and are not fetched from Google servers. No data is transmitted to Google.",
+    "section10Title": "10. Your Rights",
+    "section10Content": "You have the right to: access (Art. 15 GDPR), rectification (Art. 16 GDPR), erasure (Art. 17 GDPR), restriction of processing (Art. 18 GDPR), data portability (Art. 20 GDPR), objection (Art. 21 GDPR). To exercise your rights, contact: mail@invoice2e.eu",
+    "section11Title": "11. Right to Complain",
+    "section11Content": "You have the right to lodge a complaint with a data protection supervisory authority. The authority responsible for us is: Independent Center for Data Protection Schleswig-Holstein (ULD), Holstenstraße 98, 24103 Kiel, https://www.datenschutzzentrum.de",
+    "section12Title": "12. SSL Encryption",
+    "section12Content": "For security reasons, this website uses SSL/TLS encryption. You can recognize an encrypted connection by the browser address bar changing from 'http://' to 'https://' and by the lock icon in your browser bar.",
+    "section13Title": "13. Changes to This Privacy Policy",
+    "section13Content": "We reserve the right to update this privacy policy to comply with current legal requirements or to reflect changes in our services. The new privacy policy will apply to your next visit."
+  },
+  "impressum": {
+    "title": "Legal Notice",
+    "lastUpdated": "Last updated: February 2026",
+    "section1Title": "Information pursuant to § 5 TMG",
+    "section1Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg\nGermany",
+    "section2Title": "Contact",
+    "section2Content": "Email: mail@invoice2e.eu",
+    "section3Title": "VAT Identification Number",
+    "section3Content": "VAT identification number pursuant to § 27a of the German VAT Act: DE358337977",
+    "section4Title": "Responsible for content pursuant to § 18 (2) MStV",
+    "section4Content": "Osama Aldaas\nHerrenstr. 18d\n24768 Rendsburg",
+    "section5Title": "EU Dispute Resolution",
+    "section5Content": "The European Commission provides a platform for online dispute resolution (ODR): https://ec.europa.eu/consumers/odr/. You can find our email address in the legal notice above. We are not willing or obliged to participate in dispute resolution proceedings before a consumer arbitration board.",
+    "section6Title": "Liability for Content",
+    "section6Content": "As a service provider, we are responsible for our own content on these pages in accordance with § 7 (1) TMG. However, according to §§ 8 to 10 TMG, we are not obligated to monitor transmitted or stored third-party information or to investigate circumstances that indicate illegal activity. Obligations to remove or block the use of information under general law remain unaffected. However, liability in this regard is only possible from the time of knowledge of a specific infringement. Upon becoming aware of such violations, we will remove this content immediately.",
+    "section7Title": "Liability for Links",
+    "section7Content": "Our website contains links to external third-party websites over whose content we have no influence. Therefore, we cannot assume any liability for this external content. The respective provider or operator of the linked pages is always responsible for their content. The linked pages were checked for possible legal violations at the time of linking. Illegal content was not recognizable at the time of linking. However, permanent content monitoring of linked pages is not reasonable without concrete evidence of a legal violation. Upon becoming aware of legal violations, we will remove such links immediately."
   }
 }

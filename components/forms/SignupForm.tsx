@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { emitAuthChanged } from '@/lib/client-auth';
 
 export default function SignupForm() {
@@ -25,6 +26,7 @@ export default function SignupForm() {
     country: 'DE',
     phone: '',
   });
+  const [privacyConsent, setPrivacyConsent] = useState(false);
 
   const redirectTarget = useMemo(() => {
     const fallback = '/dashboard';
@@ -302,6 +304,29 @@ export default function SignupForm() {
         />
       </div>
 
+      <div className="flex items-start gap-3">
+        <input
+          id="privacyConsent"
+          type="checkbox"
+          checked={privacyConsent}
+          onChange={(e) => setPrivacyConsent(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950/60 text-sky-400 focus:ring-sky-400/60"
+        />
+        <label htmlFor="privacyConsent" className="text-sm text-slate-300">
+          {t.rich('privacyConsent', {
+            link: (chunks) => (
+              <Link
+                href="/privacy"
+                className="text-sky-200 hover:text-sky-100 underline"
+                target="_blank"
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
+        </label>
+      </div>
+
       {error && (
         <div className="p-3 glass-panel border border-rose-400/30 rounded-xl text-rose-200 text-sm">
           {error}
@@ -310,7 +335,7 @@ export default function SignupForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !privacyConsent}
         className="w-full px-4 py-3 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white font-semibold rounded-full hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? (
