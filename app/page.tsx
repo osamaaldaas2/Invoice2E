@@ -369,6 +369,9 @@ export default async function Home() {
         {/* Pricing Preview */}
         <div className="max-w-4xl mx-auto mb-24 md:mb-32">
           <div className="glass-card p-8 md:p-12 border-sky-400/30 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-4 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-200 text-sm font-medium">
+              {t('pricingBadge')}
+            </div>
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-4 font-display">
               {t('pricingTitle')}
             </h2>
