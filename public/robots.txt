@@ -10,4 +10,4 @@ Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /api
 
-Sitemap: https://invoice2e.eu/sitemap.xml
+Sitemap: https://www.invoice2e.eu/sitemap.xml
