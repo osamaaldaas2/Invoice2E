@@ -160,6 +160,24 @@ export default async function Home() {
           <HeroActions />
 
           <p className="text-sm text-faded mt-4">{t('noCardRequired')}</p>
+
+          {/* Trust Badges */}
+          <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+            {[
+              { icon: '🛡️', key: 'badge1' },
+              { icon: '⚡', key: 'badge2' },
+              { icon: '🌍', key: 'badge3' },
+              { icon: '🔒', key: 'badge4' },
+            ].map((b) => (
+              <div
+                key={b.key}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300"
+              >
+                <span>{b.icon}</span>
+                <span>{t(b.key)}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* How It Works - Simple Version */}
