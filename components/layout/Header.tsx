@@ -105,11 +105,11 @@ export default function Header(): React.ReactElement {
     <>
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
         <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <img src="/images/logo.png" alt={APP_NAME} className="h-8 w-8" />
-            <span className="text-xl font-semibold font-display tracking-tight gradient-text">
-              {APP_NAME}
-            </span>
+          <Link
+            href="/"
+            className="text-xl font-semibold font-display tracking-tight gradient-text hover:opacity-90 transition-opacity"
+          >
+            {APP_NAME}
           </Link>
 
           {/* Desktop nav */}
