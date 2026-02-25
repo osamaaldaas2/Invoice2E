@@ -8,6 +8,8 @@ import { ToastContainer } from '@/components/ui/toast';
 import { ConfirmProvider } from '@/lib/confirm-context';
 import { UserProvider } from '@/lib/user-context';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import '@/styles/globals.css';
 import '@/styles/variables.css';
 import { Sora, Manrope } from 'next/font/google';
@@ -125,6 +127,8 @@ export default async function RootLayout({
             </ConfirmProvider>
           </ToastProvider>
         </NextIntlClientProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
