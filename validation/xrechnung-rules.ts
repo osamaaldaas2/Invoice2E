@@ -118,25 +118,25 @@ export function validateXRechnungRules(data: CanonicalInvoice): ValidationError[
     );
   }
 
-  // BR-DE-15: Buyer reference (Leitweg-ID) is required for XRechnung
-  if (!data.buyerReference?.trim() && !data.invoiceNumber?.trim()) {
+  // DE-R-015: Buyer reference (BT-10 / Leitweg-ID) is MANDATORY for XRechnung (fatal)
+  if (!data.buyerReference?.trim()) {
     errors.push(
-      createWarning(
-        'BR-DE-15',
+      createError(
+        'DE-R-015',
         'invoice.buyerReference',
-        'Buyer reference (Leitweg-ID) should be provided for XRechnung (BR-DE-15)',
+        'Buyer reference (BT-10 / Leitweg-ID) is required for XRechnung (DE-R-015)',
         {
           suggestion:
-            'Invoice number is used as fallback, but a proper Leitweg-ID is recommended for public sector invoices',
+            'Provide a Leitweg-ID for public sector invoices (e.g. "04011000-1234512345-06") or a buyer reference for B2B invoices',
         }
       )
     );
   }
 
   // BR-CO-26 / BR-S-02 / BR-DE-16: Seller tax identifier is required
-  const hasSellerVatId = !!(data.seller?.vatId?.trim());
-  const hasSellerTaxNumber = !!(data.seller?.taxNumber?.trim());
-  const hasSellerTaxId = !!(data.seller?.taxId?.trim());
+  const hasSellerVatId = !!data.seller?.vatId?.trim();
+  const hasSellerTaxNumber = !!data.seller?.taxNumber?.trim();
+  const hasSellerTaxId = !!data.seller?.taxId?.trim();
   const hasAnySellerTaxIdentifier = hasSellerVatId || hasSellerTaxNumber || hasSellerTaxId;
 
   if (!hasAnySellerTaxIdentifier) {
@@ -146,7 +146,8 @@ export function validateXRechnungRules(data: CanonicalInvoice): ValidationError[
         'invoice.seller.taxIdentifier',
         'At least one seller tax identifier is required: VAT ID (BT-31), tax registration number (BT-32), or tax representative VAT ID (BT-63) (BR-CO-26 / BR-S-02 / BR-DE-16)',
         {
-          suggestion: 'Provide either the seller USt-IdNr. (e.g. "DE123456789") or Steuernummer (e.g. "12/345/67890")',
+          suggestion:
+            'Provide either the seller USt-IdNr. (e.g. "DE123456789") or Steuernummer (e.g. "12/345/67890")',
         }
       )
     );
@@ -160,7 +161,11 @@ export function validateXRechnungRules(data: CanonicalInvoice): ValidationError[
         'BR-DE-18',
         'invoice.currency',
         `XRechnung requires EUR as the invoice currency (BR-DE-18). Current currency: "${currency}"`,
-        { suggestion: 'Change the invoice currency to EUR (Euro)', expected: 'EUR', actual: currency }
+        {
+          suggestion: 'Change the invoice currency to EUR (Euro)',
+          expected: 'EUR',
+          actual: currency,
+        }
       )
     );
   }

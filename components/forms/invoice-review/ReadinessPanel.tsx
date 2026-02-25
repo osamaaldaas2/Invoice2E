@@ -122,7 +122,7 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkLineItems',
     'checkMonetary',
   ],
-  // Factur-X: seller address + buyer country + electronic addresses (BT-34/BT-49)
+  // Factur-X: seller address + buyer country (electronic addresses optional — only for Peppol)
   'facturx-en16931': [
     'checkInvoiceNumber',
     'checkInvoiceDate',
@@ -130,8 +130,6 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
-    'checkSellerElectronicAddress',
-    'checkBuyerEmail',
     'checkBuyerCountry',
     'checkLineItems',
     'checkMonetary',
@@ -143,8 +141,6 @@ const FORMAT_CHECKS: Record<string, CheckKey[]> = {
     'checkSellerStreet',
     'checkSellerCity',
     'checkSellerPostal',
-    'checkSellerElectronicAddress',
-    'checkBuyerEmail',
     'checkBuyerCountry',
     'checkLineItems',
     'checkMonetary',

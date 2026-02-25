@@ -12,8 +12,7 @@ const ELECTRONIC_ADDRESS_FORMATS: OutputFormat[] = [
   'peppol-bis',
   'nlcius',
   'cius-ro',
-  'facturx-en16931',
-  'facturx-basic',
+  // Factur-X: electronic addresses only required when sent via Peppol (not bilateral)
 ];
 
 export type LineItem = {

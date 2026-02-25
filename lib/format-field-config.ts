@@ -102,7 +102,7 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     buyerCountryCode: 'required',
     buyerVatId: 'optional',
     buyerTaxNumber: 'optional',
-    buyerReference: 'optional', // Leitweg-ID (warning, not error)
+    buyerReference: 'required', // Leitweg-ID — BR-DE-15 / DE-R-015 (fatal)
     buyerElectronicAddress: 'required', // BT-49
     buyerElectronicAddressScheme: 'optional',
     buyerCodiceDestinatario: 'hidden',
@@ -114,7 +114,7 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
       sellerTaxNumber: 'Steuernummer z.B. 12/345/67890 — alternativ zur USt-IdNr.',
       sellerElectronicAddress: 'BT-34 — z.B. E-Mail-Adresse des Rechnungsstellers',
       buyerElectronicAddress: 'BT-49 — z.B. E-Mail-Adresse des Rechnungsempfängers',
-      buyerReference: 'Leitweg-ID (BR-DE-15) — für Behördenrechnungen empfohlen',
+      buyerReference: 'Leitweg-ID (BR-DE-15) — Pflichtfeld für XRechnung',
       currency: 'Muss EUR sein (BR-DE-18)',
       sellerIban: 'IBAN für SEPA-Überweisung (BR-DE-23-a)',
     },
@@ -141,7 +141,7 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     buyerCountryCode: 'required',
     buyerVatId: 'optional',
     buyerTaxNumber: 'optional',
-    buyerReference: 'optional',
+    buyerReference: 'required', // Leitweg-ID — BR-DE-15 / DE-R-015 (fatal)
     buyerElectronicAddress: 'required',
     buyerElectronicAddressScheme: 'optional',
     buyerCodiceDestinatario: 'hidden',
@@ -152,7 +152,7 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
       sellerVatId: 'USt-IdNr. z.B. DE123456789 — oder Steuernummer angeben',
       sellerElectronicAddress: 'BT-34 — z.B. E-Mail-Adresse des Rechnungsstellers',
       buyerElectronicAddress: 'BT-49 — z.B. E-Mail-Adresse des Rechnungsempfängers',
-      buyerReference: 'Leitweg-ID (BR-DE-15) — für Behördenrechnungen empfohlen',
+      buyerReference: 'Leitweg-ID (BR-DE-15) — Pflichtfeld für XRechnung',
       currency: 'Muss EUR sein (BR-DE-18)',
       sellerIban: 'IBAN für SEPA-Überweisung (BR-DE-23-a)',
     },
@@ -231,7 +231,7 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     },
   },
 
-  // ── KSeF FA(2) (Poland) ─────────────────────────────────────────────────
+  // ── KSeF FA(3) (Poland, mandatory since 2026-02-01) ─────────────────────
   ksef: {
     sellerPhone: 'optional',
     sellerEmail: 'optional',
@@ -311,8 +311,8 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     sellerBic: 'optional',
     sellerVatId: 'required',
     sellerTaxNumber: 'optional',
-    sellerElectronicAddress: 'required',
-    sellerElectronicAddressScheme: 'required',
+    sellerElectronicAddress: 'optional', // Only required when sent via Peppol
+    sellerElectronicAddressScheme: 'optional',
     sellerStreet: 'required',
     sellerCity: 'required',
     sellerPostalCode: 'required',
@@ -324,8 +324,8 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     buyerVatId: 'optional',
     buyerTaxNumber: 'optional',
     buyerReference: 'optional',
-    buyerElectronicAddress: 'required',
-    buyerElectronicAddressScheme: 'required',
+    buyerElectronicAddress: 'optional', // Only required when sent via Peppol
+    buyerElectronicAddressScheme: 'optional',
     buyerCodiceDestinatario: 'hidden',
     currency: 'required',
     paymentTerms: 'required',
@@ -344,8 +344,8 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     sellerBic: 'optional',
     sellerVatId: 'required',
     sellerTaxNumber: 'optional',
-    sellerElectronicAddress: 'required',
-    sellerElectronicAddressScheme: 'required',
+    sellerElectronicAddress: 'optional', // Only required when sent via Peppol
+    sellerElectronicAddressScheme: 'optional',
     sellerStreet: 'required',
     sellerCity: 'required',
     sellerPostalCode: 'required',
@@ -357,8 +357,8 @@ export const FORMAT_FIELD_CONFIG: Record<OutputFormat, FormatFieldConfig> = {
     buyerVatId: 'optional',
     buyerTaxNumber: 'optional',
     buyerReference: 'optional',
-    buyerElectronicAddress: 'required',
-    buyerElectronicAddressScheme: 'required',
+    buyerElectronicAddress: 'optional', // Only required when sent via Peppol
+    buyerElectronicAddressScheme: 'optional',
     buyerCodiceDestinatario: 'hidden',
     currency: 'required',
     paymentTerms: 'optional', // Basic profile is more lenient
