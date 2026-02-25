@@ -160,6 +160,7 @@ type FileUploadFormProps = {
   userId?: string;
   onExtractionComplete?: (extractionId: string, data: ExtractedData) => void;
   availableCredits?: number;
+  targetFormat?: string;
 };
 
 const MULTI_RESULT_KEY = 'multiInvoiceResult';
@@ -168,6 +169,7 @@ export default function FileUploadForm({
   userId,
   onExtractionComplete,
   availableCredits = 0,
+  targetFormat,
 }: FileUploadFormProps) {
   const router = useRouter();
   const t = useTranslations('upload');
@@ -432,6 +434,9 @@ export default function FileUploadForm({
         // FIX-026: Don't send userId in request body, server gets it from session
         const formData = new FormData();
         formData.append('file', file);
+        if (targetFormat) {
+          formData.append('targetFormat', targetFormat);
+        }
 
         setState('extracting');
 

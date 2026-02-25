@@ -232,7 +232,11 @@
     "navAnalytics": "Analytics",
     "navTemplates": "Templates",
     "navCredits": "Credits",
-    "navBulkUpload": "Bulk Upload"
+    "navBulkUpload": "Bulk Upload",
+    "selectTargetFormat": "Select Target Format",
+    "selectFormat": "Choose your desired output format",
+    "selectFormatFirst": "Please select a target format first",
+    "moreFormats": "More formats"
   },
   "history": {
     "pageTitle": "Conversion History",

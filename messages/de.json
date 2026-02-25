@@ -232,7 +232,11 @@
     "navAnalytics": "Analyse",
     "navTemplates": "Vorlagen",
     "navCredits": "Guthaben",
-    "navBulkUpload": "Massenupload"
+    "navBulkUpload": "Massenupload",
+    "selectTargetFormat": "Zielformat wählen",
+    "selectFormat": "Wählen Sie das gewünschte Ausgabeformat",
+    "selectFormatFirst": "Bitte wählen Sie zuerst ein Zielformat aus",
+    "moreFormats": "Weitere Formate"
   },
   "history": {
     "pageTitle": "Konvertierungsverlauf",
