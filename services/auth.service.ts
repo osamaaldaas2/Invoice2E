@@ -104,7 +104,8 @@ export class AuthService {
         // If RPC doesn't exist, fall back to sequential approach
         if (
           rpcError.message?.includes('function') &&
-          rpcError.message?.includes('does not exist')
+          (rpcError.message?.includes('does not exist') ||
+            rpcError.message?.includes('schema cache'))
         ) {
           throw new Error('RPC_NOT_FOUND');
         }
