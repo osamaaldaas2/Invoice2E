@@ -16,6 +16,7 @@ import { getSessionFromCookie } from '@/lib/session';
 import { logger } from '@/lib/logger';
 import { ApiKeyService, ApiKeyError } from '@/lib/api-keys/api-keys';
 import { CreateApiKeyRequest, VALID_SCOPES, ApiKeyScope } from '@/lib/api-keys/types';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,12 +40,17 @@ function jsonResponse(data: Record<string, unknown>, status = 200): NextResponse
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    const rateLimitResult = await checkRateLimitAsync(getRequestIdentifier(request), 'api');
+    if (!rateLimitResult.allowed) {
+      return jsonResponse({ error: 'Too many requests' }, 429);
+    }
+
     const session = await getSessionFromCookie();
     if (!session) {
       return jsonResponse({ error: 'Authentication required' }, 401);
     }
 
-    const body = await request.json() as CreateApiKeyRequest;
+    const body = (await request.json()) as CreateApiKeyRequest;
 
     // Validate request body
     if (!body.name || typeof body.name !== 'string') {
@@ -187,4 +193,3 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return jsonResponse({ error: 'Internal server error' }, 500);
   }
 }
-

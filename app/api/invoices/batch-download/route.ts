@@ -5,18 +5,28 @@ import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-helpers';
 import { createUserScopedClient } from '@/lib/supabase.server';
-import { recomputeTotals, type MonetaryLineItem, type MonetaryAllowanceCharge } from '@/lib/monetary-validator';
+import {
+  recomputeTotals,
+  type MonetaryLineItem,
+  type MonetaryAllowanceCharge,
+} from '@/lib/monetary-validator';
 import { roundMoney, moneyEqual } from '@/lib/monetary';
 import { GeneratorFactory } from '@/services/format/GeneratorFactory';
 import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
 import { detectFormatFromData } from '@/lib/format-field-config';
 import { toLegacyFormat } from '@/lib/format-utils';
 import type { OutputFormat } from '@/types/canonical-invoice';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResult = await checkRateLimitAsync(getRequestIdentifier(request), 'download');
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json({ success: false, error: 'Too many requests' }, { status: 429 });
+    }
+
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return NextResponse.json(
@@ -93,27 +103,36 @@ export async function POST(request: NextRequest) {
           totalAmount: Number(data.totalAmount) || 0,
           buyerEmail: data.buyerEmail || null,
           buyerElectronicAddress: data.buyerElectronicAddress || data.buyerEmail || null,
-          buyerElectronicAddressScheme: data.buyerElectronicAddressScheme || (data.buyerEmail ? 'EM' : null),
+          buyerElectronicAddressScheme:
+            data.buyerElectronicAddressScheme || (data.buyerEmail ? 'EM' : null),
           sellerEmail: data.sellerEmail || null,
           sellerElectronicAddress: data.sellerElectronicAddress || data.sellerEmail || null,
-          sellerElectronicAddressScheme: data.sellerElectronicAddressScheme || (data.sellerEmail ? 'EM' : null),
+          sellerElectronicAddressScheme:
+            data.sellerElectronicAddressScheme || (data.sellerEmail ? 'EM' : null),
         } as Record<string, unknown>;
 
         // Auto-recompute totals from line items to fix AI extraction rounding errors
         const rawLineItems = Array.isArray(serviceData.lineItems)
-          ? serviceData.lineItems as Record<string, unknown>[]
+          ? (serviceData.lineItems as Record<string, unknown>[])
           : Array.isArray(serviceData.line_items)
-            ? serviceData.line_items as Record<string, unknown>[]
+            ? (serviceData.line_items as Record<string, unknown>[])
             : [];
         if (rawLineItems.length > 0) {
           serviceData.lineItems = rawLineItems;
-          const monetaryLines: MonetaryLineItem[] = rawLineItems.map((item: Record<string, unknown>) => ({
-            netAmount: roundMoney(Number(item.totalPrice ?? item.lineTotal ?? 0) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
-            taxRate: Number(item.taxRate ?? item.vatRate ?? serviceData.taxRate ?? 19),
-            taxCategoryCode: item.taxCategoryCode as string | undefined,
-          }));
+          const monetaryLines: MonetaryLineItem[] = rawLineItems.map(
+            (item: Record<string, unknown>) => ({
+              netAmount: roundMoney(
+                Number(item.totalPrice ?? item.lineTotal ?? 0) ||
+                  Number(item.unitPrice || 0) * Number(item.quantity || 1)
+              ),
+              taxRate: Number(item.taxRate ?? item.vatRate ?? serviceData.taxRate ?? 19),
+              taxCategoryCode: item.taxCategoryCode as string | undefined,
+            })
+          );
 
-          const acList = Array.isArray(serviceData.allowanceCharges) ? serviceData.allowanceCharges as any[] : [];
+          const acList = Array.isArray(serviceData.allowanceCharges)
+            ? (serviceData.allowanceCharges as any[])
+            : [];
 
           const monetaryAC: MonetaryAllowanceCharge[] = acList.map((ac: any) => ({
             chargeIndicator: Boolean(ac.chargeIndicator),
@@ -134,7 +153,9 @@ export async function POST(request: NextRequest) {
             serviceData.taxAmount = recomputed.taxAmount;
           }
           if (!moneyEqual(storedTotal, recomputed.totalAmount, 0.02)) {
-            const storedSum = roundMoney(Number(serviceData.subtotal) + Number(serviceData.taxAmount));
+            const storedSum = roundMoney(
+              Number(serviceData.subtotal) + Number(serviceData.taxAmount)
+            );
             if (!moneyEqual(storedTotal, storedSum, 0.02)) {
               serviceData.totalAmount = recomputed.totalAmount;
             }
@@ -168,35 +189,49 @@ export async function POST(request: NextRequest) {
 
         // Create/update conversion record with correct format
         const legacyFormat = toLegacyFormat(outputFormat);
-        const existingConversion = await invoiceDbService.getConversionByExtractionId(extractionId, userClient);
+        const existingConversion = await invoiceDbService.getConversionByExtractionId(
+          extractionId,
+          userClient
+        );
         if (existingConversion) {
-          await invoiceDbService.updateConversion(existingConversion.id, {
-            conversionFormat: legacyFormat,
-            outputFormat,
-            conversionStatus: 'completed',
-            validationStatus: result.validationStatus,
-            validationErrors:
-              result.validationErrors.length > 0
-                ? ({ errors: result.validationErrors } as Record<string, unknown>)
-                : undefined,
-          }, userClient);
+          await invoiceDbService.updateConversion(
+            existingConversion.id,
+            {
+              conversionFormat: legacyFormat,
+              outputFormat,
+              conversionStatus: 'completed',
+              validationStatus: result.validationStatus,
+              validationErrors:
+                result.validationErrors.length > 0
+                  ? ({ errors: result.validationErrors } as Record<string, unknown>)
+                  : undefined,
+            },
+            userClient
+          );
         } else {
-          const conversion = await invoiceDbService.createConversion({
-            userId: user.id,
-            extractionId,
-            invoiceNumber: String(data.invoiceNumber || data.invoice_number || ''),
-            buyerName: String(data.buyerName || data.buyer_name || ''),
-            conversionFormat: legacyFormat,
-            outputFormat,
-            conversionStatus: 'completed',
-          }, userClient);
-          await invoiceDbService.updateConversion(conversion.id, {
-            validationStatus: result.validationStatus,
-            validationErrors:
-              result.validationErrors.length > 0
-                ? ({ errors: result.validationErrors } as Record<string, unknown>)
-                : undefined,
-          }, userClient);
+          const conversion = await invoiceDbService.createConversion(
+            {
+              userId: user.id,
+              extractionId,
+              invoiceNumber: String(data.invoiceNumber || data.invoice_number || ''),
+              buyerName: String(data.buyerName || data.buyer_name || ''),
+              conversionFormat: legacyFormat,
+              outputFormat,
+              conversionStatus: 'completed',
+            },
+            userClient
+          );
+          await invoiceDbService.updateConversion(
+            conversion.id,
+            {
+              validationStatus: result.validationStatus,
+              validationErrors:
+                result.validationErrors.length > 0
+                  ? ({ errors: result.validationErrors } as Record<string, unknown>)
+                  : undefined,
+            },
+            userClient
+          );
         }
         await invoiceDbService.updateExtraction(extractionId, { status: 'completed' }, userClient);
       } catch (err) {

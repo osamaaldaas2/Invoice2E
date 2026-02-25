@@ -10,9 +10,15 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { createUserScopedClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api-helpers';
+import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    const rateLimitResult = await checkRateLimitAsync(getRequestIdentifier(request), 'api');
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json({ success: false, error: 'Too many requests' }, { status: 429 });
+    }
+
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });

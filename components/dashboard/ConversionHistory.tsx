@@ -193,7 +193,7 @@ function ApplyToAllPanel({
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setResult(`Failed to apply fields: ${errorMsg}`);
-      console.error('Apply to All error:', err);
+      // Error handled in UI via state
     } finally {
       setApplying(false);
       isApplyingRef.current = false;
