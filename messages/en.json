@@ -27,7 +27,9 @@
     "reloadPage": "Reload Page",
     "backToLogin": "Back to Login",
     "goToLogin": "Go to Login",
-    "viewHistory": "View in History"
+    "viewHistory": "View in History",
+    "formats": "Formats",
+    "allFormats": "All Formats"
   },
   "home": {
     "title": "Welcome to Invoice2E",
@@ -192,7 +194,14 @@
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "contact": "Contact",
-    "impressum": "Legal Notice"
+    "impressum": "Legal Notice",
+    "formats": "Formats",
+    "allFormats": "All Formats →",
+    "product": "Product",
+    "pricing": "Pricing",
+    "getStarted": "Get Started Free",
+    "legal": "Legal",
+    "contactTitle": "Contact"
   },
   "dashboard": {
     "pageTitle": "Dashboard",
@@ -790,5 +799,522 @@
     "section11Content": "You may delete your account at any time. Invoice2E may suspend or delete accounts without notice in case of violation of these Terms of Service. Upon termination, unused credits expire if the termination is initiated by the user or is due to a violation of these terms.",
     "section12Title": "12. Applicable Law and Jurisdiction",
     "section12Content": "The laws of the Federal Republic of Germany apply. The place of jurisdiction for disputes with entrepreneurs is Rendsburg. For consumers, the statutory provisions on jurisdiction apply."
+  },
+  "formatPages": {
+    "common": {
+      "viewPricing": "View Pricing",
+      "noCardRequired": "Free credits on signup · No credit card required",
+      "technicalDetails": "Technical Details",
+      "standard": "Standard",
+      "version": "Version",
+      "outputFormat": "Output Format",
+      "countries": "Countries",
+      "countriesCount": "countries",
+      "howItWorksTitle": "How It Works",
+      "whoNeedsTitle": "Who Is This For?",
+      "personas": {
+        "freelancer": {
+          "title": "Freelancers & Solopreneurs"
+        },
+        "smb": {
+          "title": "Small & Medium Businesses"
+        },
+        "accountant": {
+          "title": "Accountants & Tax Advisors"
+        }
+      },
+      "faqTitle": "Frequently Asked Questions",
+      "relatedFormats": "Related Formats",
+      "ctaTitle": "Ready to Get Started?",
+      "ctaSubtitle": "Convert your first invoice in under 30 seconds",
+      "ctaButton": "Try Free Now",
+      "allFormatsTitle": "All Conversion Formats",
+      "allFormatsSubtitle": "Convert PDF invoices to any EU-compliant e-invoice format",
+      "conversionFormats": "Conversion Formats",
+      "popularLabel": "Popular",
+      "convertNow": "Convert Now"
+    },
+    "xrechnungCii": {
+      "meta": {
+        "title": "Convert PDF to XRechnung – Free & Instant | Invoice2E",
+        "desc": "Convert PDF invoices to XRechnung XML (CII). AI-powered, EN 16931 compliant, KoSIT-validated. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to XRechnung",
+        "subtitle": "Transform your PDF invoices into EN 16931 compliant XRechnung XML – AI-powered in under 30 seconds.",
+        "mandatory": "XRechnung has been mandatory for B2B invoices in Germany since January 1, 2025",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "EN 16931 / CII",
+        "leitweg": "Leitweg-ID (BT-34) supported for public sector invoicing"
+      },
+      "howItWorks": {
+        "subtitle": "Three simple steps from PDF invoice to XRechnung XML",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF, JPG, or PNG invoice. Our AI automatically recognizes and extracts all relevant invoice data."
+        },
+        "step2": {
+          "title": "Review AI Extraction",
+          "desc": "Review and correct the extracted data. All mandatory XRechnung fields are highlighted for your attention."
+        },
+        "step3": {
+          "title": "Download XRechnung XML",
+          "desc": "Download your KoSIT-validated XRechnung XML – guaranteed compliant with EN 16931 and BR-DE-* rules."
+        }
+      },
+      "personas": {
+        "freelancer": "Create compliant XRechnung invoices for authorities and businesses quickly – no XML knowledge required.",
+        "smb": "Convert dozens of invoices via bulk upload to XRechnung. Ideal for regular B2B and B2G invoicing.",
+        "accountant": "Manage client invoices with guaranteed XRechnung compliance. Batch processing for efficiency."
+      },
+      "faq": {
+        "1": {
+          "q": "Is XRechnung mandatory?",
+          "a": "Yes. Since January 1, 2025, all businesses in Germany must be able to receive e-invoices. From 2027 (revenue > €800,000) and 2028 (all businesses), sending as e-invoice becomes mandatory too."
+        },
+        "2": {
+          "q": "What's the difference between XRechnung CII and UBL?",
+          "a": "Both are XRechnung-compliant per EN 16931. CII (Cross-Industry Invoice) and UBL (Universal Business Language) are two different XML syntaxes. Most German authorities accept both. CII is more common in the DACH region."
+        },
+        "3": {
+          "q": "Is Leitweg-ID supported?",
+          "a": "Yes. Invoice2E supports Leitweg-ID (BT-34) for invoices to public sector recipients. You can enter the Leitweg-ID in the review step."
+        },
+        "4": {
+          "q": "How is the XRechnung validated?",
+          "a": "Every invoice is validated against EN 16931, BR-DE-* rules (BR-DE-1 through BR-DE-29), and the official KoSIT validator. Over 200 business rules are automatically checked."
+        },
+        "5": {
+          "q": "How much does conversion cost?",
+          "a": "You get free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months. Failed extractions are free."
+        }
+      }
+    },
+    "xrechnungUbl": {
+      "meta": {
+        "title": "Convert PDF to XRechnung UBL – Free | Invoice2E",
+        "desc": "Convert PDF invoices to XRechnung UBL 2.1 format. EN 16931 compliant, KoSIT-validated. Try free now."
+      },
+      "hero": {
+        "h1": "Convert PDF to XRechnung (UBL)",
+        "subtitle": "Create XRechnung in UBL 2.1 format – ideal for PEPPOL-compatible systems and international recipients.",
+        "mandatory": "XRechnung has been mandatory for B2B invoices in Germany since January 1, 2025",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "EN 16931 / UBL 2.1",
+        "leitweg": "Leitweg-ID (BT-34) supported for public sector invoicing"
+      },
+      "howItWorks": {
+        "subtitle": "Three simple steps from PDF invoice to XRechnung UBL",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your invoice as PDF, JPG, or PNG. Our AI automatically extracts all relevant data."
+        },
+        "step2": {
+          "title": "Review & Correct",
+          "desc": "Review extracted data in the review screen. XRechnung mandatory fields are highlighted."
+        },
+        "step3": {
+          "title": "Download UBL XML",
+          "desc": "Download your validated XRechnung in UBL 2.1 format – compatible with PEPPOL and all EN 16931 systems."
+        }
+      },
+      "personas": {
+        "freelancer": "UBL format for international clients and PEPPOL-enabled recipients – no technical knowledge needed.",
+        "smb": "Ideal when your business partners use PEPPOL or UBL-based systems. Bulk upload available.",
+        "accountant": "UBL offers maximum interoperability in Europe. Perfect for clients with international business relationships."
+      },
+      "faq": {
+        "1": {
+          "q": "When should I choose UBL over CII?",
+          "a": "UBL is the better choice when your recipient uses PEPPOL or has a UBL-based system (e.g., in the Netherlands, Scandinavia). For German authorities, both are accepted."
+        },
+        "2": {
+          "q": "Is XRechnung UBL just as valid as CII?",
+          "a": "Yes, absolutely. Both syntaxes are officially approved by KoSIT and fulfill EN 16931. There is no legal difference."
+        },
+        "3": {
+          "q": "Can I switch between CII and UBL?",
+          "a": "Yes. In the review step, you can change the output format at any time. The extracted data remains the same."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months."
+        }
+      }
+    },
+    "zugferd": {
+      "meta": {
+        "title": "Convert PDF to ZUGFeRD – Create Hybrid Invoices | Invoice2E",
+        "desc": "Create ZUGFeRD / Factur-X EN 16931 hybrid invoices. PDF + embedded XML. AI-powered, GDPR-compliant."
+      },
+      "hero": {
+        "h1": "Convert PDF to ZUGFeRD",
+        "subtitle": "Create ZUGFeRD hybrid invoices – PDF for humans, XML for machines. The best of both worlds.",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "EN 16931 / Factur-X"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your ZUGFeRD hybrid invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your existing PDF invoice. Our AI reads and extracts all invoice data automatically."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review and correct the extracted data. ZUGFeRD-specific fields are highlighted."
+        },
+        "step3": {
+          "title": "Download ZUGFeRD PDF",
+          "desc": "Download your ZUGFeRD PDF/A-3 – a PDF with embedded EN 16931 XML. Readable by humans and machines."
+        }
+      },
+      "personas": {
+        "freelancer": "ZUGFeRD is perfect for B2B: your client sees a normal PDF, but the data is machine-readable embedded.",
+        "smb": "Ideal for companies that can't yet process pure XML. ZUGFeRD bridges the gap between old and new world.",
+        "accountant": "ZUGFeRD is recognized by all major accounting systems. Perfect for the transition to e-invoicing."
+      },
+      "faq": {
+        "1": {
+          "q": "What's the difference between ZUGFeRD and XRechnung?",
+          "a": "XRechnung is pure XML. ZUGFeRD is a hybrid: a PDF/A-3 document with embedded XML. You can open and read ZUGFeRD as a PDF, while XRechnung requires special software."
+        },
+        "2": {
+          "q": "Is ZUGFeRD suitable for government invoicing?",
+          "a": "Partially. ZUGFeRD with the 'XRechnung' profile is accepted by many authorities. For maximum public sector compatibility, we recommend pure XRechnung XML."
+        },
+        "3": {
+          "q": "What is Factur-X?",
+          "a": "Factur-X is the French name for ZUGFeRD. Technically they are identical – both based on the same EN 16931 standard with PDF/A-3 and embedded CII XML."
+        },
+        "4": {
+          "q": "Which ZUGFeRD profiles are supported?",
+          "a": "Invoice2E creates ZUGFeRD at EN 16931 conformance level – the highest profile with full compliance. Factur-X Basic is also available."
+        },
+        "5": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months."
+        }
+      }
+    },
+    "facturx": {
+      "meta": {
+        "title": "Convert PDF to Factur-X Basic | Invoice2E",
+        "desc": "Create Factur-X Basic hybrid invoices (PDF + XML). Ideal for the French market. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to Factur-X Basic",
+        "subtitle": "Create Factur-X Basic hybrid invoices for the French and European market.",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "Factur-X 1.0 / Basic"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your Factur-X hybrid invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI extracts all data automatically."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review and correct the extracted invoice data."
+        },
+        "step3": {
+          "title": "Download Factur-X PDF",
+          "desc": "Download your Factur-X Basic PDF/A-3 with embedded CII XML."
+        }
+      },
+      "personas": {
+        "freelancer": "Factur-X Basic for French clients – simple compliance without effort.",
+        "smb": "Perfect for the French market and cross-border business in the DACH-FR area.",
+        "accountant": "Factur-X Basic covers basic requirements. For full compliance, use EN 16931."
+      },
+      "faq": {
+        "1": {
+          "q": "What is Factur-X Basic?",
+          "a": "Factur-X Basic is a hybrid invoice format with PDF and embedded XML at Basic conformance level. It contains the most important invoice data as structured XML."
+        },
+        "2": {
+          "q": "Difference between Factur-X Basic and EN 16931?",
+          "a": "EN 16931 is the full conformance level with all mandatory fields. Basic contains less data and is simpler, but may not be sufficient for all requirements."
+        },
+        "3": {
+          "q": "Is Factur-X accepted in Germany?",
+          "a": "Yes, Factur-X EN 16931 is accepted as ZUGFeRD. Factur-X Basic has fewer fields and is primarily designed for the French market."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    },
+    "peppol": {
+      "meta": {
+        "title": "Convert PDF to PEPPOL BIS 3.0 | Invoice2E",
+        "desc": "Convert PDF invoices to PEPPOL BIS 3.0 UBL format. For the pan-European e-invoicing network. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to PEPPOL BIS 3.0",
+        "subtitle": "Create PEPPOL-compliant UBL invoices for the pan-European e-invoicing network – over 30 countries.",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "PEPPOL BIS 3.0 / UBL 2.1"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your PEPPOL-compliant e-invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI extracts and structures all data."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review data and add PEPPOL-specific fields like Endpoint ID."
+        },
+        "step3": {
+          "title": "Download PEPPOL UBL",
+          "desc": "Download your validated PEPPOL BIS 3.0 UBL invoice – ready for the PEPPOL network."
+        }
+      },
+      "personas": {
+        "freelancer": "PEPPOL for European clients – one format that works in over 30 countries.",
+        "smb": "Ideal for international business relationships in Europe. PEPPOL is the standard network for B2B and B2G.",
+        "accountant": "PEPPOL offers maximum reach in Europe. Perfect for clients with EU-wide business partners."
+      },
+      "faq": {
+        "1": {
+          "q": "What is PEPPOL?",
+          "a": "PEPPOL (Pan-European Public Procurement OnLine) is a network for electronic exchange of business documents. Over 30 European countries use PEPPOL for e-invoicing."
+        },
+        "2": {
+          "q": "Do I need a PEPPOL Access Point?",
+          "a": "Yes, to send invoices via the PEPPOL network, you need a PEPPOL Access Point provider. Invoice2E creates the compliant XML – your Access Point handles the delivery."
+        },
+        "3": {
+          "q": "Is PEPPOL mandatory in Germany?",
+          "a": "Not directly, but PEPPOL is supported by many public sector organizations in Europe. XRechnung via PEPPOL is a common combination."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    },
+    "fatturapa": {
+      "meta": {
+        "title": "Convert PDF to FatturaPA – Italian E-Invoice | Invoice2E",
+        "desc": "Convert PDF invoices to FatturaPA XML for the Italian SDI system. AI-powered, try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to FatturaPA",
+        "subtitle": "Create FatturaPA XML invoices for the Italian Sistema di Interscambio (SDI) – AI-powered.",
+        "mandatory": "FatturaPA has been mandatory in Italy since 2019 for all B2B and B2G invoices",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "FatturaPA 1.2.2"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your Italian e-invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI also recognizes Italian invoice formats and tax IDs."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review data and add FatturaPA-specific fields like Codice Destinatario."
+        },
+        "step3": {
+          "title": "Download FatturaPA XML",
+          "desc": "Download your validated FatturaPA XML – ready for the SDI system."
+        }
+      },
+      "personas": {
+        "freelancer": "FatturaPA for business with Italian partners – automatic creation without knowledge of the SDI system.",
+        "smb": "Mandatory for all companies sending invoices to Italy. Invoice2E makes it easy.",
+        "accountant": "Clients with Italian business relationships? FatturaPA creation without manual effort."
+      },
+      "faq": {
+        "1": {
+          "q": "What is FatturaPA?",
+          "a": "FatturaPA is the Italian e-invoicing format processed through the Sistema di Interscambio (SDI) of the Agenzia delle Entrate. Mandatory for all B2B invoices in Italy since 2019."
+        },
+        "2": {
+          "q": "What is the Codice Destinatario?",
+          "a": "The Codice Destinatario is a 7-character code that identifies the recipient in the SDI system. You receive it from the invoice recipient."
+        },
+        "3": {
+          "q": "Can I send FatturaPA from Germany?",
+          "a": "Yes. If you send invoices to Italian companies or authorities, they must be in FatturaPA format. Invoice2E supports creation from Germany."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    },
+    "ksef": {
+      "meta": {
+        "title": "Convert PDF to KSeF – Polish E-Invoice | Invoice2E",
+        "desc": "Convert PDF invoices to KSeF FA(3) format for the Polish Krajowy System e-Faktur. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to KSeF",
+        "subtitle": "Create KSeF FA(3) e-invoices for the Polish national e-invoicing system – mandatory since February 2026.",
+        "mandatory": "KSeF has been mandatory for all businesses in Poland since February 2026",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "KSeF FA(3)"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your Polish e-invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI also recognizes Polish invoice formats and NIP numbers."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review data and add KSeF-specific fields."
+        },
+        "step3": {
+          "title": "Download KSeF XML",
+          "desc": "Download your validated KSeF FA(3) XML – ready for the Krajowy System e-Faktur."
+        }
+      },
+      "personas": {
+        "freelancer": "KSeF for business with Polish partners – automatic and without KSeF knowledge.",
+        "smb": "Mandatory since 2026 for all companies sending invoices to Poland.",
+        "accountant": "Clients with Polish business relationships? KSeF-compliant invoices without manual effort."
+      },
+      "faq": {
+        "1": {
+          "q": "What is KSeF?",
+          "a": "KSeF (Krajowy System e-Faktur) is the Polish national e-invoicing system. Since February 2026, all businesses in Poland must exchange structured e-invoices via KSeF."
+        },
+        "2": {
+          "q": "Which schema is used?",
+          "a": "Invoice2E uses the current FA(3) schema, the latest version of the KSeF invoice format."
+        },
+        "3": {
+          "q": "Can I send KSeF invoices from Germany?",
+          "a": "Yes. If you send invoices to Polish companies, they can be created in KSeF format. The upload to the KSeF system is done separately."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    },
+    "nlcius": {
+      "meta": {
+        "title": "Convert PDF to NLCIUS / SI-UBL 2.0 | Invoice2E",
+        "desc": "Convert PDF invoices to the Dutch NLCIUS / SI-UBL 2.0 format. EN 16931 compliant. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to NLCIUS",
+        "subtitle": "Create NLCIUS / SI-UBL 2.0 e-invoices for the Dutch market – EN 16931 compliant.",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "NLCIUS / SI-UBL 2.0"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your Dutch e-invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI extracts all relevant data automatically."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review extracted data and add Dutch mandatory fields."
+        },
+        "step3": {
+          "title": "Download SI-UBL XML",
+          "desc": "Download your validated NLCIUS / SI-UBL 2.0 invoice."
+        }
+      },
+      "personas": {
+        "freelancer": "NLCIUS for Dutch clients – simple and EN 16931 compliant.",
+        "smb": "Ideal for companies with business relationships in the Netherlands.",
+        "accountant": "Clients with Dutch partners? NLCIUS-compliant invoices without effort."
+      },
+      "faq": {
+        "1": {
+          "q": "What is NLCIUS?",
+          "a": "NLCIUS (Netherlands Core Invoice Usage Specification) is the Dutch implementation of EN 16931, also known as SI-UBL 2.0. It is based on UBL and is the standard for e-invoices in the Netherlands."
+        },
+        "2": {
+          "q": "Is NLCIUS mandatory in the Netherlands?",
+          "a": "For invoices to the Dutch government, e-invoicing via PEPPOL with SI-UBL is mandatory. For B2B it is recommended and increasingly required."
+        },
+        "3": {
+          "q": "Difference from PEPPOL BIS?",
+          "a": "NLCIUS is a national adaptation (CIUS) of EN 16931, optimized for Dutch requirements. PEPPOL BIS is the overarching European format. Both are based on UBL."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    },
+    "ciusRo": {
+      "meta": {
+        "title": "Convert PDF to CIUS-RO – Romanian E-Invoice | Invoice2E",
+        "desc": "Convert PDF invoices to Romanian CIUS-RO format for the RO e-Factura system. Try free."
+      },
+      "hero": {
+        "h1": "Convert PDF to CIUS-RO",
+        "subtitle": "Create CIUS-RO e-invoices for the Romanian e-Factura system – EN 16931 compliant.",
+        "cta": "Convert Free Now"
+      },
+      "technical": {
+        "standard": "CIUS-RO / UBL"
+      },
+      "howItWorks": {
+        "subtitle": "Three steps to your Romanian e-invoice",
+        "step1": {
+          "title": "Upload PDF",
+          "desc": "Upload your PDF invoice. The AI extracts all data automatically."
+        },
+        "step2": {
+          "title": "Review Data",
+          "desc": "Review data and add Romanian mandatory fields."
+        },
+        "step3": {
+          "title": "Download CIUS-RO XML",
+          "desc": "Download your validated CIUS-RO UBL invoice – ready for RO e-Factura."
+        }
+      },
+      "personas": {
+        "freelancer": "CIUS-RO for Romanian business partners – automatic and without prior knowledge.",
+        "smb": "Mandatory for all B2B invoices in Romania since 2024. Invoice2E makes it easy.",
+        "accountant": "Clients with Romanian business relationships? CIUS-RO without manual effort."
+      },
+      "faq": {
+        "1": {
+          "q": "What is CIUS-RO?",
+          "a": "CIUS-RO is the Romanian implementation of EN 16931 based on UBL. It is used in the RO e-Factura system and has been mandatory for B2B invoices in Romania since 2024."
+        },
+        "2": {
+          "q": "Is CIUS-RO mandatory?",
+          "a": "Yes, since January 2024, all B2B invoices in Romania must be submitted through the e-Factura system as structured e-invoices in CIUS-RO format."
+        },
+        "3": {
+          "q": "Can I send CIUS-RO from Germany?",
+          "a": "Yes. If you send invoices to Romanian companies, they should be in CIUS-RO format. Invoice2E creates the compliant XML."
+        },
+        "4": {
+          "q": "How much does conversion cost?",
+          "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
+        }
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllPosts } from '@/lib/blog/posts';
+import { FORMAT_LANDING_CONFIGS } from '@/lib/format-landing-data';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://www.invoice2e.eu';
@@ -12,6 +13,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 1.0,
     },
+    // Format landing pages
+    ...FORMAT_LANDING_CONFIGS.map((config) => ({
+      url: `${baseUrl}/${config.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: config.popular ? 0.9 : 0.8,
+    })),
     {
       url: `${baseUrl}/pricing`,
       lastModified: new Date(),

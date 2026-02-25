@@ -114,6 +114,66 @@ export default function Header(): React.ReactElement {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Formats dropdown */}
+            <div className="relative group">
+              <button
+                className={`nav-pill ${pathname?.startsWith('/pdf-to-') || pathname === '/convert' ? 'nav-pill-active' : ''}`}
+              >
+                {t('formats')}
+                <svg
+                  className="w-3 h-3 ml-1 inline-block"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+              <div className="absolute top-full left-0 mt-1 w-56 py-2 bg-slate-950/95 border border-white/10 rounded-xl backdrop-blur-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <Link
+                  href="/pdf-to-xrechnung"
+                  className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  🇩🇪 PDF → XRechnung
+                </Link>
+                <Link
+                  href="/pdf-to-zugferd"
+                  className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  🇩🇪🇫🇷 PDF → ZUGFeRD
+                </Link>
+                <Link
+                  href="/pdf-to-peppol"
+                  className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  🇪🇺 PDF → PEPPOL
+                </Link>
+                <Link
+                  href="/pdf-to-fatturapa"
+                  className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  🇮🇹 PDF → FatturaPA
+                </Link>
+                <Link
+                  href="/pdf-to-ksef"
+                  className="block px-4 py-2 text-sm text-faded hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  🇵🇱 PDF → KSeF
+                </Link>
+                <div className="border-t border-white/10 my-1" />
+                <Link
+                  href="/convert"
+                  className="block px-4 py-2 text-sm text-sky-300 hover:text-sky-200 hover:bg-white/5 transition-colors"
+                >
+                  {t('allFormats')} →
+                </Link>
+              </div>
+            </div>
             <Link
               href="/blog"
               className={`nav-pill ${pathname?.startsWith('/blog') ? 'nav-pill-active' : ''}`}
