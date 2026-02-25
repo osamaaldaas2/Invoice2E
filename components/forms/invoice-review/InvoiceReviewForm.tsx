@@ -166,13 +166,9 @@ export default function InvoiceReviewForm({
       />
 
       {/* Output Format Selector — collapsed if pre-selected in dashboard */}
-      {hasPreselection ? (
-        <FormatPreselected
-          value={outputFormat}
-          onChangeClick={() => setShowFormatSelector((prev) => !prev)}
-        />
-      ) : null}
-      {(!hasPreselection || showFormatSelector) && (
+      {hasPreselection && !showFormatSelector ? (
+        <FormatPreselected value={outputFormat} onChangeClick={() => setShowFormatSelector(true)} />
+      ) : (
         <FormatSelector value={outputFormat} onChange={setOutputFormat} />
       )}
 
