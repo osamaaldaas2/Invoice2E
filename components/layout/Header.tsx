@@ -205,7 +205,7 @@ export default function Header(): React.ReactElement {
                 <div className="relative group">
                   <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                      {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                      {(user.firstName?.[0] || user.email?.[0] || '?').toUpperCase()}
                     </div>
                     <svg
                       className="w-3 h-3 text-slate-400"
