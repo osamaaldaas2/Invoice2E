@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: Props) {
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
             >
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                {(user.firstName?.[0] || user.email?.[0] || '?').toUpperCase()}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white truncate group-hover:text-sky-200 transition-colors">
