@@ -839,7 +839,11 @@
       "allFormatsSubtitle": "Convert PDF invoices to any EU-compliant e-invoice format",
       "conversionFormats": "Conversion Formats",
       "popularLabel": "Popular",
-      "convertNow": "Convert Now"
+      "convertNow": "Convert Now",
+      "requirementsTitle": "Requirements & Validation",
+      "requiredFields": "Required Fields",
+      "validationRules": "Validation Rules",
+      "officialSource": "Official Source"
     },
     "xrechnungCii": {
       "meta": {
@@ -897,6 +901,36 @@
           "q": "How much does conversion cost?",
           "a": "You get free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months. Failed extractions are free."
         }
+      },
+      "requirements": {
+        "subtitle": "These fields and rules are checked during conversion — based on XRechnung 3.0 and the official DE-R rules by KoSIT.",
+        "required": {
+          "1": "Invoice number (BT-1)",
+          "2": "Invoice date (BT-2) in YYYY-MM-DD format",
+          "3": "Buyer Reference / Leitweg-ID (BT-10) — mandatory (DE-R-015)",
+          "4": "Seller: Name, street, city, postal code, country (BR-DE-1 to BR-DE-5)",
+          "5": "Seller: Contact person, phone, email (BR-DE-2)",
+          "6": "Seller: VAT ID or tax number (BR-CO-26)",
+          "7": "Seller: IBAN for SEPA transfer (BR-DE-23-a)",
+          "8": "Seller: Electronic address BT-34",
+          "9": "Buyer: Name, street, city, postal code, country (BR-DE-6 to BR-DE-11)",
+          "10": "Buyer: Electronic address BT-49",
+          "11": "Currency: EUR (BR-DE-18) — other currencies not allowed",
+          "12": "Payment terms or due date (BR-CO-25)"
+        },
+        "validation": {
+          "1": "EN 16931 base validation — required fields, data types, formats",
+          "2": "BR-DE-* rules (BR-DE-1 to BR-DE-29) — German business rules",
+          "3": "DE-R-* rules — Peppol-level Germany-specific (DE-R-001 to DE-R-031)",
+          "4": "Monetary consistency: subtotal + tax = total (BR-CO-10 to BR-CO-16)",
+          "5": "Line sum check: quantity × unit price = line amount",
+          "6": "Cash discount format check (#SKONTO#TAGE=N#PROZENT=N.NN#) per DE-R-018",
+          "7": "ISO 3166-1 alpha-2 country codes and ISO 4217 currency codes",
+          "8": "Reverse charge (AE): buyer and seller VAT IDs required"
+        },
+        "source": "Rules based on XRechnung Specification 3.0 by KoSIT (Coordination Office for IT Standards), Bremen.",
+        "sourceUrl": "https://xeinkauf.de/xrechnung/",
+        "sourceName": "KoSIT — XRechnung Specification"
       }
     },
     "xrechnungUbl": {
@@ -951,6 +985,36 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months."
         }
+      },
+      "requirements": {
+        "subtitle": "Same rules as XRechnung CII — only the XML syntax differs (UBL 2.1 instead of UN/CEFACT CII).",
+        "required": {
+          "1": "Invoice number (BT-1)",
+          "2": "Invoice date (BT-2) in YYYY-MM-DD format",
+          "3": "Buyer Reference / Leitweg-ID (BT-10) — mandatory (DE-R-015)",
+          "4": "Seller: Name, street, city, postal code, country (BR-DE-1 to BR-DE-5)",
+          "5": "Seller: Contact person, phone, email (BR-DE-2)",
+          "6": "Seller: VAT ID or tax number (BR-CO-26)",
+          "7": "Seller: IBAN for SEPA transfer (BR-DE-23-a)",
+          "8": "Seller: Electronic address BT-34",
+          "9": "Buyer: Name, street, city, postal code, country (BR-DE-6 to BR-DE-11)",
+          "10": "Buyer: Electronic address BT-49",
+          "11": "Currency: EUR (BR-DE-18) — other currencies not allowed",
+          "12": "Payment terms or due date (BR-CO-25)"
+        },
+        "validation": {
+          "1": "EN 16931 base validation — required fields, data types, formats",
+          "2": "BR-DE-* rules (BR-DE-1 to BR-DE-29) — German business rules",
+          "3": "DE-R-* rules — Peppol-level Germany-specific (DE-R-001 to DE-R-031)",
+          "4": "Monetary consistency: subtotal + tax = total (BR-CO-10 to BR-CO-16)",
+          "5": "Line sum check: quantity × unit price = line amount",
+          "6": "Cash discount format check (#SKONTO#TAGE=N#PROZENT=N.NN#) per DE-R-018",
+          "7": "ISO 3166-1 alpha-2 country codes and ISO 4217 currency codes",
+          "8": "Reverse charge (AE): buyer and seller VAT IDs required"
+        },
+        "source": "Rules based on XRechnung Specification 3.0 by KoSIT (Coordination Office for IT Standards), Bremen.",
+        "sourceUrl": "https://xeinkauf.de/xrechnung/",
+        "sourceName": "KoSIT — XRechnung Specification"
       }
     },
     "zugferd": {
@@ -1007,6 +1071,30 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions. Credits are valid for 12 months."
         }
+      },
+      "requirements": {
+        "subtitle": "ZUGFeRD 2.x is based on Factur-X EN 16931. The PDF contains embedded XML — both must be consistent.",
+        "required": {
+          "1": "Invoice number (BT-1) and invoice date (BT-2)",
+          "2": "Seller: Name, street, city, postal code, country",
+          "3": "Seller: VAT ID (at least one tax identifier)",
+          "4": "Buyer: Name and country code",
+          "5": "Currency (ISO 4217, e.g. EUR, USD, CHF)",
+          "6": "Payment terms or due date (EN 16931 profile)",
+          "7": "At least one line item with description, quantity and price",
+          "8": "Electronic addresses (BT-34/BT-49) optional — only for Peppol routing"
+        },
+        "validation": {
+          "1": "EN 16931 core validation — all required fields and data types",
+          "2": "Monetary consistency between lines, taxes and totals",
+          "3": "Tax category codes: S, Z, E, AE, K, G, O, L, M",
+          "4": "ISO 3166-1 country codes and ISO 4217 currency codes",
+          "5": "PDF/A-3 conformity for the output file",
+          "6": "XML-PDF consistency — embedded data must match the PDF"
+        },
+        "source": "ZUGFeRD is maintained by the Forum elektronische Rechnung Deutschland (FeRD). Technically identical to Factur-X (German-French standard).",
+        "sourceUrl": "https://www.ferd-net.de/standards/zugferd/index.html",
+        "sourceName": "FeRD — ZUGFeRD Standard"
       }
     },
     "facturx": {
@@ -1059,6 +1147,26 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "Factur-X Basic is a simplified profile — fewer required fields than EN 16931, ideal for simple invoices.",
+        "required": {
+          "1": "Invoice number (BT-1) and invoice date (BT-2)",
+          "2": "Seller: Name, street, city, postal code, country",
+          "3": "Seller: VAT ID (at least one tax identifier)",
+          "4": "Buyer: Name and country code",
+          "5": "Currency (ISO 4217)",
+          "6": "At least one line item"
+        },
+        "validation": {
+          "1": "EN 16931 base rules (simplified for Basic profile)",
+          "2": "Monetary consistency — sum checks",
+          "3": "Tax category codes per EN 16931",
+          "4": "PDF/A-3 output format"
+        },
+        "source": "Factur-X is jointly maintained by FNFE-MPE (France) and FeRD (Germany).",
+        "sourceUrl": "https://fnfe-mpe.org/factur-x/",
+        "sourceName": "FNFE-MPE — Factur-X"
       }
     },
     "peppol": {
@@ -1111,6 +1219,30 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "Peppol BIS Billing 3.0 requires Electronic Addresses (Endpoint IDs) and strict EAS scheme validation.",
+        "required": {
+          "1": "Invoice number (BT-1) and invoice date (BT-2)",
+          "2": "Seller: Name, street, city, postal code, country",
+          "3": "Seller: VAT ID or tax identifier",
+          "4": "Seller: Electronic address BT-34 + EAS scheme (e.g. 0088, 0192)",
+          "5": "Buyer: Electronic address BT-49 + EAS scheme",
+          "6": "Currency (ISO 4217)",
+          "7": "Payment terms",
+          "8": "At least one line item with tax category"
+        },
+        "validation": {
+          "1": "PEPPOL-EN16931-R010/R020: Electronic addresses for buyer and seller",
+          "2": "EAS scheme validation (116 valid codes, e.g. 0088 EAN, 0184 Peppol)",
+          "3": "Tax categories: S, Z, E, AE, K, G, O, L, M",
+          "4": "ISO 3166-1 country codes",
+          "5": "Reverse charge (AE): VAT IDs for both parties required",
+          "6": "Credit notes (381): Preceding invoice reference (BT-25) required"
+        },
+        "source": "Rules based on Peppol BIS Billing 3.0 v3.0.20 (May 2025), maintained by OpenPeppol.",
+        "sourceUrl": "https://docs.peppol.eu/poacc/billing/3.0/",
+        "sourceName": "OpenPeppol — BIS Billing 3.0"
       }
     },
     "fatturapa": {
@@ -1164,6 +1296,29 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "FatturaPA follows the Italian SDI specification (Version 1.4) — not EN 16931. Own rules for tax IDs and routing.",
+        "required": {
+          "1": "Invoice number and invoice date",
+          "2": "Seller: Partita IVA (IT + 11 digits, e.g. IT01234567890)",
+          "3": "Seller: Full address (street, city, postal code, country)",
+          "4": "Buyer: Partita IVA or Codice Fiscale",
+          "5": "CodiceDestinatario: 7-character SDI routing code (e.g. ABCDEF1) or 0000000 for PEC",
+          "6": "Currency (ISO 4217)",
+          "7": "At least one line with description, quantity, price and tax rate (AliquotaIVA)"
+        },
+        "validation": {
+          "1": "FPA-010: Seller Partita IVA format (country code + number)",
+          "2": "FPA-020: Buyer identification (P.IVA or Codice Fiscale)",
+          "3": "FPA-021: CodiceDestinatario — exactly 7 alphanumeric characters",
+          "4": "FPA-036: RegimeFiscale (RF01–RF19) — Default: RF01 Ordinario",
+          "5": "Natura code mapping: 0% lines require tax category (E, Z, AE, K, G, O)",
+          "6": "Document type mapping: 380→TD01, 381→TD04, 384→TD05"
+        },
+        "source": "FatturaPA Specification v1.4, maintained by Agenzia delle Entrate (Italian Revenue Agency).",
+        "sourceUrl": "https://www.fatturapa.gov.it/it/norme-e-regole/documentazione-fattura-elettronica/formato-fatturapa/",
+        "sourceName": "Agenzia delle Entrate — FatturaPA"
       }
     },
     "ksef": {
@@ -1217,6 +1372,27 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "KSeF FA(3) has been mandatory in Poland since 01.02.2026. Own schema with NIP validation and Polish tax rates.",
+        "required": {
+          "1": "Seller: NIP (10-digit Polish tax ID)",
+          "2": "Buyer: NIP or company name",
+          "3": "Invoice number (max. 256 characters)",
+          "4": "Invoice date",
+          "5": "Currency (ISO 4217)",
+          "6": "At least one line with description, quantity, price and tax rate",
+          "7": "Total amount"
+        },
+        "validation": {
+          "1": "KSEF-01: NIP validation — exactly 10 digits",
+          "2": "KSEF-08: Polish tax rates: 23%, 22%, 8%, 7%, 5%, 0%, zw (exempt), np (not applicable)",
+          "3": "Line items: description, quantity and unit price are mandatory",
+          "4": "ISO 4217 currency codes"
+        },
+        "source": "KSeF (National e-Invoice System) is operated by the Polish Ministry of Finance. FA(3) schema since 01.02.2026.",
+        "sourceUrl": "https://www.podatki.gov.pl/ksef/",
+        "sourceName": "Polish Ministry of Finance — KSeF"
       }
     },
     "nlcius": {
@@ -1269,6 +1445,24 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "NLCIUS extends Peppol BIS 3.0 with Dutch requirements: OIN/KVK endpoints and BTW format.",
+        "required": {
+          "1": "All Peppol BIS 3.0 required fields (see Peppol page)",
+          "2": "Seller: OIN (scheme 0190, 20 digits) or KVK (scheme 0106, 8 digits)",
+          "3": "Buyer: OIN or KVK as electronic address",
+          "4": "Seller: BTW number (NL + 9 digits + B + 2 digits)"
+        },
+        "validation": {
+          "1": "All Peppol validation rules (PEPPOL-EN16931-R*)",
+          "2": "OIN format: exactly 20 digits (scheme ID 0190)",
+          "3": "KVK format: exactly 8 digits (scheme ID 0106)",
+          "4": "BTW format: NLxxxxxxxxxBxx (e.g. NL123456789B01)"
+        },
+        "source": "NLCIUS (SI-UBL 2.0) is maintained by Logius (Dutch Government).",
+        "sourceUrl": "https://www.logius.nl/domeinen/gegevensuitwisseling/si-ubl",
+        "sourceName": "Logius — SI-UBL / NLCIUS"
       }
     },
     "ciusRo": {
@@ -1321,6 +1515,22 @@
           "q": "How much does conversion cost?",
           "a": "Free credits on signup. After that, from €9.99 for 10 conversions."
         }
+      },
+      "requirements": {
+        "subtitle": "CIUS-RO extends Peppol BIS 3.0 with Romanian requirements: CUI/CIF tax identifier and RO VAT ID format.",
+        "required": {
+          "1": "All Peppol BIS 3.0 required fields (see Peppol page)",
+          "2": "Seller: VAT ID in format RO + 2–10 digits",
+          "3": "CUI/CIF: Optional \"RO\" prefix + up to 10 digits"
+        },
+        "validation": {
+          "1": "All Peppol validation rules (PEPPOL-EN16931-R*)",
+          "2": "RO VAT format: RO + 2–10 digits (e.g. RO12345678)",
+          "3": "CUI/CIF format: Optional \"RO\" + up to 10 digits"
+        },
+        "source": "CIUS-RO is operated by the Romanian ANAF (Tax Authority). Based on Peppol BIS 3.0.",
+        "sourceUrl": "https://www.anaf.ro/anaf/internet/ANAF/despre_ANAF/strategii_si_proiecte/factura_electronica",
+        "sourceName": "ANAF — CIUS-RO"
       }
     }
   }

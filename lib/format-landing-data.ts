@@ -22,6 +22,10 @@ export interface FormatLandingConfig {
   relatedSlugs: string[];
   /** Number of FAQ items for this format */
   faqCount: number;
+  /** Number of required fields listed on landing page */
+  requiredFieldCount: number;
+  /** Number of validation rules listed on landing page */
+  validationRuleCount: number;
   /** Is this a "popular" format (shown first in hub) */
   popular: boolean;
 }
@@ -37,6 +41,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: true,
     relatedSlugs: ['pdf-to-xrechnung-ubl', 'pdf-to-zugferd', 'pdf-to-peppol'],
     faqCount: 5,
+    requiredFieldCount: 12,
+    validationRuleCount: 8,
     popular: true,
   },
   {
@@ -49,6 +55,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: true,
     relatedSlugs: ['pdf-to-xrechnung', 'pdf-to-peppol', 'pdf-to-zugferd'],
     faqCount: 4,
+    requiredFieldCount: 12,
+    validationRuleCount: 8,
     popular: true,
   },
   {
@@ -61,6 +69,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-xrechnung', 'pdf-to-facturx', 'pdf-to-peppol'],
     faqCount: 5,
+    requiredFieldCount: 8,
+    validationRuleCount: 6,
     popular: true,
   },
   {
@@ -73,6 +83,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-zugferd', 'pdf-to-peppol', 'pdf-to-xrechnung'],
     faqCount: 4,
+    requiredFieldCount: 6,
+    validationRuleCount: 4,
     popular: false,
   },
   {
@@ -85,6 +97,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-xrechnung', 'pdf-to-zugferd', 'pdf-to-fatturapa'],
     faqCount: 4,
+    requiredFieldCount: 8,
+    validationRuleCount: 6,
     popular: true,
   },
   {
@@ -97,6 +111,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-peppol', 'pdf-to-xrechnung', 'pdf-to-ksef'],
     faqCount: 4,
+    requiredFieldCount: 7,
+    validationRuleCount: 6,
     popular: false,
   },
   {
@@ -109,6 +125,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-peppol', 'pdf-to-xrechnung', 'pdf-to-cius-ro'],
     faqCount: 4,
+    requiredFieldCount: 7,
+    validationRuleCount: 4,
     popular: false,
   },
   {
@@ -121,6 +139,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-peppol', 'pdf-to-xrechnung', 'pdf-to-cius-ro'],
     faqCount: 4,
+    requiredFieldCount: 4,
+    validationRuleCount: 4,
     popular: false,
   },
   {
@@ -133,6 +153,8 @@ export const FORMAT_LANDING_CONFIGS: FormatLandingConfig[] = [
     leitwegRelevant: false,
     relatedSlugs: ['pdf-to-peppol', 'pdf-to-xrechnung', 'pdf-to-nlcius'],
     faqCount: 4,
+    requiredFieldCount: 3,
+    validationRuleCount: 3,
     popular: false,
   },
 ];

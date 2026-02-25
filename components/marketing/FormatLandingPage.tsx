@@ -17,6 +17,14 @@ export default async function FormatLandingPage({ config }: FormatLandingPagePro
     .map((slug) => FORMAT_LANDING_CONFIGS.find((c) => c.slug === slug))
     .filter(Boolean) as FormatLandingConfig[];
 
+  // Build requirements lists from i18n (counts from config)
+  const requiredFields = Array.from({ length: config.requiredFieldCount }, (_, i) =>
+    t(`requirements.required.${i + 1}`)
+  );
+  const validationRules = Array.from({ length: config.validationRuleCount }, (_, i) =>
+    t(`requirements.validation.${i + 1}`)
+  );
+
   // Build FAQ JSON-LD
   const faqItems = Array.from({ length: config.faqCount }, (_, i) => ({
     question: t(`faq.${i + 1}.q`),
@@ -198,6 +206,62 @@ export default async function FormatLandingPage({ config }: FormatLandingPagePro
                 <p className="text-faded leading-relaxed">{t(`howItWorks.step${step.num}.desc`)}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Requirements & Validation */}
+        <div className="max-w-4xl mx-auto mb-16 md:mb-24">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4 font-display">
+              {tCommon('requirementsTitle')}
+            </h2>
+            <p className="text-lg text-faded max-w-2xl mx-auto">{t('requirements.subtitle')}</p>
+          </div>
+
+          {/* Required Fields */}
+          <div className="glass-card p-6 md:p-8 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span className="text-red-400">●</span> {tCommon('requiredFields')}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {requiredFields.map((text, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm">
+                  <span className="text-red-400 mt-0.5 shrink-0">✱</span>
+                  <span className="text-slate-300">{text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Validation Rules */}
+          <div className="glass-card p-6 md:p-8 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span className="text-sky-400">✓</span> {tCommon('validationRules')}
+            </h3>
+            <div className="space-y-2">
+              {validationRules.map((text, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm">
+                  <span className="text-sky-400 mt-0.5 shrink-0">✓</span>
+                  <span className="text-slate-300">{text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Official Source */}
+          <div className="glass-card p-6 md:p-8 border-amber-400/20">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <span>📋</span> {tCommon('officialSource')}
+            </h3>
+            <p className="text-sm text-faded mb-3">{t('requirements.source')}</p>
+            <a
+              href={t('requirements.sourceUrl')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-sky-300 hover:text-sky-200 underline underline-offset-2"
+            >
+              {t('requirements.sourceName')} ↗
+            </a>
           </div>
         </div>
 

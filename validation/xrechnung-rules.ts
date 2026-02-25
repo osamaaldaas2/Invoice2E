@@ -4,7 +4,7 @@
  */
 
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
-import { createError, createWarning, type ValidationError } from './validation-result';
+import { createError, type ValidationError } from './validation-result';
 
 /**
  * Run all BR-DE profile rules for XRechnung 3.0 CII.
