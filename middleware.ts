@@ -81,9 +81,14 @@ export default function middleware(request: NextRequest) {
   const isValidLocale = SUPPORTED_LOCALES.includes(localeCookie as 'en' | 'de');
 
   if (!isValidLocale) {
+    // Detect preferred locale from Accept-Language header
+    const acceptLang = request.headers.get('accept-language') || '';
+    const preferredLocale =
+      SUPPORTED_LOCALES.find((loc) => acceptLang.toLowerCase().includes(loc)) || DEFAULT_LOCALE;
+
     const response = NextResponse.next();
     // FIX: Audit V2 [F-021] — add secure flag to prevent cookie over HTTP
-    response.cookies.set(LOCALE_COOKIE_NAME, DEFAULT_LOCALE, {
+    response.cookies.set(LOCALE_COOKIE_NAME, preferredLocale, {
       path: '/',
       maxAge: 60 * 60 * 24 * 365, // 1 year
       sameSite: 'lax',

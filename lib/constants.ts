@@ -42,9 +42,9 @@ export const DEFAULT_VAT_RATE = 19; // Standard German VAT rate
 export const REDUCED_VAT_RATE = 7; // Reduced German VAT rate
 
 // Internationalization
-export const SUPPORTED_LOCALES = ['en', 'de'] as const;
+export const SUPPORTED_LOCALES = ['de', 'en'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
-export const DEFAULT_LOCALE = 'en';
+export const DEFAULT_LOCALE = 'de';
 export const LOCALE_COOKIE_NAME = 'locale';
 
 // Pagination defaults
