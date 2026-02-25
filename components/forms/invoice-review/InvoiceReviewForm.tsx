@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useInvoiceReviewForm } from './useInvoiceReviewForm';
 import { InvoiceDetailsSection } from './InvoiceDetailsSection';
@@ -9,7 +10,7 @@ import { PaymentSection } from './PaymentSection';
 import { TotalsSection } from './TotalsSection';
 import { AllowancesChargesSection } from './AllowancesChargesSection';
 import { ReadinessPanel } from './ReadinessPanel';
-import { FormatSelector, useFormatPreference } from './FormatSelector';
+import { FormatSelector, FormatPreselected, useFormatPreference } from './FormatSelector';
 import { FORMAT_FIELD_CONFIG } from '@/lib/format-field-config';
 
 interface InvoiceReviewFormProps {
@@ -43,7 +44,8 @@ export default function InvoiceReviewForm({
 }: InvoiceReviewFormProps) {
   const t = useTranslations('invoiceReview');
   const tCommon = useTranslations('common');
-  const [outputFormat, setOutputFormat] = useFormatPreference();
+  const [outputFormat, setOutputFormat, hasPreselection] = useFormatPreference();
+  const [showFormatSelector, setShowFormatSelector] = useState(false);
   const { form, onSubmit, isSubmitting, submitError, submitSuccess } = useInvoiceReviewForm({
     extractionId,
     userId,
@@ -163,8 +165,16 @@ export default function InvoiceReviewForm({
         initialTotals={initialTotals}
       />
 
-      {/* Output Format Selector */}
-      <FormatSelector value={outputFormat} onChange={setOutputFormat} />
+      {/* Output Format Selector — collapsed if pre-selected in dashboard */}
+      {hasPreselection ? (
+        <FormatPreselected
+          value={outputFormat}
+          onChangeClick={() => setShowFormatSelector((prev) => !prev)}
+        />
+      ) : null}
+      {(!hasPreselection || showFormatSelector) && (
+        <FormatSelector value={outputFormat} onChange={setOutputFormat} />
+      )}
 
       {/* Notes */}
       <div className="border-t border-white/10 pt-4">
