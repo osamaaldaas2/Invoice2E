@@ -52,6 +52,7 @@ function computeFormatReadiness(
   format: OutputFormat
 ): { ready: boolean; missing: string[] } {
   if (!data) return { ready: false, missing: ['Daten nicht geladen'] };
+
   const d = (data as any)?.extractionData || data;
   const config = FORMAT_FIELD_CONFIG[format] ?? FORMAT_FIELD_CONFIG['xrechnung-cii'];
   const missing: string[] = [];
@@ -504,7 +505,7 @@ export default function BulkUploadForm() {
 
   // Compute per-invoice readiness using format-aware logic
   const computeReadiness = useCallback(
-    (data: any, extractionId: string): 'ready' | 'warning' => {
+    (data: Record<string, unknown> | null, extractionId: string): 'ready' | 'warning' => {
       const format = getExtractionFormat(extractionId);
       const { ready } = computeFormatReadiness(data, format);
       return ready ? 'ready' : 'warning';
@@ -513,7 +514,7 @@ export default function BulkUploadForm() {
   );
 
   const getMissingFields = useCallback(
-    (data: any, extractionId: string): string[] => {
+    (data: Record<string, unknown> | null, extractionId: string): string[] => {
       const format = getExtractionFormat(extractionId);
       const { missing } = computeFormatReadiness(data, format);
       return missing;

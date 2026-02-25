@@ -61,6 +61,12 @@ export const RATE_LIMIT_PRESETS = {
         windowMs: 60 * 1000,            // 1 minute
         blockDurationMs: 2 * 60 * 1000, // 2 minutes
     },
+    // F-019: Tighter limit for invoice/file downloads (DB-heavy)
+    download: {
+        maxAttempts: 30,
+        windowMs: 60 * 1000,            // 1 minute
+        blockDurationMs: 60 * 1000,     // 1 minute
+    },
 };
 
 // Check if Redis is configured

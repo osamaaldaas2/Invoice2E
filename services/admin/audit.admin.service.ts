@@ -129,6 +129,7 @@ class AdminAuditService {
       throw new AppError('AUDIT_FETCH_ERROR', 'Failed to fetch audit logs', 500);
     }
 
+
     const logs: AdminAuditLog[] = (data || []).map((row: any) => {
       const admin = Array.isArray(row.admin) ? row.admin[0] : row.admin;
       const target = Array.isArray(row.target) ? row.target[0] : row.target;

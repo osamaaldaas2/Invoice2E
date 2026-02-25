@@ -65,12 +65,14 @@ export interface InvoiceReviewFormValues {
   totalAmount: number;
   notes: string;
   // Legacy flat fields for compatibility if needed during transition, though structured address preferred
+
   [key: string]: any;
 }
 
 interface UseInvoiceReviewFormProps {
   extractionId: string;
   userId: string;
+
   initialData: any;
   onSubmitSuccess?: () => void;
   outputFormat?: OutputFormat;
@@ -121,6 +123,7 @@ export const useInvoiceReviewForm = ({
 
   const defaultItems =
     sourceItems.length > 0
+
       ? sourceItems.map((item: any) => {
           const hasItemTaxRate =
             item?.taxRate !== null && item?.taxRate !== undefined && item?.taxRate !== '';
@@ -153,6 +156,7 @@ export const useInvoiceReviewForm = ({
   const sourceAllowanceCharges = Array.isArray(initialData?.allowanceCharges)
     ? initialData.allowanceCharges
     : [];
+
   const defaultAllowanceCharges = sourceAllowanceCharges.map((ac: any) => ({
     chargeIndicator: ac?.chargeIndicator === true,
     amount: Number(ac?.amount) || 0,

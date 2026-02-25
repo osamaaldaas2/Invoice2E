@@ -43,3 +43,6 @@ yarn-debug.log*
 
 # Schematron validation artifacts
 tmp/
+
+TASK-*.md
+AUDIT-V3-FIXES.md

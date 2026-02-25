@@ -42,11 +42,7 @@ const nextConfig = {
                     { key: 'X-XSS-Protection', value: '0' },  // FIX: Re-audit #54 — CSP replaces deprecated XSS auditor
                     { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
                     { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-                    {
-                        // FIX: Re-audit #55 — CSP with frame-ancestors, base-uri, form-action
-                        key: 'Content-Security-Policy',
-                        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.paypal.com https://www.sandbox.paypal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.stripe.com https://www.paypal.com https://*.supabase.co https://*.ingest.sentry.io; frame-src https://js.stripe.com https://www.paypal.com https://www.sandbox.paypal.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-                    }
+                    // CSP is defined in middleware.ts as the single source of truth [F-015]
                 ]
             }
         ];

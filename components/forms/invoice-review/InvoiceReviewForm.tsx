@@ -15,6 +15,7 @@ import { FORMAT_FIELD_CONFIG } from '@/lib/format-field-config';
 interface InvoiceReviewFormProps {
   extractionId: string;
   userId: string;
+
   initialData: any;
   confidence: number;
   onSubmitSuccess?: () => void;

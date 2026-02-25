@@ -43,6 +43,7 @@ export class OpenAIExtractor implements IAIExtractor {
         }
       }
 
+
       const result = await (this.adapter as any).extractWithStructuredOutputs(buffer, fileType, {
         extractedText,
       });

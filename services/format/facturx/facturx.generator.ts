@@ -274,6 +274,7 @@ async function buildPdf(
   await doc.attach(xmlBase64, 'factur-x.xml', {
     mimeType: 'text/xml',
     description: 'Factur-X CII XML Invoice',
+
     afRelationship: 'Alternative' as any,
   });
 
@@ -336,6 +337,7 @@ async function buildPdf(
           const namesArray = embeddedFiles.get(PDFName.of('Names'));
           if (namesArray && namesArray instanceof PDFArray) {
             // Names array is [string, ref, string, ref, ...] — get the filespec ref
+
             const afArray = context.obj([] as any[]);
             for (let i = 1; i < namesArray.size(); i += 2) {
               (afArray as PDFArray).push(namesArray.get(i)!);

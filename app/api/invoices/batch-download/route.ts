@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         const outputFormat: OutputFormat =
           (extraction.outputFormat as OutputFormat) ||
           (data.outputFormat as OutputFormat) ||
-          detectFormatFromData(data as any) ||
+          detectFormatFromData(data as Record<string, unknown>) ||
           'xrechnung-cii';
 
         logger.info('Batch download - reading extraction', {
@@ -101,23 +101,25 @@ export async function POST(request: NextRequest) {
 
         // Auto-recompute totals from line items to fix AI extraction rounding errors
         const rawLineItems = Array.isArray(serviceData.lineItems)
-          ? serviceData.lineItems as any[]
+          ? serviceData.lineItems as Record<string, unknown>[]
           : Array.isArray(serviceData.line_items)
-            ? serviceData.line_items as any[]
+            ? serviceData.line_items as Record<string, unknown>[]
             : [];
         if (rawLineItems.length > 0) {
           serviceData.lineItems = rawLineItems;
-          const monetaryLines: MonetaryLineItem[] = rawLineItems.map((item: any) => ({
+          const monetaryLines: MonetaryLineItem[] = rawLineItems.map((item: Record<string, unknown>) => ({
             netAmount: roundMoney(Number(item.totalPrice ?? item.lineTotal ?? 0) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
             taxRate: Number(item.taxRate ?? item.vatRate ?? serviceData.taxRate ?? 19),
-            taxCategoryCode: item.taxCategoryCode,
+            taxCategoryCode: item.taxCategoryCode as string | undefined,
           }));
+
           const acList = Array.isArray(serviceData.allowanceCharges) ? serviceData.allowanceCharges as any[] : [];
+
           const monetaryAC: MonetaryAllowanceCharge[] = acList.map((ac: any) => ({
-            chargeIndicator: ac.chargeIndicator,
+            chargeIndicator: Boolean(ac.chargeIndicator),
             amount: Number(ac.amount) || 0,
             taxRate: ac.taxRate != null ? Number(ac.taxRate) : undefined,
-            taxCategoryCode: ac.taxCategoryCode ?? undefined,
+            taxCategoryCode: ac.taxCategoryCode as string | undefined,
           }));
           const recomputed = recomputeTotals(monetaryLines, monetaryAC);
 

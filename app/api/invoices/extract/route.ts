@@ -170,6 +170,7 @@ async function handleExtractPost(request: NextRequest) {
         deleteQuarantine: async () => {},
         insertEntry: async () => {},
         updateEntry: async () => {},
+
         getEntry: async (id) => quarantineEntries.get(id) as any,
         getExpiredEntries: async () => [],
       });

@@ -103,6 +103,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           .select('*')
           .lte('next_run_at', asOf.toISOString())
           .eq('enabled', true);
+
         return (data ?? []) as any[];
       },
       updateScheduleNextRun: async (policyId, nextRunAt) => {

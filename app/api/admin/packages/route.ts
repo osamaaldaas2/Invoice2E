@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 import { handleApiError } from '@/lib/api-helpers';
+import type { CreditPackage } from '@/types/credit-package';
 const CreatePackageSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
@@ -56,15 +57,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const formattedPackages = packages.map((pkg: any) => ({
+    const formattedPackages = packages.map((pkg: CreditPackage) => ({
       id: pkg.id,
       name: pkg.name,
       description: pkg.description,
       credits: pkg.credits,
-      price: parseFloat(pkg.price),
+      price: parseFloat(String(pkg.price)),
       currency: pkg.currency,
       isActive: pkg.is_active,
-      isFeatured: pkg.is_featured,
+      isFeatured: pkg.is_popular,
       sortOrder: pkg.sort_order,
       createdAt: pkg.created_at,
       updatedAt: pkg.updated_at,

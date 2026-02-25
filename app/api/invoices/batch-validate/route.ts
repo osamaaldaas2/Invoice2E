@@ -69,27 +69,29 @@ export async function POST(request: NextRequest) {
         const outputFormat: OutputFormat =
           (extraction.outputFormat as OutputFormat) ||
           (data.outputFormat as OutputFormat) ||
-          detectFormatFromData(data as any) ||
+          detectFormatFromData(data as Record<string, unknown>) ||
           'xrechnung-cii';
 
         // Auto-recompute totals from line items to fix AI extraction rounding errors
-        const rawItems = Array.isArray(data.lineItems) ? data.lineItems as any[]
-          : Array.isArray(data.line_items) ? data.line_items as any[] : [];
+        const rawItems = Array.isArray(data.lineItems) ? data.lineItems as Record<string, unknown>[]
+          : Array.isArray(data.line_items) ? data.line_items as Record<string, unknown>[] : [];
 
         const dataCopy = { ...data };
         if (rawItems.length > 0) {
           dataCopy.lineItems = rawItems;
-          const monetaryLines: MonetaryLineItem[] = rawItems.map((item: any) => ({
+          const monetaryLines: MonetaryLineItem[] = rawItems.map((item: Record<string, unknown>) => ({
             netAmount: roundMoney(Number(item.totalPrice ?? item.lineTotal ?? 0) || (Number(item.unitPrice || 0) * Number(item.quantity || 1))),
             taxRate: Number(item.taxRate ?? item.vatRate ?? data.taxRate ?? 19),
-            taxCategoryCode: item.taxCategoryCode,
+            taxCategoryCode: item.taxCategoryCode as string | undefined,
           }));
+
           const acList = Array.isArray(data.allowanceCharges) ? data.allowanceCharges as any[] : [];
+
           const monetaryAC: MonetaryAllowanceCharge[] = acList.map((ac: any) => ({
-            chargeIndicator: ac.chargeIndicator,
+            chargeIndicator: Boolean(ac.chargeIndicator),
             amount: Number(ac.amount) || 0,
             taxRate: ac.taxRate != null ? Number(ac.taxRate) : undefined,
-            taxCategoryCode: ac.taxCategoryCode ?? undefined,
+            taxCategoryCode: ac.taxCategoryCode as string | undefined,
           }));
           const recomputed = recomputeTotals(monetaryLines, monetaryAC);
 
