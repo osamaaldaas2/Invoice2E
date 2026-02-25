@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
-    const body = parsed.data as Record<string, unknown>;
+    const body = parsed.data as { name: string; [key: string]: string | undefined };
 
     const templateData: TemplateData = {
       name: body.name,
