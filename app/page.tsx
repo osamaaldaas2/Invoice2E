@@ -5,6 +5,7 @@ import ValidationPipeline from '@/components/home/ValidationPipeline';
 import Upload3DIcon from '@/components/home/Upload3DIcon';
 import AI3DIcon from '@/components/home/AI3DIcon';
 import Success3DIcon from '@/components/home/Success3DIcon';
+import SupportedFormats from '@/components/home/SupportedFormats';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
@@ -343,6 +344,9 @@ export default async function Home() {
             </div>
           </div>
         </div>
+
+        {/* Supported Formats Grid */}
+        <SupportedFormats />
 
         {/* Pricing Preview */}
         <div className="max-w-4xl mx-auto mb-24 md:mb-32">
