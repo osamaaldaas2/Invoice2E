@@ -1,7 +1,11 @@
 import { useTranslations } from 'next-intl';
 
+const SECTION_COUNT = 12;
+
 export default function TermsPage(): React.ReactElement {
   const t = useTranslations('terms');
+
+  const sections = Array.from({ length: SECTION_COUNT }, (_, i) => i + 1);
 
   return (
     <div className="min-h-screen py-16">
@@ -14,30 +18,12 @@ export default function TermsPage(): React.ReactElement {
           <div className="prose prose-invert max-w-none space-y-6 text-slate-300">
             <p className="text-faded text-sm">{t('lastUpdated')}</p>
 
-            <section>
-              <h2 className="text-xl font-semibold text-white mb-3">{t('section1Title')}</h2>
-              <p>{t('section1Content')}</p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold text-white mb-3">{t('section2Title')}</h2>
-              <p>{t('section2Content')}</p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold text-white mb-3">{t('section3Title')}</h2>
-              <p>{t('section3Content')}</p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold text-white mb-3">{t('section4Title')}</h2>
-              <p>{t('section4Content')}</p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold text-white mb-3">{t('section5Title')}</h2>
-              <p>{t('section5Content')}</p>
-            </section>
+            {sections.map((n) => (
+              <section key={n}>
+                <h2 className="text-xl font-semibold text-white mb-3">{t(`section${n}Title`)}</h2>
+                <p className="whitespace-pre-line">{t(`section${n}Content`)}</p>
+              </section>
+            ))}
           </div>
         </div>
       </div>

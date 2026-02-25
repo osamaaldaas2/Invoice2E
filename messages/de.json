@@ -762,5 +762,33 @@
     "section6Content": "Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.",
     "section7Title": "Haftung für Links",
     "section7Content": "Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen."
+  },
+  "terms": {
+    "title": "Nutzungsbedingungen",
+    "lastUpdated": "Stand: Februar 2026",
+    "section1Title": "1. Geltungsbereich",
+    "section1Content": "Diese Nutzungsbedingungen gelten für die Nutzung der Webanwendung Invoice2E (https://www.invoice2e.eu), betrieben von Osama Aldaas, Herrenstr. 18d, 24768 Rendsburg. Mit der Registrierung und Nutzung von Invoice2E erklären Sie sich mit diesen Bedingungen einverstanden.",
+    "section2Title": "2. Leistungsbeschreibung",
+    "section2Content": "Invoice2E ist ein KI-gestützter Dienst zur Konvertierung von PDF-Rechnungen in elektronische Rechnungsformate wie XRechnung und ZUGFeRD. Die Konvertierung erfolgt mithilfe von KI-Diensten (Mistral AI, OpenAI, Google Gemini). Invoice2E garantiert keine fehlerfreie Erkennung oder Konvertierung. Der Nutzer ist verpflichtet, die extrahierten Daten vor der endgültigen Verwendung zu überprüfen.",
+    "section3Title": "3. Registrierung und Nutzerkonto",
+    "section3Content": "Für die Nutzung von Invoice2E ist eine Registrierung erforderlich. Sie sind verpflichtet, korrekte und vollständige Angaben zu machen und Ihre Zugangsdaten vertraulich zu behandeln. Sie haften für alle Aktivitäten, die über Ihr Konto erfolgen. Invoice2E behält sich das Recht vor, Konten bei Verstoß gegen diese Bedingungen zu sperren oder zu löschen.",
+    "section4Title": "4. Credits und Zahlungsbedingungen",
+    "section4Content": "Invoice2E arbeitet mit einem Credit-System. Credits werden über Pakete erworben und sind ab Kaufdatum 12 Monate gültig. Nach Ablauf verfallen nicht genutzte Credits ersatzlos. Die Zahlung erfolgt über Stripe oder PayPal. Es handelt sich um Einmalkäufe — es gibt keine Abonnements oder automatischen Verlängerungen. Preise können jederzeit für zukünftige Käufe angepasst werden. Bereits erworbene Credits bleiben davon unberührt.",
+    "section5Title": "5. Widerrufsrecht",
+    "section5Content": "Da es sich bei Invoice2E um einen digitalen Dienst handelt, der auf ausdrücklichen Wunsch des Nutzers sofort nach dem Kauf bereitgestellt wird, erlischt das Widerrufsrecht gemäß § 356 Abs. 5 BGB mit Beginn der Vertragserfüllung. Mit dem Kauf von Credits stimmen Sie dem ausdrücklich zu.",
+    "section6Title": "6. Nutzungsregeln",
+    "section6Content": "Sie verpflichten sich, Invoice2E nur für rechtmäßige Zwecke zu nutzen. Insbesondere ist es untersagt: den Dienst für betrügerische oder illegale Aktivitäten zu verwenden, das System durch übermäßige Anfragen zu belasten oder zu manipulieren, Sicherheitsmaßnahmen zu umgehen oder zu beeinträchtigen, den Dienst für automatisierte Massenabfragen ohne vorherige Genehmigung zu nutzen.",
+    "section7Title": "7. Haftungsbeschränkung",
+    "section7Content": "Invoice2E wird \"wie besehen\" bereitgestellt. Wir übernehmen keine Gewähr für die Richtigkeit, Vollständigkeit oder Aktualität der durch die KI extrahierten Rechnungsdaten. Der Nutzer ist allein verantwortlich für die Überprüfung und Verwendung der konvertierten Daten. Eine Haftung für indirekte Schäden, entgangenen Gewinn oder Datenverlust ist ausgeschlossen, soweit gesetzlich zulässig. Die Haftung ist in jedem Fall auf den vom Nutzer gezahlten Betrag für die betreffenden Credits begrenzt.",
+    "section8Title": "8. Verfügbarkeit",
+    "section8Content": "Wir bemühen uns um eine hohe Verfügbarkeit von Invoice2E, können jedoch keine ununterbrochene Erreichbarkeit garantieren. Wartungsarbeiten, Updates oder technische Störungen können zu vorübergehenden Einschränkungen führen. Ein Anspruch auf Verfügbarkeit besteht nicht.",
+    "section9Title": "9. Datenschutz",
+    "section9Content": "Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung. Hochgeladene Rechnungsdaten werden ausschließlich zum Zweck der Konvertierung verarbeitet und nach der Verarbeitung gelöscht.",
+    "section10Title": "10. Änderungen der Nutzungsbedingungen",
+    "section10Content": "Wir behalten uns vor, diese Nutzungsbedingungen jederzeit zu ändern. Über wesentliche Änderungen werden registrierte Nutzer per E-Mail informiert. Die fortgesetzte Nutzung des Dienstes nach Inkrafttreten der Änderungen gilt als Zustimmung.",
+    "section11Title": "11. Kündigung",
+    "section11Content": "Sie können Ihr Konto jederzeit löschen. Invoice2E kann Konten bei Verstoß gegen diese Nutzungsbedingungen ohne Vorankündigung sperren oder löschen. Bei Kündigung verfallen nicht genutzte Credits, sofern die Kündigung durch den Nutzer erfolgt oder auf einen Verstoß gegen diese Bedingungen zurückzuführen ist.",
+    "section12Title": "12. Anwendbares Recht und Gerichtsstand",
+    "section12Content": "Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand für Streitigkeiten mit Unternehmern ist Rendsburg. Für Verbraucher gelten die gesetzlichen Regelungen zum Gerichtsstand."
   }
 }

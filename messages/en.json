@@ -762,5 +762,33 @@
     "section6Content": "As a service provider, we are responsible for our own content on these pages in accordance with § 7 (1) TMG. However, according to §§ 8 to 10 TMG, we are not obligated to monitor transmitted or stored third-party information or to investigate circumstances that indicate illegal activity. Obligations to remove or block the use of information under general law remain unaffected. However, liability in this regard is only possible from the time of knowledge of a specific infringement. Upon becoming aware of such violations, we will remove this content immediately.",
     "section7Title": "Liability for Links",
     "section7Content": "Our website contains links to external third-party websites over whose content we have no influence. Therefore, we cannot assume any liability for this external content. The respective provider or operator of the linked pages is always responsible for their content. The linked pages were checked for possible legal violations at the time of linking. Illegal content was not recognizable at the time of linking. However, permanent content monitoring of linked pages is not reasonable without concrete evidence of a legal violation. Upon becoming aware of legal violations, we will remove such links immediately."
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "lastUpdated": "Last updated: February 2026",
+    "section1Title": "1. Scope",
+    "section1Content": "These Terms of Service apply to the use of the web application Invoice2E (https://www.invoice2e.eu), operated by Osama Aldaas, Herrenstr. 18d, 24768 Rendsburg, Germany. By registering and using Invoice2E, you agree to these terms.",
+    "section2Title": "2. Service Description",
+    "section2Content": "Invoice2E is an AI-powered service for converting PDF invoices into electronic invoice formats such as XRechnung and ZUGFeRD. The conversion is performed using AI services (Mistral AI, OpenAI, Google Gemini). Invoice2E does not guarantee error-free recognition or conversion. The user is obligated to review the extracted data before final use.",
+    "section3Title": "3. Registration and User Account",
+    "section3Content": "Registration is required to use Invoice2E. You are obligated to provide correct and complete information and to keep your login credentials confidential. You are liable for all activities carried out through your account. Invoice2E reserves the right to suspend or delete accounts in case of violation of these terms.",
+    "section4Title": "4. Credits and Payment Terms",
+    "section4Content": "Invoice2E operates on a credit system. Credits are purchased via packages and are valid for 12 months from the date of purchase. Unused credits expire without replacement after this period. Payment is processed via Stripe or PayPal. These are one-time purchases — there are no subscriptions or automatic renewals. Prices may be adjusted at any time for future purchases. Previously purchased credits remain unaffected.",
+    "section5Title": "5. Right of Withdrawal",
+    "section5Content": "As Invoice2E is a digital service that is provided immediately upon the user's express request after purchase, the right of withdrawal expires upon commencement of contract performance in accordance with § 356 (5) BGB (German Civil Code). By purchasing credits, you expressly agree to this.",
+    "section6Title": "6. Usage Rules",
+    "section6Content": "You agree to use Invoice2E only for lawful purposes. In particular, it is prohibited to: use the service for fraudulent or illegal activities, overload or manipulate the system through excessive requests, circumvent or impair security measures, use the service for automated bulk queries without prior approval.",
+    "section7Title": "7. Limitation of Liability",
+    "section7Content": "Invoice2E is provided \"as is.\" We do not warrant the accuracy, completeness, or timeliness of invoice data extracted by the AI. The user is solely responsible for reviewing and using the converted data. Liability for indirect damages, lost profits, or data loss is excluded to the extent permitted by law. In any case, liability is limited to the amount paid by the user for the relevant credits.",
+    "section8Title": "8. Availability",
+    "section8Content": "We strive to maintain high availability of Invoice2E but cannot guarantee uninterrupted access. Maintenance, updates, or technical disruptions may lead to temporary limitations. There is no entitlement to availability.",
+    "section9Title": "9. Data Protection",
+    "section9Content": "The processing of personal data is governed by our Privacy Policy. Uploaded invoice data is processed solely for the purpose of conversion and is deleted after processing.",
+    "section10Title": "10. Changes to Terms of Service",
+    "section10Content": "We reserve the right to change these Terms of Service at any time. Registered users will be notified of material changes by email. Continued use of the service after the changes take effect constitutes acceptance.",
+    "section11Title": "11. Termination",
+    "section11Content": "You may delete your account at any time. Invoice2E may suspend or delete accounts without notice in case of violation of these Terms of Service. Upon termination, unused credits expire if the termination is initiated by the user or is due to a violation of these terms.",
+    "section12Title": "12. Applicable Law and Jurisdiction",
+    "section12Content": "The laws of the Federal Republic of Germany apply. The place of jurisdiction for disputes with entrepreneurs is Rendsburg. For consumers, the statutory provisions on jurisdiction apply."
   }
 }
