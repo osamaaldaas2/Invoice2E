@@ -10,6 +10,7 @@
  */
 
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { logger } from '@/lib/logger';
 
 /** Service metadata exposed to spans and traces. */
 const SERVICE_NAME = 'invoice2e';
@@ -33,18 +34,15 @@ export function initTelemetry(): void {
   try {
     const activeTracer = trace.getTracerProvider().getTracer(SERVICE_NAME);
     if (!activeTracer) {
-      // eslint-disable-next-line no-console
-      console.warn('[telemetry] No active tracer provider found — spans will be no-ops');
+      logger.warn('[telemetry] No active tracer provider found — spans will be no-ops');
       return;
     }
 
-    // eslint-disable-next-line no-console
-    console.info(
+    logger.info(
       `[telemetry] OpenTelemetry ready — service=${SERVICE_NAME} version=${SERVICE_VERSION}`
     );
   } catch (error: unknown) {
-    // eslint-disable-next-line no-console
-    console.error('[telemetry] Failed to initialise OpenTelemetry', error);
+    logger.error('[telemetry] Failed to initialise OpenTelemetry', error);
   }
 }
 
