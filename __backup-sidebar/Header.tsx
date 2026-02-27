@@ -28,15 +28,19 @@ export default function Header(): React.ReactElement {
     setMounted(true);
   }, []);
 
+  // Close mobile menu on Escape key
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileMenuOpen(false);
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [mobileMenuOpen]);
 
+  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
@@ -45,7 +49,9 @@ export default function Header(): React.ReactElement {
     try {
       setLoggingOut(true);
       const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!response.ok) throw new Error(`Logout failed (${response.status})`);
+      if (!response.ok) {
+        throw new Error(`Logout failed (${response.status})`);
+      }
       emitAuthChanged();
       setMobileMenuOpen(false);
       router.replace('/login');
@@ -65,6 +71,7 @@ export default function Header(): React.ReactElement {
   const switchLocale = useCallback(
     (newLocale: string) => {
       document.cookie = `${LOCALE_COOKIE_NAME}=${newLocale};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+      // If logged in, also save to DB (fire-and-forget)
       if (user) {
         fetch('/api/users/profile', {
           method: 'PUT',
@@ -77,6 +84,7 @@ export default function Header(): React.ReactElement {
     [user]
   );
 
+  // Prevent hydration mismatch by not rendering auth buttons until mounted
   if (!mounted) {
     return (
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
@@ -87,7 +95,7 @@ export default function Header(): React.ReactElement {
           >
             {APP_NAME}
           </Link>
-          <div className="flex items-center gap-3" />
+          <div className="flex items-center gap-3">{/* Placeholder for hydration */}</div>
         </nav>
       </header>
     );
@@ -95,9 +103,8 @@ export default function Header(): React.ReactElement {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-slate-950/70 backdrop-blur-xl">
-        {/* Main header row */}
-        <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
+        <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link
             href="/"
             className="text-xl font-semibold font-display tracking-tight gradient-text hover:opacity-90 transition-opacity"
@@ -256,7 +263,7 @@ export default function Header(): React.ReactElement {
             )}
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger button */}
           <Button
             variant="ghost"
             size="icon"
@@ -284,9 +291,6 @@ export default function Header(): React.ReactElement {
             </svg>
           </Button>
         </nav>
-
-        {/* Bottom border */}
-        <div className="h-px bg-white/10" />
       </header>
 
       {/* Mobile menu backdrop */}
@@ -302,7 +306,7 @@ export default function Header(): React.ReactElement {
       {mobileMenuOpen && (
         <div
           ref={menuRef}
-          className="fixed top-[57px] left-0 right-0 z-50 md:hidden border-b border-white/10 bg-slate-950/95 backdrop-blur-xl"
+          className="fixed top-[var(--header-height,65px)] left-0 right-0 z-50 md:hidden border-b border-white/10 bg-slate-950/95 backdrop-blur-xl"
         >
           <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
             <div className="flex items-center justify-center border border-white/10 rounded-lg overflow-hidden text-xs self-center">

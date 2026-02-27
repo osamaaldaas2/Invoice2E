@@ -263,3 +263,17 @@ input[type="number"] {
     background: rgba(255, 255, 255, 0.25);
   }
 }
+
+/* Compact upload form inside bento card */
+.upload-form-compact .border-dashed {
+  border-width: 1px;
+  border-color: rgba(56, 189, 248, 0.15);
+  background: rgba(56, 189, 248, 0.03);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+.upload-form-compact .border-dashed:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.06);
+}

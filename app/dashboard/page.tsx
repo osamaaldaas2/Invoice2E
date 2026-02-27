@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import FileUploadForm from '@/components/forms/FileUploadForm';
-import FormatSelectorCard, { useFormatSelection } from '@/components/dashboard/FormatSelector';
+import { useFormatSelection } from '@/components/dashboard/FormatSelector';
+import FormatRing from '@/components/dashboard/FormatRing';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { useUser } from '@/lib/user-context';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 
 type DashboardStats = {
   totalConversions: number;
@@ -40,19 +42,11 @@ type ConversionItem = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const { user, loading: userLoading } = useUser();
   const t = useTranslations('dashboard');
+  const tFormats = useTranslations('formats');
   const tHistory = useTranslations('history');
 
-  const navItems = [
-    { href: '/dashboard', label: t('navDashboard'), icon: '🏠' },
-    { href: '/dashboard/history', label: t('navHistory'), icon: '📋' },
-    { href: '/dashboard/analytics', label: t('navAnalytics'), icon: '📊' },
-    { href: '/dashboard/templates', label: t('navTemplates'), icon: '📝' },
-    { href: '/dashboard/credits', label: t('navCredits'), icon: '💳' },
-    { href: '/invoices/bulk-upload', label: t('navBulkUpload'), icon: '📦' },
-  ];
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
@@ -61,6 +55,7 @@ export default function DashboardPage() {
   const [conversionsLoading, setConversionsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useFormatSelection();
+  const [showUpload, setShowUpload] = useState(false);
 
   useEffect(() => {
     if (userLoading) return;
@@ -72,31 +67,23 @@ export default function DashboardPage() {
     const loadData = async () => {
       setError(null);
 
-      // Fetch stats
       try {
         const response = await fetch('/api/invoices/analytics?type=stats', { cache: 'no-store' });
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error || 'Failed to load stats');
-        }
-        if (data.statistics) {
-          setStats(data.statistics);
-        }
+        if (!response.ok) throw new Error(data?.error || 'Failed to load stats');
+        if (data.statistics) setStats(data.statistics);
       } catch (err) {
         setError((prev) => prev ?? (err instanceof Error ? err.message : 'Failed to load stats'));
       } finally {
         setStatsLoading(false);
       }
 
-      // Fetch drafts
       try {
         const response = await fetch('/api/invoices/history?status=draft&limit=5', {
           cache: 'no-store',
         });
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error || 'Failed to load drafts');
-        }
+        if (!response.ok) throw new Error(data?.error || 'Failed to load drafts');
         setDrafts(data.items || []);
       } catch (err) {
         setError((prev) => prev ?? (err instanceof Error ? err.message : 'Failed to load drafts'));
@@ -104,15 +91,12 @@ export default function DashboardPage() {
         setDraftsLoading(false);
       }
 
-      // Fetch recent conversions
       try {
         const response = await fetch('/api/invoices/history?status=completed&limit=5', {
           cache: 'no-store',
         });
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error || 'Failed to load conversions');
-        }
+        if (!response.ok) throw new Error(data?.error || 'Failed to load conversions');
         setConversions(data.items || []);
       } catch (err) {
         setError(
@@ -134,302 +118,355 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  const formatDisplayName = selectedFormat ? tFormats(`${selectedFormat}.name`) : null;
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen overflow-x-hidden">
-        <div className="flex min-w-0">
-          {/* Sidebar Navigation */}
-          <aside className="hidden md:block w-64 bg-slate-950/70 border-r border-white/10 backdrop-blur-xl min-h-screen fixed left-0 top-16">
-            <div className="p-4">
-              <div className="mb-6 pb-4 border-b border-white/10">
-                <p className="text-sm text-faded">{t('welcomeBack')},</p>
-                <p className="font-semibold text-white">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs text-faded">{user.email}</p>
-              </div>
-              <nav className="space-y-1">
-                {navItems.map((item) => {
-                  const fullHref = item.href;
-                  const isActive = pathname === fullHref;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={fullHref}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-gradient-to-r from-sky-400/20 via-blue-500/10 to-transparent text-sky-100 border border-sky-300/30'
-                          : 'text-slate-200 hover:bg-white/10'
-                      }`}
-                    >
-                      <span>{item.icon}</span>
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
+      <DashboardLayout>
+        {/* Error alert */}
+        {error && (
+          <div className="mb-6 rounded-2xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Welcome */}
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-white font-display">
+            {t('welcomeBack')}, {user.firstName}
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">
+            {t('welcomeMessage', { name: user.firstName })}
+          </p>
+        </div>
+
+        {/* ── Bento Grid ── */}
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+          {/* Stat: Conversions */}
+          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-slate-500 font-medium">{t('totalConversions')}</span>
+              <span className="text-lg">📊</span>
             </div>
-          </aside>
-
-          {/* Main Content */}
-          <main className="flex-1 min-w-0 ml-0 md:ml-64 p-3 md:p-8">
-            <div className="max-w-6xl mx-auto overflow-hidden">
-              {error && (
-                <div className="mb-6 glass-panel border border-rose-400/30 text-rose-200 px-4 py-3 rounded-xl">
-                  {error}
-                </div>
+            <p className="text-3xl font-extrabold text-sky-300 tracking-tight">
+              {statsLoading ? (
+                <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
+              ) : (
+                (stats?.totalConversions ?? 0)
               )}
-              <div className="md:hidden mb-6">
-                <div className="flex items-center gap-2 mb-4 min-w-0">
-                  <span className="chip shrink-0">{user.firstName}</span>
-                  <span className="text-faded text-sm truncate min-w-0">{user.email}</span>
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {navItems.map((item) => {
-                    const fullHref = item.href;
-                    const isActive = pathname === fullHref;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={fullHref}
-                        className={`nav-pill whitespace-nowrap ${isActive ? 'nav-pill-active' : ''}`}
-                      >
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mb-8">
-                <h1 className="text-2xl md:text-3xl font-bold text-white">{t('pageTitle')}</h1>
-                <p className="text-faded mt-2">{t('welcomeMessage', { name: user.firstName })}</p>
-              </div>
+            </p>
+          </div>
 
-              <div className="space-y-8">
-                {/* Format Selection */}
-                <div className="glass-card p-4 md:p-6">
-                  <h2 className="text-lg md:text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span>🎯</span> {t('selectTargetFormat')}
-                  </h2>
-                  <FormatSelectorCard
+          {/* Stat: Success Rate */}
+          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-slate-500 font-medium">{t('successRate')}</span>
+              <span className="text-lg">✅</span>
+            </div>
+            <p className="text-3xl font-extrabold text-emerald-300 tracking-tight">
+              {statsLoading ? (
+                <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
+              ) : (
+                `${stats?.successRate ?? 0}%`
+              )}
+            </p>
+          </div>
+
+          {/* ── Upload Hero Card — center, spans 2 rows ── */}
+          <div className="col-span-2 md:col-span-6 md:row-span-2 rounded-2xl border border-sky-400/10 bg-[radial-gradient(ellipse_at_50%_40%,rgba(56,189,248,0.04)_0%,rgba(255,255,255,0.02)_70%)] p-6 md:p-8 flex flex-col items-center justify-center order-first md:order-none">
+            {!showUpload ? (
+              <>
+                <div onClick={() => selectedFormat && setShowUpload(true)}>
+                  <FormatRing
                     selectedFormat={selectedFormat}
-                    onSelect={setSelectedFormat}
+                    onSelect={(f) => {
+                      setSelectedFormat(f);
+                    }}
                   />
                 </div>
-
-                {/* Upload Section (full width) */}
-                <div
-                  className={`glass-card p-4 md:p-6 transition-opacity duration-300 ${!selectedFormat ? 'opacity-50' : ''}`}
-                >
-                  <h2 className="text-lg md:text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span>📤</span> {t('uploadInvoice')}
-                  </h2>
-                  {!selectedFormat ? (
-                    <div className="text-center py-8 text-faded">
-                      <p className="text-sm">{t('selectFormatFirst')}</p>
-                    </div>
-                  ) : statsLoading ? (
-                    <div className="h-32 rounded-xl bg-white/5 animate-pulse" />
+                <p className="text-xs text-slate-600 mt-2 text-center">
+                  {selectedFormat ? (
+                    <>
+                      <span className="text-sky-400 font-semibold">{formatDisplayName}</span>
+                      {' — '}
+                      <button
+                        onClick={() => setShowUpload(true)}
+                        className="text-sky-400 hover:text-sky-300 underline underline-offset-2"
+                      >
+                        {t('uploadInvoice')}
+                      </button>
+                    </>
                   ) : (
-                    <FileUploadForm
-                      userId={user.id}
-                      availableCredits={stats?.availableCredits ?? 0}
-                      targetFormat={selectedFormat}
-                      onExtractionComplete={(extractionId) => {
-                        router.push(`/review/${extractionId}`);
-                      }}
-                    />
+                    <span>{t('selectFormatFirst')}</span>
                   )}
-                </div>
-
-                {/* Row 2: Recent Conversions + Drafts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
-                  {/* Recent Conversions */}
-                  <div className="glass-card p-4 md:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-                        <span>📋</span> {t('recentConversions')}
-                      </h2>
-                      <Link
-                        href="/dashboard/history?status=completed"
-                        className="text-sm text-sky-200 hover:underline"
-                      >
-                        {t('viewAllArrow')}
-                      </Link>
-                    </div>
-                    {conversionsLoading ? (
-                      <div className="space-y-3">
-                        {[...Array(3)].map((_, i) => (
-                          <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />
-                        ))}
-                      </div>
-                    ) : conversions.length === 0 ? (
-                      <div className="text-center py-12 text-faded">
-                        <p className="text-4xl mb-2">📭</p>
-                        <p>{t('noConversions')}</p>
-                        <p className="text-sm mt-1">{t('noConversionsHint')}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {conversions.map((conversion) => (
-                          <Link
-                            key={conversion.id}
-                            href={
-                              conversion.extraction_id
-                                ? `/review/${conversion.extraction_id}`
-                                : '/dashboard/history'
-                            }
-                            className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition-colors cursor-pointer"
-                          >
-                            <div>
-                              <p className="text-white font-medium">
-                                {conversion.invoice_number || t('invoiceFallback')}
-                              </p>
-                              <p className="text-xs text-faded">
-                                {new Date(conversion.created_at).toLocaleDateString('de-DE', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })}
-                              </p>
-                            </div>
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                conversion.status === 'failed' ||
-                                conversion.status === 'failed_refunded'
-                                  ? 'bg-rose-500/15 text-rose-200 border border-rose-400/30'
-                                  : conversion.status === 'draft'
-                                    ? 'bg-amber-500/15 text-amber-200 border border-amber-400/30'
-                                    : conversion.status === 'processing' ||
-                                        conversion.status === 'pending'
-                                      ? 'bg-sky-500/15 text-sky-200 border border-sky-400/30'
-                                      : 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30'
-                              }`}
-                            >
-                              {conversion.status === 'completed'
-                                ? t('completedStatus')
-                                : conversion.status === 'draft'
-                                  ? t('draftStatus')
-                                  : conversion.status === 'failed'
-                                    ? tHistory('statusFailed')
-                                    : conversion.status === 'failed_refunded'
-                                      ? tHistory('statusFailedRefunded')
-                                      : conversion.status === 'processing'
-                                        ? tHistory('statusProcessing')
-                                        : conversion.status === 'pending'
-                                          ? tHistory('statusPending')
-                                          : t('completedStatus')}
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Drafts Section */}
-                  <div className="glass-card p-4 md:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-                        <span>⏳</span> {t('draftsInProgress')}
-                      </h2>
-                      <Link
-                        href="/dashboard/history?status=draft"
-                        className="text-sm text-sky-200 hover:underline"
-                      >
-                        {t('viewAllArrow')}
-                      </Link>
-                    </div>
-                    {draftsLoading ? (
-                      <div className="space-y-3">
-                        {[...Array(3)].map((_, i) => (
-                          <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />
-                        ))}
-                      </div>
-                    ) : drafts.filter((draft) => draft.status === 'draft').length === 0 ? (
-                      <div className="text-center py-8 text-faded">
-                        <p className="text-3xl mb-2">📄</p>
-                        <p>{t('noDrafts')}</p>
-                        <p className="text-sm mt-1">{t('noDraftsHint')}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {drafts
-                          .filter((draft) => draft.status === 'draft')
-                          .map((draft) => (
-                            <div
-                              key={draft.id}
-                              className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                            >
-                              <div>
-                                <p className="text-white font-medium">
-                                  {draft.invoice_number || t('draftFallback')}
-                                </p>
-                                <p className="text-xs text-faded">
-                                  {new Date(draft.created_at).toLocaleDateString('de-DE', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                  })}
-                                </p>
-                              </div>
-                              <Link
-                                href={`/review/${draft.extraction_id || draft.id}`}
-                                className="px-4 py-2 rounded-full bg-amber-500/20 text-amber-100 border border-amber-400/30 hover:bg-amber-500/30"
-                              >
-                                {t('resume')}
-                              </Link>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                </p>
+              </>
+            ) : (
+              <div className="w-full upload-form-compact">
+                <button
+                  onClick={() => setShowUpload(false)}
+                  className="text-xs text-slate-500 hover:text-slate-300 mb-4 flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                  {t('selectTargetFormat')}
+                </button>
+                <p className="text-xs text-slate-500 mb-3">
+                  <span className="text-sky-400 font-semibold">{formatDisplayName}</span> ausgewählt
+                </p>
+                {statsLoading ? (
+                  <div className="h-32 rounded-xl bg-white/5 animate-pulse" />
+                ) : (
+                  <FileUploadForm
+                    userId={user.id}
+                    availableCredits={stats?.availableCredits ?? 0}
+                    targetFormat={selectedFormat!}
+                    onExtractionComplete={(extractionId) => {
+                      router.push(`/review/${extractionId}`);
+                    }}
+                  />
+                )}
               </div>
+            )}
+          </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mt-8">
-                <Link
-                  href="/dashboard/history"
-                  className="glass-card p-4 md:p-6 hover:border-sky-400/40 transition-colors"
-                >
-                  <h3 className="text-faded font-medium text-sm md:text-base">
-                    {t('totalConversions')}
-                  </h3>
-                  <p className="text-2xl md:text-3xl font-bold text-sky-200 mt-2">
-                    {statsLoading ? '--' : stats?.totalConversions || 0}
-                  </p>
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="glass-card p-4 md:p-6 hover:border-emerald-400/40 transition-colors"
-                >
-                  <h3 className="text-faded font-medium text-sm md:text-base">
-                    {t('creditsRemaining')}
-                  </h3>
-                  <p className="text-2xl md:text-3xl font-bold text-emerald-200 mt-2">
-                    {statsLoading ? '--' : (stats?.availableCredits ?? '--')}
-                  </p>
-                </Link>
-                <Link
-                  href="/dashboard/analytics"
-                  className="glass-card p-4 md:p-6 hover:border-violet-400/40 transition-colors"
-                >
-                  <h3 className="text-faded font-medium text-sm md:text-base">
-                    {t('successRate')}
-                  </h3>
-                  <p className="text-2xl md:text-3xl font-bold text-violet-200 mt-2">
-                    {statsLoading ? '--' : `${stats?.successRate || 0}%`}
-                  </p>
-                </Link>
-              </div>
+          {/* Stat: Credits */}
+          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-slate-500 font-medium">{t('creditsRemaining')}</span>
+              <span className="text-lg">💳</span>
             </div>
-          </main>
+            <p className="text-3xl font-extrabold text-violet-300 tracking-tight">
+              {statsLoading ? (
+                <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
+              ) : (
+                (stats?.availableCredits ?? 0)
+              )}
+            </p>
+          </div>
+
+          {/* Stat: Avg Processing */}
+          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-slate-500 font-medium">Ø Verarbeitung</span>
+              <span className="text-lg">⚡</span>
+            </div>
+            <p className="text-3xl font-extrabold text-amber-200 tracking-tight">
+              {statsLoading ? (
+                <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
+              ) : (
+                `${(stats?.avgProcessingTime ?? 0).toFixed(1)}s`
+              )}
+            </p>
+          </div>
+
+          {/* ── Recent Conversions ── */}
+          <div className="col-span-2 md:col-span-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                📋 {t('recentConversions')}
+              </h3>
+              <Link
+                href="/dashboard/history?status=completed"
+                className="text-[11px] text-sky-400 hover:underline"
+              >
+                {t('viewAllArrow')}
+              </Link>
+            </div>
+            {conversionsLoading ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-11 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            ) : conversions.length === 0 ? (
+              <div className="text-center py-10 text-slate-600">
+                <p className="text-3xl mb-2">📭</p>
+                <p className="text-sm">{t('noConversions')}</p>
+                <p className="text-xs mt-1">{t('noConversionsHint')}</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {conversions.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={c.extraction_id ? `/review/${c.extraction_id}` : '/dashboard/history'}
+                    className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
+                  >
+                    <div>
+                      <p className="text-[13px] font-semibold text-slate-200">
+                        {c.invoice_number || t('invoiceFallback')}
+                      </p>
+                      <p className="text-[11px] text-slate-700">
+                        {new Date(c.created_at).toLocaleDateString('de-DE', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                        {c.output_format ? ` · ${c.output_format}` : ''}
+                      </p>
+                    </div>
+                    <StatusBadge status={c.status} t={t} tHistory={tHistory} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Drafts ── */}
+          <div className="col-span-2 md:col-span-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                ⏳ {t('draftsInProgress')}
+              </h3>
+              <Link
+                href="/dashboard/history?status=draft"
+                className="text-[11px] text-sky-400 hover:underline"
+              >
+                {t('viewAllArrow')}
+              </Link>
+            </div>
+            {draftsLoading ? (
+              <div className="space-y-2">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="h-11 rounded-xl bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            ) : drafts.filter((d) => d.status === 'draft').length === 0 ? (
+              <div className="text-center py-8 text-slate-600">
+                <p className="text-2xl mb-2">📄</p>
+                <p className="text-sm">{t('noDrafts')}</p>
+                <p className="text-xs mt-1">{t('noDraftsHint')}</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {drafts
+                  .filter((d) => d.status === 'draft')
+                  .map((d) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center justify-between rounded-xl px-3 py-2.5"
+                    >
+                      <div>
+                        <p className="text-[13px] font-semibold text-slate-200">
+                          {d.invoice_number || t('draftFallback')}
+                        </p>
+                        <p className="text-[11px] text-slate-700">
+                          {new Date(d.created_at).toLocaleDateString('de-DE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/review/${d.extraction_id || d.id}`}
+                        className="px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-400/15 hover:bg-amber-500/20 transition-colors"
+                      >
+                        {t('resume')} →
+                      </Link>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Quick Action Cards ── */}
+          <ActionCard
+            href="/dashboard/analytics"
+            icon="📊"
+            title="Analytics"
+            desc="Trends & Statistiken"
+          />
+          <ActionCard
+            href="/dashboard/templates"
+            icon="📝"
+            title="Vorlagen"
+            desc="Wiederkehrende Daten"
+          />
+          <ActionCard
+            href="/invoices/bulk-upload"
+            icon="📦"
+            title="Massenupload"
+            desc="Batch-Konvertierung"
+          />
+          <ActionCard href="/pricing" icon="✨" title="Credits" desc="Guthaben aufladen" />
         </div>
-      </div>
+      </DashboardLayout>
     </ErrorBoundary>
+  );
+}
+
+/* ── Helper Components ── */
+
+function StatusBadge({
+  status,
+  t,
+  tHistory,
+}: {
+  status: string;
+  t: (key: string) => string;
+  tHistory: (key: string) => string;
+}) {
+  const styles: Record<string, string> = {
+    completed: 'bg-emerald-500/10 text-emerald-300 border-emerald-400/15',
+    draft: 'bg-amber-500/10 text-amber-300 border-amber-400/15',
+    failed: 'bg-rose-500/10 text-rose-300 border-rose-400/15',
+    failed_refunded: 'bg-rose-500/10 text-rose-300 border-rose-400/15',
+    processing: 'bg-sky-500/10 text-sky-300 border-sky-400/15',
+    pending: 'bg-sky-500/10 text-sky-300 border-sky-400/15',
+  };
+
+  const labels: Record<string, string> = {
+    completed: `✓ ${t('completedStatus')}`,
+    draft: t('draftStatus'),
+    failed: tHistory('statusFailed'),
+    failed_refunded: tHistory('statusFailedRefunded'),
+    processing: tHistory('statusProcessing'),
+    pending: tHistory('statusPending'),
+  };
+
+  return (
+    <span
+      className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${styles[status] || styles.completed}`}
+    >
+      {labels[status] || t('completedStatus')}
+    </span>
+  );
+}
+
+function ActionCard({
+  href,
+  icon,
+  title,
+  desc,
+}: {
+  href: string;
+  icon: string;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5 group relative"
+    >
+      <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-lg mb-3">
+        {icon}
+      </div>
+      <p className="text-sm font-semibold text-white">{title}</p>
+      <p className="text-xs text-slate-600 mt-0.5">{desc}</p>
+      <span className="absolute bottom-4 right-4 text-sm text-slate-800 group-hover:text-sky-400 group-hover:translate-x-0.5 transition-all">
+        →
+      </span>
+    </Link>
   );
 }
