@@ -215,9 +215,19 @@ export class PaymentProcessor {
     const credits = parseInt(metadata.credits || '0', 10);
     const paymentIntent = session.payment_intent as string;
 
-    if (!userId || !credits) {
-      logger.error('Missing userId or credits in webhook metadata', { metadata });
-      return { success: false, message: 'Missing metadata' };
+    // H2 fix: Validate credits is a finite positive integer within bounds
+    const MAX_CREDITS_PER_PURCHASE = 10000;
+    if (!userId || !Number.isFinite(credits) || credits <= 0) {
+      logger.error('Missing userId or invalid credits in webhook metadata', { metadata, credits });
+      return { success: false, message: 'Missing or invalid metadata' };
+    }
+    if (credits > MAX_CREDITS_PER_PURCHASE) {
+      logger.error('Credits exceeds maximum per purchase', {
+        credits,
+        max: MAX_CREDITS_PER_PURCHASE,
+        userId,
+      });
+      return { success: false, message: 'Credits amount exceeds limit' };
     }
 
     // Get the checkout session ID for idempotency checks
@@ -262,6 +272,16 @@ export class PaymentProcessor {
         });
         return { success: true, message: 'Transaction already completed' };
       }
+
+      // M2 fix: Block credit addition for expired/failed transactions
+      if (existingTx?.payment_status === 'failed') {
+        logger.warn('Transaction is in failed/expired state, refusing credit addition', {
+          eventId,
+          sessionId,
+          status: existingTx.payment_status,
+        });
+        return { success: false, message: 'Transaction already failed/expired' };
+      }
     }
 
     // Atomic credit addition with idempotency — single RPC call replaces
@@ -276,26 +296,36 @@ export class PaymentProcessor {
     );
 
     if (verifyResult.alreadyProcessed) {
-      logger.info('Stripe webhook credits already processed', { eventId, userId });
+      logger.info('Stripe webhook credits already processed, skipping email', { eventId, userId });
       return { success: true, message: 'Already processed' };
     }
 
-    // Update transaction status — filter by session ID to avoid updating wrong transaction
-    const txUpdate = supabase
+    // C2 fix: Require sessionId — refuse to update without it to avoid matching wrong transaction
+    if (!sessionId) {
+      logger.error('Stripe webhook missing session ID, cannot safely update transaction', {
+        eventId,
+        userId,
+        paymentIntent,
+      });
+      return {
+        success: true,
+        userId,
+        credits,
+        message: 'Credits added but transaction update skipped (no session ID)',
+      };
+    }
+
+    // Update transaction status — always filter by session ID
+    await supabase
       .from('payment_transactions')
       .update({
         payment_status: 'completed',
         stripe_payment_id: paymentIntent,
       })
       .eq('user_id', userId)
+      .eq('stripe_session_id', sessionId)
       .eq('payment_status', 'pending')
       .eq('payment_method', 'stripe');
-
-    if (sessionId) {
-      txUpdate.eq('stripe_session_id', sessionId);
-    }
-
-    await txUpdate;
 
     // Send confirmation email
     const { data: userData } = await supabase
@@ -412,10 +442,19 @@ export class PaymentProcessor {
       return { success: false, message: 'Missing user ID' };
     }
 
-    // SECURITY FIX (BUG-045): Validate credits is positive
-    if (!credits || credits <= 0) {
+    // SECURITY FIX (BUG-045): Validate credits is positive and bounded
+    const MAX_CREDITS_PER_PAYPAL_PURCHASE = 10000;
+    if (!Number.isFinite(credits) || credits <= 0) {
       logger.error('Invalid credits amount from PayPal', { credits, orderId });
       return { success: false, message: 'Invalid credits amount' };
+    }
+    if (credits > MAX_CREDITS_PER_PAYPAL_PURCHASE) {
+      logger.error('PayPal credits exceeds maximum per purchase', {
+        credits,
+        max: MAX_CREDITS_PER_PAYPAL_PURCHASE,
+        orderId,
+      });
+      return { success: false, message: 'Credits amount exceeds limit' };
     }
 
     // IDEMPOTENCY FIX #1: Check if verify already processed this payment

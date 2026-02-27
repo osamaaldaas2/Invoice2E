@@ -137,8 +137,8 @@ export function normalizeIban(value: unknown): string | null {
   if (!text) return null;
 
   if (text.length < 15 || text.length > 34 || !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(text)) {
-    logger.warn('Invalid IBAN format detected', { iban: text.substring(0, 4) + '...' });
-    return text;
+    logger.warn('Invalid IBAN format detected — rejecting', { iban: text.substring(0, 4) + '...' });
+    return null;
   }
 
   // Country-specific length check
@@ -272,7 +272,8 @@ export function isEuVatId(taxId: string | null | undefined): boolean {
  */
 export function normalizeExtractedData(data: Record<string, unknown>): ExtractedInvoiceData {
   const rawSubtotal = safeNumberStrict(data.subtotal);
-  const subtotal = isNaN(rawSubtotal) ? 0 : rawSubtotal;
+  const hasSubtotal = !isNaN(rawSubtotal);
+  const subtotal = hasSubtotal ? rawSubtotal : 0;
 
   const rawTotal = safeNumberStrict(data.totalAmount);
   if (isNaN(rawTotal)) {
@@ -280,14 +281,16 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
   }
   const totalAmount = isNaN(rawTotal) ? 0 : rawTotal;
 
-  // Tax amount
+  // Tax amount — only derive from subtotal when AI actually provided one (C3 fix)
   const rawTaxAmount = safeNumberStrict(data.taxAmount);
   const hasTaxAmount =
     data.taxAmount !== null && data.taxAmount !== undefined && data.taxAmount !== '';
   const taxAmount =
-    hasTaxAmount && !isNaN(rawTaxAmount) && !(rawTaxAmount === 0 && totalAmount > subtotal + 0.01)
+    hasTaxAmount &&
+    !isNaN(rawTaxAmount) &&
+    !(rawTaxAmount === 0 && hasSubtotal && totalAmount > subtotal + 0.01)
       ? rawTaxAmount
-      : totalAmount > subtotal
+      : hasSubtotal && totalAmount > subtotal
         ? Math.round((totalAmount - subtotal) * 100) / 100
         : 0;
 
@@ -400,7 +403,13 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
     taxRate: !isNaN(parsedTaxRate) ? parsedTaxRate : undefined,
     taxAmount,
     totalAmount,
-    currency: (data.currency as string) || 'EUR',
+    currency: (() => {
+      const raw = data.currency as string;
+      if (!raw) {
+        logger.warn('Currency not extracted from invoice, defaulting to EUR');
+      }
+      return raw || 'EUR';
+    })(),
     paymentTerms: (data.paymentTerms as string) || null,
     notes: (data.notes as string) || null,
     // FIX: Audit V2 [F-009] — normalize AI confidence to 0-1 range
@@ -408,7 +417,10 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
       const raw = Number(data.confidence);
       if (isNaN(raw) || raw < 0) return 0.7;
       if (raw > 1 && raw <= 100) return raw / 100;
-      if (raw > 100) return 0.7;
+      if (raw > 100) {
+        logger.warn('AI confidence exceeds 100, defaulting to 0.7', { rawConfidence: raw });
+        return 0.7;
+      }
       return raw;
     })(),
     // EN 16931 new fields (additive, all optional)
@@ -450,12 +462,22 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
       });
 
       // Convert line items: net = gross / (1 + taxRate/100)
-      for (const item of result.lineItems) {
+      for (let i = 0; i < result.lineItems.length; i++) {
+        const item = result.lineItems[i]!;
         const rate = item.taxRate ?? 0;
         if (rate > 0) {
           const factor = 1 + rate / 100;
           item.unitPrice = Math.round((item.unitPrice / factor) * 100) / 100;
           item.totalPrice = Math.round((item.totalPrice / factor) * 100) / 100;
+        } else if (item.taxRate === undefined) {
+          logger.warn(
+            'Gross pricing detected but line item has no taxRate — cannot convert to NET',
+            {
+              lineIndex: i,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            }
+          );
         }
       }
 
@@ -540,7 +562,7 @@ function normalizeAllowanceCharges(raw: unknown): AllowanceCharge[] {
       if (!item || typeof item !== 'object') return null;
 
       const amount = safeNumberStrict(item.amount);
-      if (isNaN(amount) || amount <= 0) return null;
+      if (isNaN(amount) || amount < 0) return null;
 
       const percentage = safeNumberStrict(item.percentage);
       const baseAmount = safeNumberStrict(item.baseAmount);

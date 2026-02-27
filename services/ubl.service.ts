@@ -108,6 +108,35 @@ export class UBLService {
   async generate(data: UBLInvoiceData): Promise<string> {
     logger.info('Generating UBL 2.1 XRechnung invoice', { invoiceNumber: data.invoiceNumber });
 
+    // H8 fix: Validate line items have required numeric fields before generation
+    for (let i = 0; i < data.lineItems.length; i++) {
+      const item = data.lineItems[i]!;
+      if (typeof item.unitPrice !== 'number' || isNaN(item.unitPrice)) {
+        throw new Error(
+          `Line item ${i + 1}: unitPrice must be a valid number (got ${item.unitPrice})`
+        );
+      }
+      if (typeof item.quantity !== 'number' || isNaN(item.quantity)) {
+        throw new Error(
+          `Line item ${i + 1}: quantity must be a valid number (got ${item.quantity})`
+        );
+      }
+      if (typeof item.totalPrice !== 'number' || isNaN(item.totalPrice)) {
+        throw new Error(
+          `Line item ${i + 1}: totalPrice must be a valid number (got ${item.totalPrice})`
+        );
+      }
+    }
+
+    // M11 fix: Reject negative totals on regular invoices (credit notes use typeCode 381)
+    if (data.documentTypeCode !== 381) {
+      if (data.subtotal < 0 || data.totalAmount < 0) {
+        throw new Error(
+          'Invoice totals must not be negative. Use documentTypeCode 381 for credit notes.'
+        );
+      }
+    }
+
     try {
       const xml =
         data.documentTypeCode === 381
@@ -131,7 +160,12 @@ export class UBLService {
     const dueDate = data.dueDate ? this.formatDate(data.dueDate) : issueDate;
     const typeCode = data.documentTypeCode || 380;
     // BR-DE-15: BuyerReference is MANDATORY for XRechnung
-    const buyerRef = data.buyerReference || data.invoiceNumber || 'LEITWEG-ID';
+    const buyerRef = data.buyerReference || data.invoiceNumber;
+    if (!buyerRef) {
+      throw new Error(
+        'BuyerReference (BR-DE-15) is mandatory for XRechnung. Provide buyerReference or invoiceNumber.'
+      );
+    }
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
@@ -167,7 +201,12 @@ export class UBLService {
   private buildCreditNoteDocument(data: UBLInvoiceData): string {
     const issueDate = this.formatDate(data.invoiceDate);
     const dueDate = data.dueDate ? this.formatDate(data.dueDate) : issueDate;
-    const buyerRef = data.buyerReference || data.invoiceNumber || 'LEITWEG-ID';
+    const buyerRef = data.buyerReference || data.invoiceNumber;
+    if (!buyerRef) {
+      throw new Error(
+        'BuyerReference (BR-DE-15) is mandatory for XRechnung. Provide buyerReference or invoiceNumber.'
+      );
+    }
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
@@ -271,11 +310,103 @@ export class UBLService {
   /**
    * Detect electronic address scheme from address value.
    */
+  // H11 fix: Validate against known PEPPOL ICD codes (ISO 6523)
+  private static readonly VALID_PEPPOL_ICD_CODES = new Set([
+    '0002',
+    '0007',
+    '0009',
+    '0037',
+    '0060',
+    '0088',
+    '0096',
+    '0097',
+    '0106',
+    '0130',
+    '0135',
+    '0142',
+    '0147',
+    '0151',
+    '0170',
+    '0183',
+    '0184',
+    '0190',
+    '0191',
+    '0192',
+    '0193',
+    '0195',
+    '0196',
+    '0198',
+    '0199',
+    '0200',
+    '0201',
+    '0202',
+    '0204',
+    '0208',
+    '0209',
+    '0210',
+    '0211',
+    '0212',
+    '0213',
+    '0215',
+    '0216',
+    '9901',
+    '9906',
+    '9907',
+    '9910',
+    '9913',
+    '9914',
+    '9915',
+    '9917',
+    '9918',
+    '9919',
+    '9920',
+    '9921',
+    '9922',
+    '9923',
+    '9924',
+    '9925',
+    '9926',
+    '9927',
+    '9928',
+    '9929',
+    '9930',
+    '9931',
+    '9932',
+    '9933',
+    '9934',
+    '9935',
+    '9936',
+    '9937',
+    '9938',
+    '9939',
+    '9940',
+    '9941',
+    '9942',
+    '9943',
+    '9944',
+    '9945',
+    '9946',
+    '9947',
+    '9948',
+    '9949',
+    '9950',
+    '9951',
+    '9952',
+    '9953',
+    '9954',
+    '9955',
+    '9956',
+    '9957',
+    '9958',
+  ]);
+
   private detectScheme(address: string): string {
     if (!address) return 'EM';
     if (address.includes('@')) return 'EM';
     const peppolMatch = address.match(/^(\d{4}):/);
-    if (peppolMatch?.[1]) return peppolMatch[1];
+    if (peppolMatch?.[1] && UBLService.VALID_PEPPOL_ICD_CODES.has(peppolMatch[1])) {
+      return peppolMatch[1];
+    }
     return 'EM';
   }
 

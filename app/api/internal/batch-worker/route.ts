@@ -27,19 +27,20 @@ function isWorkerAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    if (!isWorkerAuthorized(request)) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized worker request' },
-        { status: 401 }
-      );
-    }
-
+    // H10 fix: Rate limit BEFORE auth to prevent brute-force on worker secret
     const rateLimitId = `worker:${getRequestIdentifier(request)}`;
     const rateLimit = await checkRateLimitAsync(rateLimitId, 'worker');
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { success: false, error: 'Too many worker requests' },
         { status: 429, headers: { 'Retry-After': String(rateLimit.resetInSeconds) } }
+      );
+    }
+
+    if (!isWorkerAuthorized(request)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized worker request' },
+        { status: 401 }
       );
     }
 

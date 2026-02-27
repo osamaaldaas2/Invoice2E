@@ -13,11 +13,7 @@ import { createAdminClient } from '@/lib/supabase.server';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { publishToQueue } from './publisher';
-import type {
-  OutboxEvent,
-  OutboxEventRow,
-  AppendOutboxEventInput,
-} from './types';
+import type { OutboxEvent, OutboxEventRow, AppendOutboxEventInput } from './types';
 
 const TABLE = 'outbox_events';
 
@@ -62,7 +58,7 @@ export class OutboxService {
    */
   async appendEvent(
     supabaseClient: ReturnType<typeof createAdminClient>,
-    input: AppendOutboxEventInput,
+    input: AppendOutboxEventInput
   ): Promise<OutboxEvent> {
     const { data, error } = await supabaseClient
       .from(TABLE)
@@ -83,7 +79,11 @@ export class OutboxService {
         eventType: input.eventType,
         aggregateId: input.aggregateId,
       });
-      throw new AppError('OUTBOX_APPEND_FAILED', `Failed to append outbox event: ${error.message}`, 500);
+      throw new AppError(
+        'OUTBOX_APPEND_FAILED',
+        `Failed to append outbox event: ${error.message}`,
+        500
+      );
     }
 
     const event = rowToEvent(data as OutboxEventRow);
@@ -118,7 +118,11 @@ export class OutboxService {
 
     if (error) {
       logger.error('Failed to poll outbox events', { error: error.message });
-      throw new AppError('OUTBOX_POLL_FAILED', `Failed to poll outbox events: ${error.message}`, 500);
+      throw new AppError(
+        'OUTBOX_POLL_FAILED',
+        `Failed to poll outbox events: ${error.message}`,
+        500
+      );
     }
 
     if (!rows || rows.length === 0) {
@@ -157,6 +161,7 @@ export class OutboxService {
           error: errorMessage,
         });
 
+        // M6 fix: Only update if still pending — prevents published→pending regression
         await supabase
           .from(TABLE)
           .update({
@@ -164,7 +169,8 @@ export class OutboxService {
             last_error: errorMessage,
             status: event.retryCount + 1 >= 5 ? 'failed' : 'pending',
           })
-          .eq('id', event.id);
+          .eq('id', event.id)
+          .eq('status', 'pending');
       }
     }
 
@@ -201,7 +207,11 @@ export class OutboxService {
 
     if (error) {
       logger.error('Failed to retry outbox events', { error: error.message });
-      throw new AppError('OUTBOX_RETRY_FAILED', `Failed to retry outbox events: ${error.message}`, 500);
+      throw new AppError(
+        'OUTBOX_RETRY_FAILED',
+        `Failed to retry outbox events: ${error.message}`,
+        500
+      );
     }
 
     const count = data?.length ?? 0;
@@ -235,7 +245,11 @@ export class OutboxService {
 
     if (error) {
       logger.error('Failed to clean up outbox events', { error: error.message });
-      throw new AppError('OUTBOX_CLEANUP_FAILED', `Failed to clean up outbox events: ${error.message}`, 500);
+      throw new AppError(
+        'OUTBOX_CLEANUP_FAILED',
+        `Failed to clean up outbox events: ${error.message}`,
+        500
+      );
     }
 
     const count = data?.length ?? 0;

@@ -22,7 +22,7 @@ import type { CanonicalInvoice, OutputFormat } from '@/types/canonical-invoice';
 import { toXRechnungData } from '../shared/canonical-to-xrechnung';
 import { xrechnungBuilder } from '@/services/xrechnung/builder';
 import { validateXmlStructure } from '@/services/xrechnung/validator';
-import { escapeXml } from '@/lib/xml-utils';
+import { escapeXml, formatAmount } from '@/lib/xml-utils';
 import { logger } from '@/lib/logger';
 
 /** Factur-X profile specification IDs */
@@ -199,15 +199,26 @@ async function buildPdf(
   // Line items
   for (const item of invoice.lineItems) {
     if (y < 100) {
-      // Simple overflow — in production you'd add a new page
-      page.drawText('... (continued)', { x: margin, y, font, size: 8 });
+      // H6 fix: Log truncation warning instead of silently dropping items
+      const remaining = invoice.lineItems.length - invoice.lineItems.indexOf(item);
+      logger.warn('Factur-X PDF truncated — line items overflow single page', {
+        totalItems: invoice.lineItems.length,
+        droppedItems: remaining,
+      });
+      page.drawText(`... (${remaining} more items — see XML for full data)`, {
+        x: margin,
+        y,
+        font,
+        size: 8,
+      });
       break;
     }
     const desc = (item.description ?? '').substring(0, 40);
     page.drawText(desc, { x: cols.desc, y, font, size: 8 });
     page.drawText(String(item.quantity), { x: cols.qty, y, font, size: 8 });
-    page.drawText(item.unitPrice.toFixed(2), { x: cols.unit, y, font, size: 8 });
-    page.drawText(item.totalPrice.toFixed(2), { x: cols.total, y, font, size: 8 });
+    // H7 fix: Use formatAmount() for consistent rounding with XML
+    page.drawText(formatAmount(item.unitPrice), { x: cols.unit, y, font, size: 8 });
+    page.drawText(formatAmount(item.totalPrice), { x: cols.total, y, font, size: 8 });
     page.drawText(`${item.taxRate}%`, { x: cols.tax, y, font, size: 8 });
     y -= 13;
   }
@@ -452,6 +463,15 @@ export class FacturXGenerator implements IFormatGenerator {
     const warnings: string[] = [];
     if (!structValidation.valid) {
       warnings.push(...structValidation.errors.map((e) => `[XML-STRUCT] ${e}`));
+    }
+
+    // H6 fix: Warn if line items likely overflow the single-page PDF visual
+    const MAX_PDF_LINE_ITEMS = 35;
+    if (invoice.lineItems.length > MAX_PDF_LINE_ITEMS) {
+      warnings.push(
+        `[PDF-TRUNCATED] Invoice has ${invoice.lineItems.length} line items but PDF visual fits ~${MAX_PDF_LINE_ITEMS}. ` +
+          `Remaining items are in the embedded XML but not visible in the PDF.`
+      );
     }
 
     return {
