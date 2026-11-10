@@ -107,10 +107,17 @@ async function buildPdf(
 
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
-  const page = doc.addPage([595, 842]); // A4
+  let page = doc.addPage([595, 842]); // A4
   const { width, height } = page.getSize();
   let y = height - 50;
   const margin = 50;
+
+  // FIX (AUDIT-I6): Helper to add a new page when content overflows
+  const addNewPage = () => {
+    page = doc.addPage([595, 842]);
+    y = height - 50;
+    return page;
+  };
 
   // Title
   page.drawText('INVOICE', { x: margin, y, font: boldFont, size: 20, color: rgb(0.1, 0.1, 0.4) });
@@ -197,21 +204,24 @@ async function buildPdf(
   y -= 13;
 
   // Line items
+  // FIX (AUDIT-I6): Multi-page support — add new page when content overflows
   for (const item of invoice.lineItems) {
     if (y < 100) {
-      // H6 fix: Log truncation warning instead of silently dropping items
-      const remaining = invoice.lineItems.length - invoice.lineItems.indexOf(item);
-      logger.warn('Factur-X PDF truncated — line items overflow single page', {
-        totalItems: invoice.lineItems.length,
-        droppedItems: remaining,
+      addNewPage();
+      // Redraw column headers on new page
+      page.drawText('Description', { x: cols.desc, y, font: boldFont, size: 9 });
+      page.drawText('Qty', { x: cols.qty, y, font: boldFont, size: 9 });
+      page.drawText('Unit Price', { x: cols.unit, y, font: boldFont, size: 9 });
+      page.drawText('Total', { x: cols.total, y, font: boldFont, size: 9 });
+      page.drawText('Tax %', { x: cols.tax, y, font: boldFont, size: 9 });
+      y -= 4;
+      page.drawLine({
+        start: { x: margin, y },
+        end: { x: width - margin, y },
+        thickness: 0.5,
+        color: rgb(0.6, 0.6, 0.6),
       });
-      page.drawText(`... (${remaining} more items — see XML for full data)`, {
-        x: margin,
-        y,
-        font,
-        size: 8,
-      });
-      break;
+      y -= 13;
     }
     const desc = (item.description ?? '').substring(0, 40);
     page.drawText(desc, { x: cols.desc, y, font, size: 8 });

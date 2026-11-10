@@ -22,7 +22,7 @@ import type {
   RetainableEntityType,
   RetentionLogRow,
 } from './types';
-import { RETENTION_POLICIES } from './policies';
+import { RETENTION_POLICIES, getPolicyForJurisdiction } from './policies';
 
 // ─── Database adapter interface (dependency injection) ────────────────────────
 
@@ -127,10 +127,13 @@ export class RetentionEngine {
    */
   async evaluateRetention(policy: RetentionPolicy): Promise<RetainableEntity[]> {
     if (policy.retentionDays <= 0) {
-      this.logger.info('Policy has zero retention days (on-request only), skipping time-based evaluation', {
-        policyId: policy.id,
-        jurisdiction: policy.jurisdiction,
-      });
+      this.logger.info(
+        'Policy has zero retention days (on-request only), skipping time-based evaluation',
+        {
+          policyId: policy.id,
+          jurisdiction: policy.jurisdiction,
+        }
+      );
       return [];
     }
 
@@ -156,7 +159,9 @@ export class RetentionEngine {
         expiredCount: expired.length,
       });
 
-      return expired;
+      return expired.filter(
+        (e) => !e.isArchived && getPolicyForJurisdiction(e.country, e.entityType)?.id === policy.id
+      );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error('Failed to evaluate retention', {
@@ -177,7 +182,7 @@ export class RetentionEngine {
    */
   async archive(
     entityIds: readonly string[],
-    entityType: RetainableEntityType,
+    entityType: RetainableEntityType
   ): Promise<RetentionResult> {
     return this.executeAction([...entityIds], entityType, 'archive', async (ids) => {
       await this.db.archiveEntities(ids, entityType);
@@ -194,7 +199,7 @@ export class RetentionEngine {
    */
   async anonymize(
     entityIds: readonly string[],
-    entityType: RetainableEntityType,
+    entityType: RetainableEntityType
   ): Promise<RetentionResult> {
     return this.executeAction([...entityIds], entityType, 'anonymize', async (ids) => {
       await this.db.anonymizeEntities(ids, entityType);
@@ -211,7 +216,7 @@ export class RetentionEngine {
    */
   async deleteExpired(
     entityIds: readonly string[],
-    entityType: RetainableEntityType,
+    entityType: RetainableEntityType
   ): Promise<RetentionResult> {
     return this.executeAction([...entityIds], entityType, 'delete', async (ids) => {
       await this.db.deleteEntities(ids, entityType);
@@ -247,8 +252,10 @@ export class RetentionEngine {
           this.logger.warn('Schedule references unknown policy, skipping', {
             policyId: schedule.policyId,
           });
-          continue;
+          throw new Error(`Unknown retention policy: ${schedule.policyId}`);
         }
+        if (schedule.entityType !== policy.entityType)
+          throw new Error('Retention schedule entity mismatch');
 
         const expired = await this.evaluateRetention(policy);
         if (expired.length === 0) {
@@ -281,7 +288,7 @@ export class RetentionEngine {
         totalDeleted += result.deleted;
         allErrors.push(...result.errors);
 
-        await this.advanceSchedule(schedule.policyId, now);
+        if (result.errors.length === 0) await this.advanceSchedule(schedule.policyId, now);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -326,8 +333,13 @@ export class RetentionEngine {
     });
 
     const entityTypes: RetainableEntityType[] = [
-      'invoice', 'extraction', 'conversion', 'payment',
-      'user', 'audit_log', 'business_correspondence',
+      'invoice',
+      'extraction',
+      'conversion',
+      'payment',
+      'user',
+      'audit_log',
+      'business_correspondence',
     ];
 
     let totalRetained = 0;
@@ -389,7 +401,7 @@ export class RetentionEngine {
     entityIds: string[],
     entityType: RetainableEntityType,
     action: RetentionAction,
-    operation: (ids: string[]) => Promise<void>,
+    operation: (ids: string[]) => Promise<void>
   ): Promise<RetentionResult> {
     const errors: RetentionError[] = [];
     let successCount = 0;

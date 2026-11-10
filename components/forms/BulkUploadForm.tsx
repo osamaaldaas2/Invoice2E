@@ -16,29 +16,30 @@ import type { OutputFormat } from '@/types/canonical-invoice';
 /*  Shared constants                                                   */
 /* ------------------------------------------------------------------ */
 
-const APPLYABLE_FIELDS = [
-  { key: 'sellerName', label: 'Verkäufername' },
-  { key: 'sellerEmail', label: 'Verkäufer-E-Mail (BT-34)' },
-  { key: 'sellerPhone', label: 'Verkäufer-Telefon' },
-  { key: 'sellerStreet', label: 'Verkäufer-Straße' },
-  { key: 'sellerCity', label: 'Verkäufer-Stadt' },
-  { key: 'sellerPostalCode', label: 'Verkäufer-PLZ' },
-  { key: 'sellerCountryCode', label: 'Verkäufer-Ländercode' },
-  { key: 'sellerTaxId', label: 'Verkäufer-Steuer-ID' },
-  { key: 'sellerVatId', label: 'Verkäufer-USt-ID' },
-  { key: 'sellerIban', label: 'Verkäufer-IBAN' },
-  { key: 'sellerBic', label: 'Verkäufer-BIC' },
-  { key: 'buyerName', label: 'Käufername' },
-  { key: 'buyerEmail', label: 'Käufer-E-Mail (BT-49)' },
-  { key: 'buyerStreet', label: 'Käufer-Straße' },
-  { key: 'buyerCity', label: 'Käufer-Stadt' },
-  { key: 'buyerPostalCode', label: 'Käufer-PLZ' },
-  { key: 'buyerCountryCode', label: 'Käufer-Ländercode' },
-  { key: 'buyerTaxId', label: 'Käufer-Steuer-ID' },
-  { key: 'buyerReference', label: 'Käufer-Referenz (BR-DE-15)' },
-  { key: 'paymentTerms', label: 'Zahlungsbedingungen' },
-  { key: 'currency', label: 'Währung' },
-];
+// FIX (AUDIT-M7): Translation keys instead of hardcoded German strings
+const APPLYABLE_FIELD_KEYS = [
+  'sellerName',
+  'sellerEmail',
+  'sellerPhone',
+  'sellerStreet',
+  'sellerCity',
+  'sellerPostalCode',
+  'sellerCountryCode',
+  'sellerTaxId',
+  'sellerVatId',
+  'sellerIban',
+  'sellerBic',
+  'buyerName',
+  'buyerEmail',
+  'buyerStreet',
+  'buyerCity',
+  'buyerPostalCode',
+  'buyerCountryCode',
+  'buyerTaxId',
+  'buyerReference',
+  'paymentTerms',
+  'currency',
+] as const;
 
 const ALL_FORMATS = getAllFormats();
 
@@ -51,7 +52,7 @@ function computeFormatReadiness(
   data: Record<string, unknown> | null,
   format: OutputFormat
 ): { ready: boolean; missing: string[] } {
-  if (!data) return { ready: false, missing: ['Daten nicht geladen'] };
+  if (!data) return { ready: false, missing: ['dataNotLoaded'] };
 
   const d = (data as any)?.extractionData || data;
   const config = FORMAT_FIELD_CONFIG[format] ?? FORMAT_FIELD_CONFIG['xrechnung-cii'];
@@ -63,20 +64,29 @@ function computeFormatReadiness(
   if (!(Number(d.totalAmount) > 0)) missing.push('Gesamtbetrag');
 
   // Format-specific field checks
-  if (config.sellerPhone === 'required' && !d.sellerPhone && !d.sellerPhoneNumber) missing.push('Verkäufer-Telefon');
-  if (config.sellerEmail === 'required' && !d.sellerEmail && !d.sellerElectronicAddress) missing.push('Verkäufer-E-Mail');
-  if (config.sellerContactName === 'required' && !d.sellerContactName) missing.push('Verkäufer-Kontaktname');
+  if (config.sellerPhone === 'required' && !d.sellerPhone && !d.sellerPhoneNumber)
+    missing.push('Verkäufer-Telefon');
+  if (config.sellerEmail === 'required' && !d.sellerEmail && !d.sellerElectronicAddress)
+    missing.push('Verkäufer-E-Mail');
+  if (config.sellerContactName === 'required' && !d.sellerContactName)
+    missing.push('Verkäufer-Kontaktname');
   if (config.sellerIban === 'required' && !d.sellerIban) missing.push('Verkäufer-IBAN');
-  if (config.sellerVatId === 'required' && !d.sellerVatId && !d.sellerTaxNumber && !d.sellerTaxId) missing.push('Verkäufer-Steuer-ID');
-  if (config.sellerStreet === 'required' && !d.sellerStreet && !d.sellerAddress) missing.push('Verkäufer-Straße');
+  if (config.sellerVatId === 'required' && !d.sellerVatId && !d.sellerTaxNumber && !d.sellerTaxId)
+    missing.push('Verkäufer-Steuer-ID');
+  if (config.sellerStreet === 'required' && !d.sellerStreet && !d.sellerAddress)
+    missing.push('Verkäufer-Straße');
   if (config.sellerCity === 'required' && !d.sellerCity) missing.push('Verkäufer-Stadt');
   if (config.sellerPostalCode === 'required' && !d.sellerPostalCode) missing.push('Verkäufer-PLZ');
-  if (config.buyerStreet === 'required' && !d.buyerStreet && !d.buyerAddress) missing.push('Käufer-Straße');
+  if (config.buyerStreet === 'required' && !d.buyerStreet && !d.buyerAddress)
+    missing.push('Käufer-Straße');
   if (config.buyerCity === 'required' && !d.buyerCity) missing.push('Käufer-Stadt');
   if (config.buyerPostalCode === 'required' && !d.buyerPostalCode) missing.push('Käufer-PLZ');
-  if (config.buyerCountryCode === 'required' && !d.buyerCountryCode) missing.push('Käufer-Ländercode');
-  if (config.buyerElectronicAddress === 'required' && !d.buyerElectronicAddress && !d.buyerEmail) missing.push('Käufer-E-Adresse');
-  if (config.buyerCodiceDestinatario === 'required' && !d.buyerCodiceDestinatario) missing.push('CodiceDestinatario');
+  if (config.buyerCountryCode === 'required' && !d.buyerCountryCode)
+    missing.push('Käufer-Ländercode');
+  if (config.buyerElectronicAddress === 'required' && !d.buyerElectronicAddress && !d.buyerEmail)
+    missing.push('Käufer-E-Adresse');
+  if (config.buyerCodiceDestinatario === 'required' && !d.buyerCodiceDestinatario)
+    missing.push('CodiceDestinatario');
   if (config.paymentTerms === 'required' && !d.paymentTerms) missing.push('Zahlungsbedingungen');
 
   return { ready: missing.length === 0, missing };
@@ -95,6 +105,7 @@ function ApplyToAllPanel({
   onApplied: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations('bulkUpload');
   const [fields, setFields] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -121,16 +132,16 @@ function ApplyToAllPanel({
       const data = await res.json();
       if (data.success) {
         setResult(
-          `${data.data.updated} Rechnungen aktualisiert (${data.data.skipped} hatten bereits Werte)`
+          `${data.data.updated} ${t('invoicesUpdated')} (${data.data.skipped} ${t('alreadyHadValues')})`
         );
         setTimeout(() => {
           onApplied();
         }, 1500);
       } else {
-        setResult(`Fehler: ${data.error}`);
+        setResult(`${t('error')}: ${data.error}`);
       }
     } catch (err) {
-      setResult(`Fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+      setResult(`${t('failedLabel')}: ${err instanceof Error ? err.message : t('unknownError')}`);
     } finally {
       setApplying(false);
       isApplyingRef.current = false;
@@ -140,22 +151,20 @@ function ApplyToAllPanel({
   return (
     <div className="p-4 glass-panel border border-sky-400/20 rounded-xl">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-sky-200">
-          Auf alle Rechnungen anwenden (füllt nur leere Felder)
-        </h4>
+        <h4 className="text-sm font-semibold text-sky-200">{t('applyToAll')}</h4>
         <button onClick={onClose} className="text-slate-400 hover:text-white text-xs">
-          Schließen
+          {t('close')}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
-        {APPLYABLE_FIELDS.map(({ key, label }) => (
+        {APPLYABLE_FIELD_KEYS.map((key) => (
           <div key={key} className="flex flex-col gap-0.5">
-            <label className="text-[11px] text-slate-400">{label}</label>
+            <label className="text-[11px] text-slate-400">{t(key)}</label>
             <input
               type="text"
               value={fields[key] || ''}
               onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))}
-              placeholder={label}
+              placeholder={t(key)}
               className="px-2 py-1 text-xs bg-white/5 border border-white/10 rounded text-white placeholder:text-slate-600 focus:border-sky-400/50 focus:outline-none"
             />
           </div>
@@ -167,7 +176,7 @@ function ApplyToAllPanel({
           disabled={applying || Object.values(fields).every((v) => !v.trim())}
           className="px-4 py-1.5 text-xs font-medium rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-100 hover:bg-sky-500/30 disabled:opacity-40"
         >
-          {applying ? 'Wird angewendet...' : 'Auf alle anwenden'}
+          {applying ? t('applying') : t('applyAll')}
         </button>
         {result && <span className="text-xs text-sky-300">{result}</span>}
       </div>
@@ -218,9 +227,7 @@ function FormatAssignmentBar({
           disabled={selectedIds.size === 0 || applying}
           className="px-4 py-1.5 text-xs font-medium rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-100 hover:bg-sky-500/30 disabled:opacity-40"
         >
-          {applying
-            ? 'Wird zugewiesen...'
-            : `Format zuweisen (${selectedIds.size})`}
+          {applying ? 'Wird zugewiesen...' : `Format zuweisen (${selectedIds.size})`}
         </button>
 
         {/* Select all / Unselect all */}
@@ -533,7 +540,10 @@ export default function BulkUploadForm() {
           // Load format from extraction record if available
           const outputFormat = data.data.outputFormat || data.data.output_format;
           if (outputFormat) {
-            setExtractionFormats((prev) => ({ ...prev, [extractionId]: outputFormat as OutputFormat }));
+            setExtractionFormats((prev) => ({
+              ...prev,
+              [extractionId]: outputFormat as OutputFormat,
+            }));
           }
         }
       } catch {
@@ -854,7 +864,7 @@ export default function BulkUploadForm() {
                         onClick={() => setShowApplyAll(!showApplyAll)}
                         className="px-3 py-1.5 text-xs font-medium rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-200 hover:bg-sky-500/25 flex-shrink-0 ml-2"
                       >
-                        {showApplyAll ? 'Schließen' : 'Auf alle anwenden'}
+                        {showApplyAll ? t('close') : t('applyAll')}
                       </button>
                     </div>
                   </div>
@@ -887,18 +897,14 @@ export default function BulkUploadForm() {
               >
                 {job.results.map((row, idx) => {
                   const cached = row.extractionId ? extractionCache[row.extractionId] : null;
-                  const readiness = cached && row.extractionId
-                    ? computeReadiness(cached, row.extractionId)
-                    : null;
-                  const missing = cached && readiness === 'warning' && row.extractionId
-                    ? getMissingFields(cached, row.extractionId)
-                    : [];
-                  const format = row.extractionId
-                    ? getExtractionFormat(row.extractionId)
-                    : null;
-                  const formatMeta = format
-                    ? ALL_FORMATS.find((f) => f.id === format)
-                    : null;
+                  const readiness =
+                    cached && row.extractionId ? computeReadiness(cached, row.extractionId) : null;
+                  const missing =
+                    cached && readiness === 'warning' && row.extractionId
+                      ? getMissingFields(cached, row.extractionId)
+                      : [];
+                  const format = row.extractionId ? getExtractionFormat(row.extractionId) : null;
+                  const formatMeta = format ? ALL_FORMATS.find((f) => f.id === format) : null;
                   const isSelected = row.extractionId ? selectedIds.has(row.extractionId) : false;
 
                   return (

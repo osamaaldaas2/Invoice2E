@@ -8,7 +8,11 @@ const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'Test1234!';
  * Log in through the UI and return the authenticated page.
  * Reusable helper for any spec that needs a logged-in session.
  */
-export async function login(page: Page, email = TEST_EMAIL, password = TEST_PASSWORD): Promise<void> {
+export async function login(
+  page: Page,
+  email = TEST_EMAIL,
+  password = TEST_PASSWORD
+): Promise<void> {
   await page.goto('/login');
   await page.getByRole('textbox', { name: /email/i }).fill(email);
   await page.getByRole('textbox', { name: /password/i }).fill(password);
@@ -22,9 +26,9 @@ type AuthFixtures = {
 };
 
 export const test = base.extend<AuthFixtures>({
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, providePage) => {
     await login(page);
-    await use(page);
+    await providePage(page);
   },
 });
 

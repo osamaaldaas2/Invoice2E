@@ -91,8 +91,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const parsed = ConvertRequestSchema.safeParse(body);
 
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]?.message || 'Invalid request body';
-      logger.warn('Convert validation failed', { errors: parsed.error.errors });
+      const firstError = parsed.error.issues[0]?.message || 'Invalid request body';
+      logger.warn('Convert validation failed', { errors: parsed.error.issues });
       return NextResponse.json({ success: false, error: firstError }, { status: 400 });
     }
 

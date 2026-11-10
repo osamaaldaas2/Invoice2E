@@ -4,7 +4,7 @@
  */
 
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
-import { createError, type ValidationError } from './validation-result';
+import { createError, createWarning, type ValidationError } from './validation-result';
 import { validatePeppolRules } from './peppol-rules';
 
 /** OIN: exactly 20 digits */
@@ -23,7 +23,7 @@ function validateDutchEndpoint(
   address: string | null | undefined,
   scheme: string | null | undefined,
   party: 'Seller' | 'Buyer',
-  fieldPrefix: string,
+  fieldPrefix: string
 ): ValidationError[] {
   const errors: ValidationError[] = [];
   if (!address || !scheme) return errors;
@@ -34,8 +34,8 @@ function validateDutchEndpoint(
         'NLCIUS-OIN-FORMAT',
         `${fieldPrefix}.electronicAddress`,
         `${party} OIN (schemeID 0190) must be exactly 20 digits, got "${address}"`,
-        { suggestion: 'Provide a 20-digit OIN identifier' },
-      ),
+        { suggestion: 'Provide a 20-digit OIN identifier' }
+      )
     );
   }
 
@@ -45,8 +45,8 @@ function validateDutchEndpoint(
         'NLCIUS-KVK-FORMAT',
         `${fieldPrefix}.electronicAddress`,
         `${party} KVK number (schemeID 0106) must be exactly 8 digits, got "${address}"`,
-        { suggestion: 'Provide an 8-digit KVK number' },
-      ),
+        { suggestion: 'Provide an 8-digit KVK number' }
+      )
     );
   }
 
@@ -69,8 +69,8 @@ export function validateNLCIUSRules(data: CanonicalInvoice): ValidationError[] {
         'NLCIUS-BTW-FORMAT',
         'invoice.seller.vatId',
         `Dutch VAT ID must match format NLxxxxxxxxxBxx, got "${sellerVat}"`,
-        { suggestion: 'Format: NL + 9 digits + B + 2 digits (e.g. NL123456789B01)' },
-      ),
+        { suggestion: 'Format: NL + 9 digits + B + 2 digits (e.g. NL123456789B01)' }
+      )
     );
   }
 
@@ -81,8 +81,25 @@ export function validateNLCIUSRules(data: CanonicalInvoice): ValidationError[] {
         'NLCIUS-BTW-FORMAT',
         'invoice.buyer.vatId',
         `Dutch VAT ID must match format NLxxxxxxxxxBxx, got "${buyerVat}"`,
-        { suggestion: 'Format: NL + 9 digits + B + 2 digits (e.g. NL123456789B01)' },
-      ),
+        { suggestion: 'Format: NL + 9 digits + B + 2 digits (e.g. NL123456789B01)' }
+      )
+    );
+  }
+
+  // FIX (AUDIT-M2): Warn if neither party is Dutch
+  const sellerCountry = data.seller?.countryCode?.trim();
+  const buyerCountry = data.buyer?.countryCode?.trim();
+  if (sellerCountry && buyerCountry && sellerCountry !== 'NL' && buyerCountry !== 'NL') {
+    errors.push(
+      createWarning(
+        'NLCIUS-COUNTRY',
+        'invoice.seller.countryCode',
+        `NLCIUS is the Dutch CIUS — neither seller ("${sellerCountry}") nor buyer ("${buyerCountry}") is in NL. Verify correct format selection.`,
+        {
+          suggestion:
+            'NLCIUS / SI-UBL 2.0 is intended for invoices involving at least one Dutch party',
+        }
+      )
     );
   }
 
@@ -92,16 +109,16 @@ export function validateNLCIUSRules(data: CanonicalInvoice): ValidationError[] {
       data.seller?.electronicAddress,
       data.seller?.electronicAddressScheme,
       'Seller',
-      'invoice.seller',
-    ),
+      'invoice.seller'
+    )
   );
   errors.push(
     ...validateDutchEndpoint(
       data.buyer?.electronicAddress,
       data.buyer?.electronicAddressScheme,
       'Buyer',
-      'invoice.buyer',
-    ),
+      'invoice.buyer'
+    )
   );
 
   return errors;

@@ -5,11 +5,12 @@
 -- Fix: Insert a retroactive credit_transaction record to close the gap.
 
 INSERT INTO credit_transactions (user_id, amount, transaction_type, source, reference_id, balance_after)
-VALUES (
-    '778af93d-e173-43cc-bf5f-1b0a2be5d933',
+SELECT
+    '778af93d-e173-43cc-bf5f-1b0a2be5d933'::uuid,
     5000,
     'credit',
     'reconciliation',
     'retroactive-initial-grant-pre-logging',
     5024  -- balance at the time this grant would have been: 5000 + 24 existing credits
-);
+WHERE EXISTS (SELECT 1 FROM users WHERE id = '778af93d-e173-43cc-bf5f-1b0a2be5d933')
+AND NOT EXISTS (SELECT 1 FROM credit_transactions WHERE reference_id = 'retroactive-initial-grant-pre-logging');

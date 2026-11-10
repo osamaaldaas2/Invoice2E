@@ -31,7 +31,7 @@ export class UserDatabaseService {
 
   async createUser(data: CreateUserData): Promise<User> {
     const supabase = this.getSupabase();
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
 
     const { data: user, error } = await supabase
       .from('users')
@@ -78,7 +78,7 @@ export class UserDatabaseService {
 
   async updateUser(userId: string, data: UpdateUserData): Promise<User> {
     const supabase = this.getSupabase();
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
 
     const { data: user, error } = await supabase
       .from('users')

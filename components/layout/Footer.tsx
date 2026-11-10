@@ -1,127 +1,50 @@
 import { useTranslations } from 'next-intl';
-import { APP_NAME } from '@/lib/constants';
-
+import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
+import Brand from './Brand';
 export default function Footer(): React.ReactElement {
   const t = useTranslations('footer');
-
+  const d = useTranslations('design');
   return (
-    <footer className="border-t border-white/10 bg-slate-950/60 py-10">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="glass-panel rounded-2xl px-6 py-8">
-          {/* Link Columns */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            {/* Formats */}
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-3">{t('formats')}</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a
-                    href="/pdf-to-xrechnung"
-                    className="text-faded hover:text-white transition-colors"
-                  >
-                    PDF → XRechnung
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/pdf-to-zugferd"
-                    className="text-faded hover:text-white transition-colors"
-                  >
-                    PDF → ZUGFeRD
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/pdf-to-peppol"
-                    className="text-faded hover:text-white transition-colors"
-                  >
-                    PDF → PEPPOL
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/pdf-to-fatturapa"
-                    className="text-faded hover:text-white transition-colors"
-                  >
-                    PDF → FatturaPA
-                  </a>
-                </li>
-                <li>
-                  <a href="/pdf-to-ksef" className="text-faded hover:text-white transition-colors">
-                    PDF → KSeF
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Product */}
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-3">{t('product')}</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a href="/pricing" className="text-faded hover:text-white transition-colors">
-                    {t('pricing')}
-                  </a>
-                </li>
-                <li>
-                  <a href="/blog" className="text-faded hover:text-white transition-colors">
-                    Blog
-                  </a>
-                </li>
-                <li>
-                  <a href="/signup" className="text-faded hover:text-white transition-colors">
-                    {t('getStarted')}
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-3">{t('legal')}</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a href="/privacy" className="text-faded hover:text-white transition-colors">
-                    {t('privacy')}
-                  </a>
-                </li>
-                <li>
-                  <a href="/impressum" className="text-faded hover:text-white transition-colors">
-                    {t('impressum')}
-                  </a>
-                </li>
-                <li>
-                  <a href="/terms" className="text-faded hover:text-white transition-colors">
-                    {t('terms')}
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Contact */}
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-3">{t('contactTitle')}</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a
-                    href="mailto:mail@invoice2e.eu"
-                    className="text-faded hover:text-white transition-colors"
-                  >
-                    {t('contact')}
-                  </a>
-                </li>
-              </ul>
-            </div>
+    <footer className="site-footer">
+      <div className="brand-container">
+        <div className="footer-main">
+          <div className="footer-brand">
+            <Link href="/" aria-label="Invoice2E — Home">
+              <Brand />
+            </Link>
+            <p>{d('footerTagline')}</p>
+            <span>{d('footerDescription')}</span>
           </div>
-
-          {/* Bottom bar */}
-          <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-faded">
-              {t('copyright')
-                .replace('Invoice2E', APP_NAME)
-                .replace(/20\d{2}/, String(new Date().getFullYear()))}
-            </p>
+          <div className="footer-column">
+            <h4>{t('product')}</h4>
+            <Link href="/convert">{t('formats')}</Link>
+            <Link href="/pricing">{t('pricing')}</Link>
+            <Link href="/blog">Journal</Link>
+            <Link href="/signup">{t('getStarted')}</Link>
           </div>
+          <div className="footer-column">
+            <h4>{t('formats')}</h4>
+            <Link href="/pdf-to-xrechnung">XRechnung</Link>
+            <Link href="/pdf-to-zugferd">ZUGFeRD</Link>
+            <Link href="/pdf-to-peppol">Peppol</Link>
+            <Link href="/pdf-to-fatturapa">FatturaPA</Link>
+            <Link href="/pdf-to-ksef">KSeF</Link>
+          </div>
+          <div className="footer-column">
+            <h4>{t('legal')}</h4>
+            <Link href="/privacy">{t('privacy')}</Link>
+            <Link href="/impressum">{t('impressum')}</Link>
+            <Link href="/terms">{t('terms')}</Link>
+            <a href="mailto:mail@invoice2e.eu">{t('contact')}</a>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>{t('copyright').replace(/20\d{2}/, String(new Date().getFullYear()))}</span>
+          <a href="mailto:mail@invoice2e.eu">
+            mail@invoice2e.eu
+            <ArrowUpRight size={12} />
+          </a>
         </div>
       </div>
     </footer>

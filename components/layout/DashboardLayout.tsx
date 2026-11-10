@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { LayoutDashboard, Clock, CreditCard, User } from 'lucide-react';
 import { useUser } from '@/lib/user-context';
 
 interface Props {
@@ -14,7 +16,13 @@ export default function DashboardLayout({ children }: Props) {
   const pathname = usePathname();
   const { user, loading } = useUser();
 
-  const isSubPage = pathname !== '/dashboard';
+  const t = useTranslations('common');
+  const links = [
+    { href: '/dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { href: '/dashboard/history', label: t('viewHistory'), icon: Clock },
+    { href: '/dashboard/credits', label: t('credits'), icon: CreditCard },
+    { href: '/dashboard/profile', label: t('profile'), icon: User },
+  ];
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,28 +43,18 @@ export default function DashboardLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-[calc(100vh-120px)]">
-      <main className="p-3 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          {isSubPage && (
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors mb-6"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Dashboard
+    <div className="workspace-shell min-h-[calc(100vh-120px)]">
+      <div className="brand-container pb-12">
+        <nav className="workspace-nav" aria-label={t('dashboard')}>
+          {links.map(({ href, label, icon: Icon }) => (
+            <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined}>
+              <Icon size={15} />
+              {label}
             </Link>
-          )}
-          {children}
-        </div>
-      </main>
+          ))}
+        </nav>
+        {children}
+      </div>
     </div>
   );
 }

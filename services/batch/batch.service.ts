@@ -345,13 +345,26 @@ export class BatchService {
     const splitBuffers = await pdfSplitterService.splitByPageGroups(pdfBuffer, pageGroups);
 
     const extractor = ExtractorFactory.create();
-    const results: BatchResult[] = [];
-    let completedFiles = 0;
-    let failedFiles = 0;
+    const previous = (Array.isArray(job.results) ? job.results : []) as BatchResult[];
+    const results: BatchResult[] = splitBuffers.map(
+      (_, i) =>
+        previous[i] ?? {
+          filename: `Invoice ${i + 1}`,
+          status: 'pending',
+        }
+    );
+    let completedFiles = results.filter((r) => r.status === 'success').length;
+    let failedFiles = results.filter((r) => r.status === 'failed').length;
 
     // Process segments in parallel chunks
-    const segments = splitBuffers.map((buf, i) => ({ buf, i }));
-    for (let c = 0; c < segments.length; c += MULTI_INVOICE_CONCURRENCY) {
+    const segments = splitBuffers
+      .map((buf, i) => ({ buf, i }))
+      .filter(({ i }) => results[i]?.status === 'pending');
+    for (
+      let c = 0;
+      c < Math.min(segments.length, MULTI_INVOICE_CONCURRENCY);
+      c += MULTI_INVOICE_CONCURRENCY
+    ) {
       const chunk = segments.slice(c, c + MULTI_INVOICE_CONCURRENCY);
 
       await Promise.all(
@@ -380,7 +393,7 @@ export class BatchService {
               adminClient
             );
 
-            results.push({
+            results[i] = {
               filename: segmentName,
               status: 'success',
               invoiceNumber: extractedData.invoiceNumber || undefined,
@@ -389,17 +402,17 @@ export class BatchService {
                 typeof extractedData.confidence === 'number' ? extractedData.confidence : undefined,
               reviewStatus: 'pending_review',
               completedAt: new Date().toISOString(),
-            });
+            };
             completedFiles++;
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Unknown error';
-            results.push({
+            results[i] = {
               filename: segmentName,
               status: 'failed',
               error: errMsg,
               reviewStatus: 'not_available',
               completedAt: new Date().toISOString(),
-            });
+            };
             failedFiles++;
           }
         })
@@ -425,12 +438,32 @@ export class BatchService {
       }
     }
 
+    if (results.some((r) => r.status === 'pending')) {
+      const { error } = await supabase
+        .from('batch_jobs')
+        .update({
+          status: 'pending',
+          processing_started_at: null,
+          results,
+          completed_files: completedFiles,
+          failed_files: failedFiles,
+        })
+        .eq('id', jobId);
+      if (error) throw new Error('Failed to checkpoint multi-invoice batch');
+      return;
+    }
+
     // Credits already deducted upfront in extract/route.ts (extraction:multi)
     // Refund credits for any failed extractions
     let refundSucceeded = false;
     if (failedFiles > 0) {
       try {
-        await creditsDbService.addCredits(userId, failedFiles, `batch:refund:${jobId}`, jobId);
+        await creditsDbService.refundCreditsIdempotent(
+          userId,
+          failedFiles,
+          `batch:refund:${jobId}`,
+          `batch:multi-refund:${jobId}`
+        );
         refundSucceeded = true;
         logger.info('Refunded credits for failed multi-invoice extractions', {
           jobId,
@@ -570,25 +603,14 @@ export class BatchService {
       const allProcessed = totalFiles > 0 && completedFiles + failedFiles >= totalFiles;
 
       if (allProcessed) {
-        // All files were processed — the final status update must have failed.
-        // Finalize directly instead of resetting to pending (prevents double credit deduction).
-        const finalStatus =
-          failedFiles === 0 ? 'completed' : completedFiles === 0 ? 'failed' : 'completed';
-
-        await supabase
+        // Re-enter finalization with persisted results so refunds are also replayed safely.
+        const { error: resetError } = await supabase
           .from('batch_jobs')
-          .update({
-            status: finalStatus,
-            completed_at: new Date().toISOString(),
-          })
+          .update({ status: 'pending', processing_started_at: null })
           .eq('id', job.id)
           .eq('status', 'processing');
-        logger.info('Stuck batch job finalized (all files already processed)', {
-          jobId: job.id,
-          finalStatus,
-          completedFiles,
-          failedFiles,
-        });
+        if (resetError) throw resetError;
+        logger.info('Stuck batch queued for idempotent finalization', { jobId: job.id });
       } else if (ageMs > thresholdMs * 3) {
         // Job has been around too long — give up
         const unprocessed = totalFiles - completedFiles - failedFiles;
@@ -606,11 +628,11 @@ export class BatchService {
         // Refund credits for files that were never processed
         if (unprocessed > 0 && job.credits_deducted) {
           try {
-            await creditsDbService.addCredits(
+            await creditsDbService.refundCreditsIdempotent(
               job.user_id,
               unprocessed,
               `batch:refund:stuck:${job.id}`,
-              job.id
+              `batch:refund:stuck:${job.id}`
             );
             logger.info('Refunded credits for unprocessed files in stuck batch', {
               jobId: job.id,

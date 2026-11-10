@@ -50,6 +50,7 @@ export type UserRole = 'user' | 'admin' | 'super_admin' | 'accountant';
  */
 interface SessionPayload {
   userId: string;
+  sessionId: string;
   /** @deprecated PII removed from token — use fetchSessionProfile() instead */
   email: string;
   /** @deprecated PII removed from token — use fetchSessionProfile() instead */
@@ -81,6 +82,7 @@ export function createSessionToken(user: {
   // FIX: Audit #036 — add iss/aud claims.
   const payload: SessionPayload = {
     userId: user.id,
+    sessionId: crypto.randomUUID(),
     email: '',
     firstName: '',
     lastName: '',
@@ -159,7 +161,7 @@ export function verifySessionToken(token: string): SessionPayload | null {
 
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
-    if (payload.expiresAt < now) {
+    if (!payload.userId || !Number.isFinite(payload.expiresAt) || payload.expiresAt <= now) {
       logger.info('Session token expired', { userId: payload.userId });
       return null;
     }
@@ -210,6 +212,16 @@ async function setSessionCookieInternal(user: {
   role?: UserRole;
 }): Promise<void> {
   const token = createSessionToken(user);
+  const payload = verifySessionToken(token)!;
+  const { createAdminClient } = await import('@/lib/supabase.server');
+  const { error } = await createAdminClient()
+    .from('auth_sessions')
+    .insert({
+      id: payload.sessionId,
+      user_id: user.id,
+      expires_at: new Date(payload.expiresAt * 1000).toISOString(),
+    });
+  if (error) throw new Error('Failed to persist session');
   const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
@@ -234,38 +246,8 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
       return null;
     }
 
-    const session = verifySessionToken(token);
+    const session = await verifyActiveSessionToken(token);
     if (!session) return null;
-
-    // EXP-6: Sliding window — renew session if older than half the TTL (3.5 days)
-    const now = Math.floor(Date.now() / 1000);
-    const halfTtl = SESSION_MAX_AGE / 2;
-    if (now - session.issuedAt > halfTtl) {
-      // FIX: Audit V2 [F-003] — invalidate profile cache on renewal
-      _profileCache.delete(session.userId);
-      try {
-        const freshToken = createSessionToken({
-          id: session.userId,
-          email: session.email,
-          firstName: session.firstName,
-          lastName: session.lastName,
-          role: session.role,
-        });
-        cookieStore.set(SESSION_COOKIE_NAME, freshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: SESSION_MAX_AGE,
-          path: '/',
-        });
-      } catch (renewalError) {
-        // Non-critical: if cookie renewal fails, session still valid
-        logger.warn('Session renewal failed, continuing with current session', {
-          userId: session.userId,
-          error: renewalError instanceof Error ? renewalError.message : String(renewalError),
-        });
-      }
-    }
 
     return session;
   } catch (error) {
@@ -279,6 +261,18 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
  */
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? verifySessionToken(token) : null;
+  if (session?.sessionId) {
+    const { createAdminClient } = await import('@/lib/supabase.server');
+    const { error } = await createAdminClient()
+      .from('auth_sessions')
+      .delete()
+      .eq('id', session.sessionId)
+      .eq('user_id', session.userId);
+    if (error) throw new Error('Failed to revoke session');
+    _profileCache.delete(session.userId);
+  }
 
   cookieStore.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
@@ -287,6 +281,25 @@ export async function clearSessionCookie(): Promise<void> {
     maxAge: 0,
     path: '/',
   });
+}
+
+/** Signature validation alone is not authorization. Never cache this live check. */
+export async function verifyActiveSessionToken(token: string): Promise<SessionPayload | null> {
+  const session = verifySessionToken(token);
+  if (!session?.sessionId) return null;
+  const { createAdminClient } = await import('@/lib/supabase.server');
+  const { data, error } = await createAdminClient().rpc('resolve_active_session', {
+    p_session_id: session.sessionId,
+    p_user_id: session.userId,
+  });
+  if (error || !data) return null;
+  return {
+    ...session,
+    role: data.role,
+    email: data.email,
+    firstName: data.first_name,
+    lastName: data.last_name,
+  };
 }
 
 // ============================================

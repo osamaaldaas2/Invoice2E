@@ -10,6 +10,9 @@
 import type { ExtractedInvoiceData, TaxCategoryCode, AllowanceCharge } from '@/types';
 import { logger } from '@/lib/logger';
 
+// FIX (AUDIT-I7): Module-level collector for IBAN warnings, reset per normalization call
+let _ibanWarnings: string[] = [];
+
 /**
  * Try to parse city and postal code from a combined address string.
  * Handles common German/European formats:
@@ -154,11 +157,16 @@ export function normalizeIban(value: unknown): string | null {
   }
 
   // Checksum validation (mod 97)
+  // FIX (AUDIT-I7): Track checksum failures as warnings surfaced to the user
   if (!validateIbanChecksum(text)) {
     logger.warn('IBAN checksum invalid — likely misread digits', {
       iban: text.substring(0, 4) + '***',
       length: text.length,
     });
+    // Store on module-level collector so normalizeExtractedData can surface it
+    _ibanWarnings.push(
+      `IBAN ${text.substring(0, 4)}*** has an invalid checksum — likely misread digits. Please verify.`
+    );
   }
 
   return text;
@@ -271,6 +279,9 @@ export function isEuVatId(taxId: string | null | undefined): boolean {
  * Normalize raw AI-extracted data into a standardized ExtractedInvoiceData object.
  */
 export function normalizeExtractedData(data: Record<string, unknown>): ExtractedInvoiceData {
+  // FIX (AUDIT-I7): Reset IBAN warning collector for this normalization pass
+  _ibanWarnings = [];
+
   const rawSubtotal = safeNumberStrict(data.subtotal);
   const hasSubtotal = !isNaN(rawSubtotal);
   const subtotal = hasSubtotal ? rawSubtotal : 0;
@@ -496,6 +507,11 @@ export function normalizeExtractedData(data: Record<string, unknown>): Extracted
       // Recalculate subtotal as actual net (totalAmount − taxAmount)
       result.subtotal = Math.round((result.totalAmount - result.taxAmount) * 100) / 100;
     }
+  }
+
+  // FIX (AUDIT-I7): Surface IBAN checksum warnings to the user via validationWarnings
+  if (_ibanWarnings.length > 0) {
+    result.validationWarnings = [...(result.validationWarnings || []), ..._ibanWarnings];
   }
 
   return result;

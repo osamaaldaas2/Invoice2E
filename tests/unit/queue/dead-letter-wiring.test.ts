@@ -10,13 +10,15 @@ type EventHandler = (...args: unknown[]) => void;
 const registeredHandlers: Record<string, EventHandler[]> = {};
 
 vi.mock('bullmq', () => ({
-  Worker: vi.fn().mockImplementation(() => ({
-    on: vi.fn((event: string, handler: EventHandler) => {
-      if (!registeredHandlers[event]) registeredHandlers[event] = [];
-      registeredHandlers[event]!.push(handler);
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
+  Worker: vi.fn().mockImplementation(function () {
+    return {
+      on: vi.fn((event: string, handler: EventHandler) => {
+        if (!registeredHandlers[event]) registeredHandlers[event] = [];
+        registeredHandlers[event]!.push(handler);
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+  }),
 }));
 
 vi.mock('@/lib/queue/connection', () => ({

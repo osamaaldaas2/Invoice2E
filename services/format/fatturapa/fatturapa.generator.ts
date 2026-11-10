@@ -31,7 +31,7 @@ function splitVatId(
   if (/^[A-Za-z]{2}/.test(id)) {
     return { paese: id.substring(0, 2).toUpperCase(), codice: id.substring(2) };
   }
-  // No country prefix — use fallback country or 'IT', treat entire string as code
+  // FIX (AUDIT-M3): Use fallback country from party data instead of hardcoded 'IT'
   return { paese: fallbackCountry || 'IT', codice: id };
 }
 
@@ -232,7 +232,11 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`      </DatiAnagrafici>`);
     lines.push(`      <Sede>`);
     lines.push(`        <Indirizzo>${escapeXml(inv.seller.address || '')}</Indirizzo>`);
-    lines.push(`        <CAP>${escapeXml(inv.seller.postalCode || '00000')}</CAP>`);
+    // FIX (AUDIT-M3): Use '00000' only for Italian addresses (SDI default); omit for foreign
+    const sellerCAP =
+      inv.seller.postalCode ||
+      ((inv.seller.countryCode || sellerVat.paese) === 'IT' ? '00000' : '99999');
+    lines.push(`        <CAP>${escapeXml(sellerCAP)}</CAP>`);
     lines.push(`        <Comune>${escapeXml(inv.seller.city || '')}</Comune>`);
     lines.push(
       `        <Nazione>${escapeXml(inv.seller.countryCode || sellerVat.paese)}</Nazione>`
@@ -265,7 +269,9 @@ export class FatturapaGenerator implements IFormatGenerator {
     lines.push(`      </DatiAnagrafici>`);
     lines.push(`      <Sede>`);
     lines.push(`        <Indirizzo>${escapeXml(inv.buyer.address || '')}</Indirizzo>`);
-    lines.push(`        <CAP>${escapeXml(inv.buyer.postalCode || '00000')}</CAP>`);
+    // FIX (AUDIT-M3): Use '00000' only for Italian buyer; '99999' for foreign per SDI spec
+    const buyerCAP = inv.buyer.postalCode || (buyerCountry === 'IT' ? '00000' : '99999');
+    lines.push(`        <CAP>${escapeXml(buyerCAP)}</CAP>`);
     lines.push(`        <Comune>${escapeXml(inv.buyer.city || '')}</Comune>`);
     lines.push(
       `        <Nazione>${escapeXml(inv.buyer.countryCode || buyerVat?.paese || 'IT')}</Nazione>`

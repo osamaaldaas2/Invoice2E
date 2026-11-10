@@ -60,7 +60,7 @@ export const createApiKeySchema = z.object({
 
 export const batchApplySchema = z.object({
   extractionIds: z.array(z.string()).min(1).max(500),
-  fields: z.record(z.string()),
+  fields: z.record(z.string(), z.string()),
 });
 
 export const batchDownloadSchema = z.object({

@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { sessionId, orderId } = body;
 
+    if (
+      (sessionId && orderId) ||
+      (sessionId && !/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) ||
+      (orderId && !/^[a-zA-Z0-9]+$/.test(orderId))
+    ) {
+      throw new ValidationError('Provide one valid payment identifier');
+    }
+
     if (!sessionId && !orderId) {
       return NextResponse.json(
         { success: false, error: 'Session ID or Order ID is required' },
@@ -174,8 +182,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Check for expired transaction
-      if (transaction.payment_status === 'expired') {
+      if (transaction.payment_status === 'completed') {
+        return NextResponse.json({
+          success: true,
+          verified: true,
+          credits,
+          message: 'Already processed',
+        });
+      }
+      if (!['pending', 'processing'].includes(transaction.payment_status)) {
         logger.warn('Attempt to verify expired transaction', { paymentId, userId: user.id });
         return NextResponse.json(
           {
@@ -220,6 +235,7 @@ export async function POST(req: NextRequest) {
           .from('payment_transactions')
           .update(updateData)
           .eq('id', transaction.id)
+          .eq('payment_status', 'completed')
           .eq('user_id', user.id);
 
         if (updateError) {

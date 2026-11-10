@@ -164,19 +164,24 @@ export class CreditsDatabaseService {
     eventType: string,
     referenceId?: string
   ): Promise<{ success: boolean; alreadyProcessed: boolean; newBalance?: number }> {
-    if (amount <= 0) {
+    if (
+      !Number.isSafeInteger(amount) ||
+      amount <= 0 ||
+      !referenceId ||
+      !['stripe', 'paypal'].includes(provider)
+    ) {
       throw new ValidationError('Amount must be positive');
     }
 
     const supabase = this.getSupabase();
 
-    const { data, error } = await supabase.rpc('verify_and_add_credits', {
+    const { data, error } = await supabase.rpc('settle_payment_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_event_id: eventId,
       p_provider: provider,
       p_event_type: eventType,
-      p_reference_id: referenceId || null,
+      p_payment_id: referenceId,
     });
 
     if (error) {

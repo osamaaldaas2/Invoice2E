@@ -47,3 +47,12 @@ tmp/
 TASK-*.md
 AUDIT-V3-FIXES.md
 .gitnexus
+
+# Local dependency-audit download cache
+.audit-npm-cache/
+
+# Local audit reports, logs and screenshots
+audit/
+
+# Windows folder metadata
+desktop.ini

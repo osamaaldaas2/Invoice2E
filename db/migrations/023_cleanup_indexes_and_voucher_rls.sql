@@ -4,7 +4,7 @@
 --   2. Drop unused indexes (reported by Supabase linter — never queried)
 --   3. Add RLS policies for vouchers and voucher_redemptions (RLS enabled but no policies)
 
-BEGIN;
+-- Transaction is managed by the migration runner.
 
 -- ============================================================
 -- 1. DROP DUPLICATE INDEX on webhook_events
@@ -82,5 +82,3 @@ CREATE POLICY "voucher_redemptions_select" ON public.voucher_redemptions
         user_id::text = (select auth.uid())::text
         OR is_admin((select auth.uid())::uuid)
     );
-
-COMMIT;

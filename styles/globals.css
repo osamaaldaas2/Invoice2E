@@ -92,14 +92,14 @@ input[type="number"] {
 
 @layer base {
   :root {
-    --background: 228 28% 8%;
+    --background: 152 39% 11%;
     --foreground: 210 40% 96%;
-    --card: 228 26% 12%;
+    --card: 151 28% 15%;
     --card-foreground: 210 40% 96%;
-    --popover: 228 26% 12%;
+    --popover: 151 28% 15%;
     --popover-foreground: 210 40% 96%;
-    --primary: 212 92% 62%;
-    --primary-foreground: 220 40% 10%;
+    --primary: 73 72% 73%;
+    --primary-foreground: 152 39% 15%;
     --secondary: 224 20% 18%;
     --secondary-foreground: 210 40% 96%;
     --muted: 225 16% 18%;
@@ -110,19 +110,19 @@ input[type="number"] {
     --destructive-foreground: 210 40% 96%;
     --border: 220 22% 20%;
     --input: 220 22% 20%;
-    --ring: 212 92% 62%;
+    --ring: 73 50% 60%;
     --radius: 1rem;
   }
 
   .dark {
-    --background: 228 28% 8%;
+    --background: 152 39% 11%;
     --foreground: 210 40% 96%;
-    --card: 228 26% 12%;
+    --card: 151 28% 15%;
     --card-foreground: 210 40% 96%;
-    --popover: 228 26% 12%;
+    --popover: 151 28% 15%;
     --popover-foreground: 210 40% 96%;
-    --primary: 212 92% 62%;
-    --primary-foreground: 220 40% 10%;
+    --primary: 73 72% 73%;
+    --primary-foreground: 152 39% 15%;
     --secondary: 224 20% 18%;
     --secondary-foreground: 210 40% 96%;
     --muted: 225 16% 18%;
@@ -133,7 +133,7 @@ input[type="number"] {
     --destructive-foreground: 210 40% 96%;
     --border: 220 22% 20%;
     --input: 220 22% 20%;
-    --ring: 212 92% 62%;
+    --ring: 73 50% 60%;
   }
 }
 
@@ -213,7 +213,7 @@ input[type="number"] {
   }
 
   .gradient-text {
-    background: linear-gradient(90deg, #7dd3fc 0%, #60a5fa 45%, #f97316 100%);
+    background: linear-gradient(90deg, #e1efbd 0%, #b8d78e 100%);
     -webkit-background-clip: text;
     color: transparent;
   }

@@ -12,6 +12,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import '@/styles/globals.css';
 import '@/styles/variables.css';
+import '@/styles/brand.css';
 import { Sora, Manrope } from 'next/font/google';
 
 const displayFont = Sora({
@@ -118,8 +119,13 @@ export default async function RootLayout({
           <ToastProvider>
             <ConfirmProvider>
               <UserProvider>
+                <a href="#main-content" className="skip-link">
+                  {locale === 'de' ? 'Zum Inhalt' : 'Skip to content'}
+                </a>
                 <Header />
-                <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
+                <main id="main-content" className="flex-1 min-w-0 overflow-x-hidden">
+                  {children}
+                </main>
                 <Footer />
                 <ToastContainer />
                 <ConfirmDialog />

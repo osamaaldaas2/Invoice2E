@@ -25,6 +25,9 @@ export default [
             ...nextPlugin.configs.recommended.rules,
             ...nextPlugin.configs['core-web-vitals'].rules,
             ...hooksPlugin.configs.recommended.rules,
+            // Compiler migration diagnostics remain visible; hook correctness stays blocking.
+            'react-hooks/set-state-in-effect': 'warn',
+            'react-hooks/refs': 'warn',
             '@next/next/no-html-link-for-pages': 'off',
             'no-console': 'warn',
             'no-debugger': 'error',

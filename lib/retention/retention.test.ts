@@ -11,15 +11,8 @@ import {
   getAllPoliciesForJurisdiction,
   RETENTION_POLICIES,
 } from './policies';
-import {
-  RetentionEngine,
-  hashPii,
-} from './engine';
-import type {
-  RetentionDatabaseAdapter,
-  RetainableEntity,
-  RetentionLogger,
-} from './engine';
+import { RetentionEngine, hashPii } from './engine';
+import type { RetentionDatabaseAdapter, RetainableEntity, RetentionLogger } from './engine';
 import type { RetentionSchedule } from './types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -185,7 +178,7 @@ describe('RetentionEngine', () => {
         expect.objectContaining({
           entityType: 'invoice',
           limit: 500,
-        }),
+        })
       );
     });
   });
@@ -254,7 +247,7 @@ describe('RetentionEngine', () => {
       expect(db.updateScheduleNextRun).toHaveBeenCalled();
     });
 
-    it('should skip schedules with unknown policies', async () => {
+    it('should reject schedules with unknown policies', async () => {
       const schedule: RetentionSchedule = {
         policyId: 'nonexistent-policy',
         entityType: 'invoice',
@@ -264,9 +257,8 @@ describe('RetentionEngine', () => {
 
       (db.getDueSchedules as ReturnType<typeof vi.fn>).mockResolvedValue([schedule]);
 
-      const result = await engine.processRetentionSchedule();
-
-      expect(result.processed).toBe(0);
+      await expect(engine.processRetentionSchedule()).rejects.toThrow('Unknown retention policy');
+      expect(db.updateScheduleNextRun).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalled();
     });
 

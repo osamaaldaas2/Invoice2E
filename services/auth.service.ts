@@ -491,56 +491,14 @@ export class AuthService {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const supabase = this.getSupabase();
 
-    // Validate token
-    const { data: tokenData, error: tokenError } = await supabase
-      .from('password_reset_tokens')
-      .select('id, user_id, expires_at, used_at')
-      .eq('token_hash', tokenHash)
-      .single();
-
-    if (tokenError || !tokenData) {
-      throw new ValidationError('Invalid or expired reset link');
-    }
-
-    if (tokenData.used_at) {
-      throw new ValidationError('This reset link has already been used');
-    }
-
-    if (new Date(tokenData.expires_at) < new Date()) {
-      throw new ValidationError('This reset link has expired');
-    }
-
-    // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
-
-    // Update user password
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
-      .eq('id', tokenData.user_id);
-
-    if (updateError) {
-      logger.error('Failed to update password', {
-        userId: tokenData.user_id,
-        error: updateError.message,
-      });
-      throw new AppError('DB_ERROR', 'Failed to reset password', 500);
-    }
-
-    // Mark token as used
-    await supabase
-      .from('password_reset_tokens')
-      .update({ used_at: new Date().toISOString() })
-      .eq('id', tokenData.id);
-
-    // Invalidate all other tokens for this user
-    await supabase
-      .from('password_reset_tokens')
-      .delete()
-      .eq('user_id', tokenData.user_id)
-      .neq('id', tokenData.id);
-
-    logger.info('Password reset successful', { userId: tokenData.user_id });
+    const { data, error } = await supabase.rpc('consume_password_reset', {
+      p_token_hash: tokenHash,
+      p_password_hash: passwordHash,
+    });
+    if (error) throw new AppError('DB_ERROR', 'Failed to reset password', 500);
+    if (!data) throw new ValidationError('Invalid or expired reset link');
+    logger.info('Password reset successful');
   }
 }
 

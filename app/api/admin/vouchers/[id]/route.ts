@@ -150,7 +150,7 @@ export async function PUT(
     const { id } = await context.params;
     const extra = {
       voucherId: id,
-      ...(error instanceof z.ZodError ? { details: error.errors } : {}),
+      ...(error instanceof z.ZodError ? { details: error.issues } : {}),
     };
     const isPlainError = error instanceof Error && !(error instanceof z.ZodError);
 

@@ -49,7 +49,6 @@ const mockChain = buildChain();
 
 vi.mock('@/lib/supabase.server', () => ({
   createAdminClient: vi.fn(() => mockChain),
-  createAdminClient: vi.fn(() => mockChain),
   createUserScopedClient: vi.fn(() => Promise.resolve(mockChain)),
 }));
 
@@ -118,60 +117,33 @@ vi.mock('@/lib/constants', () => ({
 
 import { BatchProcessor } from '@/services/batch/batch.processor';
 
-describe('BatchProcessor credit idempotency (R-1/R-5)', () => {
-  let processor: BatchProcessor;
-
+describe('BatchProcessor atomic credit reservation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    creditsDeductedFlag = false;
-    mockChain._pendingClaimResult = null;
-    processor = new BatchProcessor();
+    mockChain.rpc = vi.fn().mockResolvedValue({ data: true, error: null });
   });
 
-  it('deducts credits on first run (credits_deducted=false)', async () => {
-    const files = [{ name: 'test.pdf', content: Buffer.from('fake') }];
-
-    try {
-      await processor.processBatch('job-1', files);
-    } catch {
-      // Expect errors from mocking gaps in file processing — we only assert on deductCredits
-    }
-
-    expect(mockDeductCredits).toHaveBeenCalledTimes(1);
-    expect(mockDeductCredits).toHaveBeenCalledWith('user-1', 1, 'batch:deduct:job-1');
-  });
-
-  it('skips deduction on recovery re-run (credits_deducted=true)', async () => {
-    // Simulate: credits were already deducted in a previous run
-    creditsDeductedFlag = true;
-
-    const files = [{ name: 'test.pdf', content: Buffer.from('fake') }];
-
-    try {
-      await processor.processBatch('job-1', files);
-    } catch {
-      // Expect errors from mocking gaps in file processing
-    }
-
-    // deductCredits should NOT have been called
+  it('delegates reservation and marker to one database transaction', async () => {
+    await new BatchProcessor()
+      .processBatch('job-1', [{ name: 'test.pdf', content: Buffer.from('fake') }])
+      .catch(() => {});
+    expect(mockChain.rpc).toHaveBeenCalledWith('deduct_batch_credits', {
+      p_job_id: 'job-1',
+      p_user_id: 'user-1',
+      p_amount: 1,
+    });
     expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(
+      mockChain.update.mock.calls.some((call: any[]) => call[0]?.credits_deducted === true)
+    ).toBe(false);
   });
 
-  it('flag is set atomically before deduction', async () => {
-    const files = [{ name: 'test.pdf', content: Buffer.from('fake') }];
-
-    try {
-      await processor.processBatch('job-1', files);
-    } catch {
-      // Expected
-    }
-
-    // Verify update was called with credits_deducted: true
-    const updateCalls = mockChain.update.mock.calls;
-    const claimCall = updateCalls.find((call: any[]) => call[0]?.credits_deducted === true);
-    expect(claimCall).toBeDefined();
-
-    // And credits_deducted flag should now be true
-    expect(creditsDeductedFlag).toBe(true);
+  it('does not call extraction when the reservation fails', async () => {
+    mockChain.rpc.mockResolvedValue({ data: null, error: { message: 'database unavailable' } });
+    const { invoiceDbService } = await import('@/services/invoice.db.service');
+    await new BatchProcessor()
+      .processBatch('job-1', [{ name: 'test.pdf', content: Buffer.from('fake') }])
+      .catch(() => {});
+    expect(invoiceDbService.createExtraction).not.toHaveBeenCalled();
   });
 });

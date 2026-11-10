@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=9.0.0"
   },
   "scripts": {
@@ -21,14 +21,15 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "prepare": "husky",
-    "lint:deps": "npx depcruise --config .dependency-cruiser.cjs app services lib components types hooks adapters domains",
+    "lint:deps": "npx depcruise --config .dependency-cruiser.cjs app services lib components types hooks adapters",
     "test:e2e": "npx playwright test",
-    "test:e2e:ui": "npx playwright test --ui"
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:security-db": "tsx scripts/security-db-check.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.2",
     "@google/generative-ai": "^0.24.1",
-    "@hookform/resolvers": "^3.3.0",
+    "@hookform/resolvers": "^7.0.1",
     "@sentry/nextjs": "^10.38.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.38.0",
@@ -58,7 +59,7 @@
     "tesseract.js": "^7.0.0",
     "unpdf": "^1.4.0",
     "xstate": "^5.19.0",
-    "zod": "^3.22.0",
+    "zod": "^4.6.7",
     "zustand": "^4.4.0"
   },
   "lint-staged": {
@@ -71,22 +72,23 @@
     ]
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@eslint/eslintrc": "^3.3.3",
     "@playwright/test": "^1.52.0",
     "@tailwindcss/typography": "^0.5.19",
-    "@testcontainers/postgresql": "^10.18.0",
+    "@testcontainers/postgresql": "^12.2.1",
     "@testing-library/jest-dom": "^6.1.0",
     "@testing-library/react": "^14.1.0",
     "@types/bcrypt": "^6.0.0",
     "@types/jest": "^30.0.0",
     "@types/jsdom": "^27.0.0",
-    "@types/node": "^20.10.0",
+    "@types/node": "^22.0.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.11.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@vitest/coverage-v8": "~3.2.4",
-    "@vitest/ui": "~3.2.4",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/ui": "^5.1.0",
     "autoprefixer": "^10.4.0",
     "dependency-cruiser": "^16.0.0",
     "eslint": "^9.39.2",
@@ -100,7 +102,8 @@
     "prettier": "^3.1.0",
     "supabase": "^2.75.5",
     "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.15",
     "typescript": "^5.3.0",
-    "vitest": "~3.2.4"
+    "vitest": "^5.1.0"
   }
 }

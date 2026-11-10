@@ -36,10 +36,39 @@ export const DEFAULT_CREDITS_ON_SIGNUP = 1;
 // PDF boundary detection
 export const MAX_PAGES_FOR_BOUNDARY_DETECTION = 50;
 
-// Tax configuration (German VAT rates)
+// Tax configuration — country-aware VAT rates
 // FIX (QA-BUG-4): Centralized VAT rate configuration
-export const DEFAULT_VAT_RATE = 19; // Standard German VAT rate
+// FIX (AUDIT-I4): Country-aware defaults instead of hardcoded German 19%
+export const STANDARD_VAT_RATES: Readonly<Record<string, number>> = {
+  DE: 19,
+  AT: 20,
+  FR: 20,
+  IT: 22,
+  PL: 23,
+  NL: 21,
+  RO: 19,
+  ES: 21,
+  BE: 21,
+  PT: 23,
+  CZ: 21,
+  SE: 25,
+  DK: 25,
+  FI: 25.5,
+  IE: 23,
+  GR: 24,
+  HU: 27,
+  LU: 17,
+  CH: 8.1,
+  NO: 25,
+};
+export const DEFAULT_VAT_RATE = 19; // Fallback when country unknown (German VAT rate)
 export const REDUCED_VAT_RATE = 7; // Reduced German VAT rate
+
+/** Get the standard VAT rate for a given country code. Falls back to 19% (DE). */
+export function getStandardVatRate(countryCode?: string | null): number {
+  if (!countryCode) return DEFAULT_VAT_RATE;
+  return STANDARD_VAT_RATES[countryCode.toUpperCase()] ?? DEFAULT_VAT_RATE;
+}
 
 // Internationalization
 export const SUPPORTED_LOCALES = ['de', 'en'] as const;

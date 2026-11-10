@@ -1,3 +1,4 @@
+import { scheduleBatchWorker } from '@/lib/batch-trigger';
 /**
  * Bulk Upload API Route
  * Handles batch invoice processing
@@ -39,23 +40,6 @@ const resolveActiveUserId = async (
     .maybeSingle();
 
   return (byEmail?.id as string | undefined) || null;
-};
-
-const triggerBatchWorkerAsync = (req: NextRequest): void => {
-  const secret = process.env.BATCH_WORKER_SECRET;
-  const headers: Record<string, string> = {};
-  if (secret) {
-    headers['x-internal-worker-key'] = secret;
-  }
-
-  void fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=3`, {
-    method: 'POST',
-    headers,
-  }).catch((error) => {
-    logger.warn('Failed to trigger internal batch worker', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
 };
 
 /**
@@ -175,7 +159,7 @@ export async function POST(req: NextRequest) {
     const job = await batchService.createBatchJob(activeUserId, buffer);
 
     // Fire-and-forget queue processing trigger
-    triggerBatchWorkerAsync(req);
+    scheduleBatchWorker();
 
     logger.info('Batch job created', {
       jobId: job.id,
@@ -278,7 +262,7 @@ export async function GET(req: NextRequest) {
       const ageMs = Date.now() - new Date(status.createdAt).getTime();
       if (ageMs > 10_000) {
         logger.warn('Batch job stuck in pending, re-triggering worker', { batchId, ageMs });
-        triggerBatchWorkerAsync(req);
+        scheduleBatchWorker();
       }
     }
 

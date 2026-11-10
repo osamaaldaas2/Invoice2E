@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
-import { verifySessionToken, fetchSessionProfile } from '@/lib/session';
+import { verifyActiveSessionToken, fetchSessionProfile } from '@/lib/session';
 
 // FIX: Re-audit #11 — session cookie name must match lib/session.ts
 const SESSION_COOKIE_NAME = 'session_token';
@@ -33,7 +33,7 @@ export async function getAuthenticatedUser(req: NextRequest): Promise<Authentica
       return null;
     }
 
-    const session = verifySessionToken(token);
+    const session = await verifyActiveSessionToken(token);
 
     if (!session) {
       logger.debug('Invalid or expired session token');

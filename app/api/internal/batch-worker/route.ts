@@ -8,11 +8,19 @@ import { checkRateLimitAsync, getRequestIdentifier } from '@/lib/rate-limiter';
 export const maxDuration = 300; // 5 min — handles up to ~100 invoices at concurrency 5
 
 function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 function isWorkerAuthorized(request: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (request.method === 'GET') {
+    return (
+      !!cronSecret &&
+      safeCompare(request.headers.get('authorization') || '', `Bearer ${cronSecret}`)
+    );
+  }
   const configuredSecret = process.env.BATCH_WORKER_SECRET;
 
   if (!configuredSecret) {
@@ -48,9 +56,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await batchService.recoverStuckJobs();
 
     const { searchParams } = new URL(request.url);
-    const maxJobsParam = Number(searchParams.get('maxJobs') || '3');
+    const maxJobsParam = Number(searchParams.get('maxJobs') || '1');
     const maxJobs =
-      Number.isFinite(maxJobsParam) && maxJobsParam > 0 ? Math.min(maxJobsParam, 20) : 3;
+      Number.isFinite(maxJobsParam) && maxJobsParam > 0 ? Math.min(maxJobsParam, 1) : 1;
 
     let processed = 0;
     for (let i = 0; i < maxJobs; i++) {
@@ -72,6 +80,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 }
+
+export const GET = POST;
 
 export async function OPTIONS(): Promise<NextResponse> {
   return NextResponse.json({}, { status: 200 });

@@ -11,7 +11,7 @@
  */
 
 import { roundMoney, sumMoney, computeTax, moneyEqual } from './monetary';
-import { DEFAULT_VAT_RATE } from './constants';
+import { getStandardVatRate } from './constants';
 
 export interface MonetaryLineItem {
   netAmount: number;
@@ -42,6 +42,8 @@ export interface MonetaryTotals {
   prepaidAmount?: number;
   /** Document-level allowances and charges (BG-20 / BG-21) */
   allowanceCharges?: MonetaryAllowanceCharge[];
+  /** FIX (AUDIT-I4): Seller country code for country-aware VAT rate fallback */
+  sellerCountryCode?: string | null;
 }
 
 export interface MonetaryValidationError {
@@ -76,7 +78,7 @@ export function validateMonetaryCrossChecks(totals: MonetaryTotals): MonetaryVal
   let isGrossPriced = false;
   if (hasAllowancesOrCharges && !moneyEqual(totalWithoutVat, totals.subtotal, 0.02)) {
     const grossAfterAdjustments = totalWithoutVat; // lineNetSum - allowances + charges
-    const commonRates = [0.19, 0.07, 0.20, 0.21, 0.10, 0.05];
+    const commonRates = [0.19, 0.07, 0.2, 0.21, 0.1, 0.05];
     for (const rate of commonRates) {
       const netFromGross = roundMoney(grossAfterAdjustments / (1 + rate));
       if (moneyEqual(netFromGross, totals.subtotal, 0.05)) {
@@ -90,7 +92,8 @@ export function validateMonetaryCrossChecks(totals: MonetaryTotals): MonetaryVal
     if (hasAllowancesOrCharges) {
       errors.push({
         ruleId: 'BR-CO-13',
-        message: 'Invoice total without VAT does not match line total - allowances + charges (BT-109)',
+        message:
+          'Invoice total without VAT does not match line total - allowances + charges (BT-109)',
         expected: roundMoney(totalWithoutVat).toFixed(2),
         actual: roundMoney(totals.subtotal).toFixed(2),
       });
@@ -122,7 +125,11 @@ export function validateMonetaryCrossChecks(totals: MonetaryTotals): MonetaryVal
   } else {
     // Standard net-pricing validation
     // BR-CO-14: For each tax group, verify tax = basis * rate
-    const taxGroups = groupByTaxRate(totals.lineItems, totals.allowanceCharges);
+    const taxGroups = groupByTaxRate(
+      totals.lineItems,
+      totals.allowanceCharges,
+      totals.sellerCountryCode
+    );
     let computedTotalTax = 0;
     for (const group of taxGroups) {
       const expectedTax = computeTax(group.taxableAmount, group.taxRate);
@@ -169,7 +176,8 @@ export function validateMonetaryCrossChecks(totals: MonetaryTotals): MonetaryVal
  */
 export function groupByTaxRate(
   lineItems: MonetaryLineItem[],
-  allowanceCharges?: MonetaryAllowanceCharge[]
+  allowanceCharges?: MonetaryAllowanceCharge[],
+  sellerCountryCode?: string | null
 ): TaxBreakdownEntry[] {
   const groups = new Map<number, { taxableAmount: number; taxCategoryCode: string }>();
 
@@ -189,7 +197,8 @@ export function groupByTaxRate(
   // Include document-level allowances/charges in tax groups
   if (allowanceCharges && allowanceCharges.length > 0) {
     for (const ac of allowanceCharges) {
-      const rate = ac.taxRate ?? DEFAULT_VAT_RATE;
+      // FIX (AUDIT-I4): Country-aware VAT rate fallback
+      const rate = ac.taxRate ?? getStandardVatRate(sellerCountryCode);
       const existing = groups.get(rate);
       const adjustment = ac.chargeIndicator ? ac.amount : -ac.amount;
 
@@ -251,5 +260,13 @@ export function recomputeTotals(
   const taxAmount = sumMoney(taxBreakdowns.map((tb) => tb.taxAmount));
   const totalAmount = roundMoney(subtotal + taxAmount);
 
-  return { lineNetSum, subtotal, taxAmount, totalAmount, totalAllowances, totalCharges, taxBreakdowns };
+  return {
+    lineNetSum,
+    subtotal,
+    taxAmount,
+    totalAmount,
+    totalAllowances,
+    totalCharges,
+    taxBreakdowns,
+  };
 }

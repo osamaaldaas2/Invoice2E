@@ -8,6 +8,7 @@ module.exports = {
       from: {},
       to: {
         circular: true,
+        dependencyTypesNot: ['type-only'],
       },
     },
     {
@@ -71,6 +72,8 @@ module.exports = {
         'lib/ cannot import from services/ or components/ (CONSTITUTION: file_structure_rules)',
       from: {
         path: '^lib/',
+        // Explicit composition roots wire application services.
+        pathNot: ['^lib/container/', '^lib/ai-resilience\\.ts$'],
       },
       to: {
         path: '^(services|components)/',
@@ -85,7 +88,8 @@ module.exports = {
         path: '^types/',
       },
       to: {
-        pathNot: '^types/',
+        // Runtime validation schemas are colocated with their inferred types.
+        pathNot: ['^types/', '^node_modules/zod/'],
         dependencyTypesNot: ['type-only'],
       },
     },

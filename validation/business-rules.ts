@@ -4,9 +4,13 @@
  */
 
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
-import { validateMonetaryCrossChecks, type MonetaryLineItem, type MonetaryAllowanceCharge } from '@/lib/monetary-validator';
+import {
+  validateMonetaryCrossChecks,
+  type MonetaryLineItem,
+  type MonetaryAllowanceCharge,
+} from '@/lib/monetary-validator';
 import { roundMoney } from '@/lib/monetary';
-import { DEFAULT_VAT_RATE } from '@/lib/constants';
+import { getStandardVatRate } from '@/lib/constants';
 import { createError, type ValidationError } from './validation-result';
 
 /**
@@ -27,7 +31,11 @@ export function validateBusinessRules(data: CanonicalInvoice): ValidationError[]
     const quantity = Number(item.quantity) || 1;
     const totalPrice = Number(item.totalPrice) || unitPrice * quantity;
     const rawRate = Number(item.taxRate);
-    const taxRate = Number.isFinite(rawRate) && rawRate >= 0 ? rawRate : DEFAULT_VAT_RATE;
+    // FIX (AUDIT-I4): Use country-aware VAT rate instead of hardcoded German 19%
+    const taxRate =
+      Number.isFinite(rawRate) && rawRate >= 0
+        ? rawRate
+        : getStandardVatRate(data.seller?.countryCode);
 
     // F3: Check if totalPrice looks like GROSS instead of NET
     if (unitPrice > 0 && quantity > 0) {
@@ -84,12 +92,14 @@ export function validateBusinessRules(data: CanonicalInvoice): ValidationError[]
   });
 
   // Map document-level allowances/charges for monetary validation
-  const monetaryAllowanceCharges: MonetaryAllowanceCharge[] = (data.allowanceCharges ?? []).map((ac) => ({
-    chargeIndicator: ac.chargeIndicator,
-    amount: Number(ac.amount) || 0,
-    taxRate: ac.taxRate != null ? Number(ac.taxRate) : undefined,
-    taxCategoryCode: ac.taxCategoryCode ?? undefined,
-  }));
+  const monetaryAllowanceCharges: MonetaryAllowanceCharge[] = (data.allowanceCharges ?? []).map(
+    (ac) => ({
+      chargeIndicator: ac.chargeIndicator,
+      amount: Number(ac.amount) || 0,
+      taxRate: ac.taxRate != null ? Number(ac.taxRate) : undefined,
+      taxCategoryCode: ac.taxCategoryCode ?? undefined,
+    })
+  );
 
   // Run standard BR-CO monetary cross-checks
   const monetaryErrors = validateMonetaryCrossChecks({
@@ -98,6 +108,7 @@ export function validateBusinessRules(data: CanonicalInvoice): ValidationError[]
     taxAmount: Number(data.totals?.taxAmount) || 0,
     totalAmount: Number(data.totals?.totalAmount) || 0,
     allowanceCharges: monetaryAllowanceCharges,
+    sellerCountryCode: data.seller?.countryCode,
   });
 
   // Combine semantic errors with BR-CO errors

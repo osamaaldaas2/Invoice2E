@@ -1,3 +1,4 @@
+import { decryptExtractionRow } from '@/lib/encryption/extraction';
 /**
  * Analytics Service
  * Provides conversion history and statistics for users
@@ -152,7 +153,7 @@ export class AnalyticsService {
     });
 
     const mapExtraction = (row: any): ConversionHistoryItem => {
-      const data = row.extraction_data || {};
+      const data = decryptExtractionRow(row).extraction_data || {};
       const invoiceNumber = data.invoiceNumber || data.invoice_number || 'N/A';
       const buyerName =
         data.buyerName || data.buyer_name || data.sellerName || data.seller_name || 'Invoice';

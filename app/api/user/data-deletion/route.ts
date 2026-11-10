@@ -27,9 +27,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = await createUserScopedClient(user.id);
 
     // FIX: Audit #024 — record GDPR erasure request
-    // Actual pseudonymization is processed asynchronously to avoid timeout
+    // Requests require administrative review of retention obligations
     const { error } = await supabase.from('gdpr_requests').insert({
-      user_id: user.id,
+      subject_id: user.id,
       request_type: 'erasure',
       status: 'pending',
       requested_at: new Date().toISOString(),
@@ -51,12 +51,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       message:
-        'Your data deletion request has been received and will be processed within 30 days per GDPR requirements.',
+        'Your data deletion request has been received for review. Records subject to retention obligations require a separate assessment.',
     });
   } catch (error) {
     return handleApiError(error, 'GDPR data deletion error', {
       message: 'Failed to process deletion request',
       includeSuccess: true,
     });
+  }
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const db = await createUserScopedClient(user.id);
+    const { data, error } = await db
+      .from('gdpr_requests')
+      .select('id,status,requested_at,completed_at')
+      .eq('subject_id', user.id)
+      .eq('request_type', 'erasure')
+      .order('requested_at', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return NextResponse.json({ success: true, requests: data });
+  } catch (error) {
+    return handleApiError(error, 'Deletion request status failed');
   }
 }

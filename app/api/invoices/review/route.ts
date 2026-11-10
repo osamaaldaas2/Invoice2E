@@ -140,8 +140,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const parsedReview = ReviewedDataSchema.safeParse(rawReviewedData);
     if (!parsedReview.success) {
-      const firstError = parsedReview.error.errors[0]?.message || 'Invalid review data';
-      logger.warn('Review validation failed', { errors: parsedReview.error.errors });
+      const firstError = parsedReview.error.issues[0]?.message || 'Invalid review data';
+      logger.warn('Review validation failed', { errors: parsedReview.error.issues });
       return NextResponse.json({ success: false, error: firstError }, { status: 400 });
     }
     // Safe cast: Zod validated core fields, .passthrough() preserves all extra fields

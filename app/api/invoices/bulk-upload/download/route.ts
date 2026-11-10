@@ -11,7 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { batchService } from '@/services/batch.service';
 import { invoiceDbService } from '@/services/invoice.db.service';
-import { xrechnungService, type XRechnungInvoiceData } from '@/services/xrechnung.service';
+import { GeneratorFactory } from '@/services/format/GeneratorFactory';
+import { toCanonicalInvoice } from '@/services/format/canonical-mapper';
+import type { OutputFormat } from '@/types/canonical-invoice';
 import { logger } from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { verifySignedDownloadToken } from '@/lib/session';
@@ -102,8 +104,7 @@ export async function GET(req: NextRequest) {
           userClient
         );
         const cachedXml = (existingConversion as Record<string, unknown> | null)?.xml_content as
-          | string
-          | undefined;
+          string | undefined;
         const cachedFileName = (existingConversion as Record<string, unknown> | null)
           ?.xml_file_name as string | undefined;
 
@@ -120,26 +121,32 @@ export async function GET(req: NextRequest) {
             string,
             unknown
           >;
-          const serviceData = {
-            ...data,
-            invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
-            invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
-            sellerName: data.sellerName || 'Unknown Seller',
-            sellerCountryCode: data.sellerCountryCode || 'DE',
-            buyerCountryCode: data.buyerCountryCode || 'DE',
-            totalAmount: Number(data.totalAmount) || 0,
-            // Map email fields → electronicAddress for XRechnung validation (BR-DE)
-            sellerElectronicAddress: data.sellerElectronicAddress || data.sellerEmail || '',
-            buyerElectronicAddress: data.buyerElectronicAddress || data.buyerEmail || '',
-            paymentTerms: data.paymentTerms || '',
-          } as Record<string, unknown>;
+          // Resolve output format: extraction-level → batch-level → default
+          const resolvedFormat: OutputFormat =
+            ((extraction as Record<string, unknown>).outputFormat as OutputFormat) ||
+            'xrechnung-cii';
 
-          const xmlResult = await xrechnungService.generateXRechnung(
-            serviceData as unknown as XRechnungInvoiceData
+          const canonical = toCanonicalInvoice(
+            {
+              ...data,
+              invoiceNumber: data.invoiceNumber || `DRAFT-${extractionId.slice(0, 8)}`,
+              invoiceDate: data.invoiceDate || new Date().toISOString().split('T')[0],
+              sellerName: data.sellerName || 'Unknown Seller',
+              sellerCountryCode: data.sellerCountryCode || 'DE',
+              buyerCountryCode: data.buyerCountryCode || 'DE',
+              totalAmount: Number(data.totalAmount) || 0,
+              sellerElectronicAddress: data.sellerElectronicAddress || data.sellerEmail || '',
+              buyerElectronicAddress: data.buyerElectronicAddress || data.buyerEmail || '',
+              paymentTerms: data.paymentTerms || '',
+            } as Record<string, unknown>,
+            resolvedFormat
           );
-          xmlContent = xmlResult.xmlContent;
-          xmlFileName = xmlResult.fileName;
-          validationStatus = xmlResult.validationStatus;
+
+          const generator = GeneratorFactory.create(resolvedFormat);
+          const genResult = await generator.generate(canonical);
+          xmlContent = genResult.xmlContent;
+          xmlFileName = genResult.fileName;
+          validationStatus = genResult.validationStatus;
 
           // Cache the generated XML
           if (existingConversion) {

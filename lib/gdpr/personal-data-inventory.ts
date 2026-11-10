@@ -23,8 +23,8 @@ export const PERSONAL_DATA_INVENTORY: PersonalDataInventory = {
       'email',
       'first_name',
       'last_name',
-      'address_line_1',
-      'address_line_2',
+      'address_line1',
+      'address_line2',
       'city',
       'postal_code',
       'country',
@@ -35,35 +35,23 @@ export const PERSONAL_DATA_INVENTORY: PersonalDataInventory = {
   },
   invoice_extractions: {
     entity: 'invoice_extractions',
-    fields: [
-      'extraction_data',
-    ],
+    fields: ['extraction_data'],
     description:
       'Extracted invoice data — contains seller/buyer names, addresses, tax IDs, IBANs, emails embedded in extraction_data JSON',
   },
   invoice_conversions: {
     entity: 'invoice_conversions',
-    fields: [
-      'buyer_name',
-      'email_recipient',
-    ],
+    fields: ['buyer_name', 'email_recipient'],
     description: 'Invoice conversions — buyer name and email recipient',
   },
   payment_transactions: {
     entity: 'payment_transactions',
-    fields: [
-      'stripe_payment_id',
-    ],
+    fields: ['stripe_payment_id'],
     description: 'Payment transactions — linked to external payment provider identity',
   },
   audit_logs: {
     entity: 'audit_logs',
-    fields: [
-      'user_id',
-      'ip_address',
-      'user_agent',
-      'changes',
-    ],
+    fields: ['user_id', 'ip_address', 'user_agent', 'changes'],
     description: 'Audit logs — user references, IP addresses, and change history',
   },
 };

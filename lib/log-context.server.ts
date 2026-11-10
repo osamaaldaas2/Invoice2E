@@ -23,7 +23,6 @@ export interface LogContext {
 
 // Plain 'async_hooks' (no node: prefix) — webpack externalises it on the server,
 // and both bundlers swap this entire module for log-context.stub.ts on the client.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { AsyncLocalStorage } = require('async_hooks') as typeof import('async_hooks');
 
 const storage = new AsyncLocalStorage<LogContext>();

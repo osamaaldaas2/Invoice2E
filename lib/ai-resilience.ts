@@ -18,19 +18,7 @@
  * Fallback order: gemini → openai → mistral. Each provider gets its own breaker
  * so one degraded provider doesn't block the others.
  *
- * ### ⚠️ Retry amplification warning (finding #66)
- *
- * The batch processor (`services/batch/batch.processor.ts`) has its OWN retry
- * loop (3 retries, 5 s exponential backoff) that wraps `resilientExtract()`.
- * When `USE_CIRCUIT_BREAKER` is enabled, the effective retry budget compounds:
- *
- *   batch retries (3) × resilience retries (2) × fallback providers (3) = up to 27 attempts
- *
- * This is acceptable for now because:
- * - The circuit breaker fast-fails open providers (ms, not seconds)
- * - The batch processor only retries specific error patterns (429, 503, PARSE_ERROR)
- * - Once the flag is enabled, the batch processor's own retry should be
- *   **reduced or removed** to avoid redundancy. Track this in the activation checklist.
+ * Batch callers delegate retries to this layer when enabled.
  */
 
 import { logger } from '@/lib/logger';

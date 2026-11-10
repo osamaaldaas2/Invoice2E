@@ -6,8 +6,7 @@ import { camelToSnakeKeys, snakeToCamelKeys } from '@/lib/database-helpers';
 import { createAdminClient } from '@/lib/supabase.server';
 import { withOptimisticLock, OptimisticLockError } from '@/lib/optimistic-lock';
 import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags';
-import { encryptSensitiveFields } from '@/lib/encryption';
-import crypto from 'crypto';
+import { encryptExtractionData, decryptExtractionRow } from '@/lib/encryption/extraction';
 
 export type CreateExtractionData = {
   userId: string;
@@ -65,13 +64,28 @@ export class InvoiceDatabaseService {
     }
   }
 
+  private async prepareExtraction(
+    data: object,
+    client: SupabaseClient
+  ): Promise<Record<string, unknown>> {
+    const row = camelToSnakeKeys<Record<string, unknown>>(data);
+    if (
+      row.extraction_data &&
+      (process.env.FIELD_ENCRYPTION_ACTIVE_KEY ||
+        (await isFeatureEnabled(client, FEATURE_FLAGS.USE_FIELD_ENCRYPTION)))
+    ) {
+      row.extraction_data = encryptExtractionData(row.extraction_data as Record<string, unknown>);
+    }
+    return row;
+  }
+
   async createExtraction(
     data: CreateExtractionData,
     client?: SupabaseClient
   ): Promise<InvoiceExtraction> {
     // P0-1: Client required - fail fast if missing
     this.assertClientProvided(client, 'createExtraction');
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = await this.prepareExtraction(data, client!);
 
     const { data: extraction, error } = await client!
       .from('invoice_extractions')
@@ -84,7 +98,7 @@ export class InvoiceDatabaseService {
       throw new AppError('DB_ERROR', 'Failed to save extraction', 500);
     }
 
-    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    return snakeToCamelKeys(decryptExtractionRow(extraction)) as InvoiceExtraction;
   }
 
   async getExtractionById(
@@ -105,7 +119,7 @@ export class InvoiceDatabaseService {
       throw new NotFoundError('Extraction not found');
     }
 
-    return snakeToCamelKeys(data) as InvoiceExtraction;
+    return snakeToCamelKeys(decryptExtractionRow(data)) as InvoiceExtraction;
   }
 
   async getUserExtractions(
@@ -128,7 +142,9 @@ export class InvoiceDatabaseService {
       throw new AppError('DB_ERROR', 'Failed to fetch extractions', 500);
     }
 
-    return (data ?? []).map((item) => snakeToCamelKeys(item) as InvoiceExtraction);
+    return (data ?? []).map(
+      (item) => snakeToCamelKeys(decryptExtractionRow(item)) as InvoiceExtraction
+    );
   }
 
   async updateExtraction(
@@ -143,26 +159,7 @@ export class InvoiceDatabaseService {
   ): Promise<InvoiceExtraction> {
     this.assertClientProvided(client, 'updateExtraction');
 
-    // S3.6: Encrypt sensitive fields when flag is enabled
-    const useEncryption = await isFeatureEnabled(client!, FEATURE_FLAGS.USE_FIELD_ENCRYPTION).catch(
-      () => false
-    );
-    if (useEncryption && data.extractionData) {
-      try {
-        const dek = crypto.randomBytes(32);
-        const meta = encryptSensitiveFields(data.extractionData as any, dek);
-        if (meta.encryptedFields.length > 0) {
-          logger.info('Sensitive fields encrypted', { extractionId, fields: meta.encryptedFields });
-        }
-      } catch (encErr) {
-        logger.warn('Field encryption failed, storing unencrypted', {
-          extractionId,
-          error: encErr instanceof Error ? encErr.message : String(encErr),
-        });
-      }
-    }
-
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = await this.prepareExtraction(data, client!);
 
     const { data: extraction, error } = await client!
       .from('invoice_extractions')
@@ -182,7 +179,7 @@ export class InvoiceDatabaseService {
       throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
     }
 
-    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    return snakeToCamelKeys(decryptExtractionRow(extraction)) as InvoiceExtraction;
   }
 
   /**
@@ -268,7 +265,7 @@ export class InvoiceDatabaseService {
     client?: SupabaseClient
   ): Promise<InvoiceConversion> {
     this.assertClientProvided(client, 'createConversion');
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
 
     const { data: conversion, error } = await client!
       .from('invoice_conversions')
@@ -290,7 +287,7 @@ export class InvoiceDatabaseService {
     client?: SupabaseClient
   ): Promise<InvoiceConversion> {
     this.assertClientProvided(client, 'updateConversion');
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = camelToSnakeKeys<Record<string, unknown>>(data);
 
     const { data: conversion, error } = await client!
       .from('invoice_conversions')
@@ -428,10 +425,20 @@ export class InvoiceDatabaseService {
   ): Promise<{ success: boolean; remainingCredits?: number; error?: string }> {
     this.assertClientProvided(client, 'processConversionTransaction');
 
-    const { data, error } = await client!.rpc('convert_invoice_with_credit_deduction', {
+    // Verify access with the caller's RLS client before invoking a privileged RPC.
+    const { data: owned, error: ownershipError } = await client!
+      .from('invoice_conversions')
+      .select('id')
+      .eq('id', conversionId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (ownershipError || !owned) throw new NotFoundError('Conversion not found');
+    const { data, error } = await createAdminClient().rpc('convert_invoice_with_credit_deduction', {
       p_user_id: userId,
       p_conversion_id: conversionId,
       p_credits_cost: 1,
+      p_validation_status: null,
+      p_validation_errors: null,
     });
 
     if (error) {
@@ -480,7 +487,7 @@ export class InvoiceDatabaseService {
       throw new NotFoundError('Extraction not found');
     }
 
-    return snakeToCamelKeys(data) as InvoiceExtraction;
+    return snakeToCamelKeys(decryptExtractionRow(data)) as InvoiceExtraction;
   }
 
   /**
@@ -492,7 +499,7 @@ export class InvoiceDatabaseService {
     data: { status?: string; extractionData?: Record<string, unknown> }
   ): Promise<InvoiceExtraction> {
     const adminClient = createAdminClient();
-    const snakeData = camelToSnakeKeys(data);
+    const snakeData = await this.prepareExtraction(data, adminClient);
 
     const { data: extraction, error } = await adminClient
       .from('invoice_extractions')
@@ -506,7 +513,7 @@ export class InvoiceDatabaseService {
       throw new AppError('DB_ERROR', 'Failed to update extraction', 500);
     }
 
-    return snakeToCamelKeys(extraction) as InvoiceExtraction;
+    return snakeToCamelKeys(decryptExtractionRow(extraction)) as InvoiceExtraction;
   }
 }
 

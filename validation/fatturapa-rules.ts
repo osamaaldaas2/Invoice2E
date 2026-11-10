@@ -40,11 +40,7 @@ export function validateFatturapaRules(data: CanonicalInvoice): ValidationError[
   // FPA-002: Invoice date required
   if (!data.invoiceDate?.trim()) {
     errors.push(
-      createError(
-        'FPA-002',
-        'invoice.invoiceDate',
-        'Invoice date (Data) is required for FatturaPA'
-      )
+      createError('FPA-002', 'invoice.invoiceDate', 'Invoice date (Data) is required for FatturaPA')
     );
   }
 
@@ -52,11 +48,7 @@ export function validateFatturapaRules(data: CanonicalInvoice): ValidationError[
   const currency = data.currency?.trim();
   if (!currency) {
     errors.push(
-      createError(
-        'FPA-003',
-        'invoice.currency',
-        'Currency code (Divisa) is required for FatturaPA'
-      )
+      createError('FPA-003', 'invoice.currency', 'Currency code (Divisa) is required for FatturaPA')
     );
   } else if (!ISO_4217_PATTERN.test(currency.toUpperCase())) {
     errors.push(
@@ -167,7 +159,10 @@ export function validateFatturapaRules(data: CanonicalInvoice): ValidationError[
           'FPA-021',
           'invoice.buyer.electronicAddress',
           `CodiceDestinatario "${codiceDestinatario}" should be exactly 7 alphanumeric characters`,
-          { actual: codiceDestinatario, suggestion: 'Use 7-character SDI code or "0000000" for PEC delivery' }
+          {
+            actual: codiceDestinatario,
+            suggestion: 'Use 7-character SDI code or "0000000" for PEC delivery',
+          }
         )
       );
     }
@@ -242,13 +237,14 @@ export function validateFatturapaRules(data: CanonicalInvoice): ValidationError[
     }
   }
 
-  // FPA-035: Natura code — 0% VAT lines should have taxCategoryCode set
+  // FPA-036a: Natura code — 0% VAT lines should have taxCategoryCode set
+  // FIX (AUDIT-M4): Renamed from duplicate FPA-035 to FPA-036a
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
     if (item.taxRate === 0 && !item.taxCategoryCode) {
       errors.push(
         createWarning(
-          'FPA-035',
+          'FPA-036a',
           `invoice.lineItems[${i}].taxCategoryCode`,
           `Line item ${i + 1}: 0% VAT rate requires a tax category code to determine Natura (e.g. E, Z, AE, K, G, O)`,
           { suggestion: 'Set taxCategoryCode to map to the correct FatturaPA Natura code' }

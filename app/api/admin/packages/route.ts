@@ -173,7 +173,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (error) {
-    const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
+    const extra = error instanceof z.ZodError ? { details: error.issues } : undefined;
     return handleApiError(error, 'Admin create package error', {
       includeSuccess: true,
       extra,

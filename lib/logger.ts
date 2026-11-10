@@ -89,8 +89,7 @@ function redact(value: unknown, depth = 0): unknown {
 // ─── Context injection (server-only, lazy) ────────────────────────────────────
 
 let _getLogContext:
-  | (() => { requestId?: string; tenantId?: string; userId?: string } | undefined)
-  | null = null;
+  (() => { requestId?: string; tenantId?: string; userId?: string } | undefined) | null = null;
 
 function tryGetContext(): { requestId?: string; tenantId?: string; userId?: string } | undefined {
   if (_getLogContext !== null) return _getLogContext();
@@ -117,10 +116,12 @@ let _getTraceContext: (() => { traceId: string; spanId: string } | undefined) | 
 function tryGetTraceContext(): { traceId: string; spanId: string } | undefined {
   if (_getTraceContext !== null) return _getTraceContext();
   try {
-    const mod = require('@/lib/telemetry-utils') as {
-      getTraceContext: () => { traceId: string; spanId: string } | undefined;
+    const { trace } = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    _getTraceContext = () => {
+      const ctx = trace.getActiveSpan()?.spanContext();
+      if (!ctx || ctx.traceId === '00000000000000000000000000000000') return undefined;
+      return { traceId: ctx.traceId, spanId: ctx.spanId };
     };
-    _getTraceContext = mod.getTraceContext;
     return _getTraceContext();
   } catch {
     _getTraceContext = () => undefined;

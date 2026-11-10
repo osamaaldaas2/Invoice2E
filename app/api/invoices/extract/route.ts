@@ -1,3 +1,4 @@
+import { scheduleBatchWorker } from '@/lib/batch-trigger';
 import { NextRequest, NextResponse } from 'next/server';
 import { ExtractorFactory } from '@/services/ai/extractor.factory';
 import { invoiceDbService } from '@/services/invoice.db.service';
@@ -28,27 +29,6 @@ const BACKGROUND_THRESHOLD = 3;
  * Uses AbortController to ensure the request is sent without waiting for the
  * worker to finish processing (it runs as a separate serverless invocation).
  */
-const triggerBatchWorker = async (req: NextRequest): Promise<void> => {
-  const secret = process.env.BATCH_WORKER_SECRET;
-  const headers: Record<string, string> = {};
-  if (secret) {
-    headers['x-internal-worker-key'] = secret;
-  }
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
-  try {
-    await fetch(`${req.nextUrl.origin}/api/internal/batch-worker?maxJobs=1`, {
-      method: 'POST',
-      headers,
-      signal: controller.signal,
-    });
-  } catch {
-    // Expected: abort timeout fires because worker takes longer than 3s.
-    // The worker function was already triggered and runs independently.
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
 
 // Increase body size limit for large files if needed (though Next.js handles this elsewhere usually)
 export const maxDuration = 300; // 5 min — covers inline (≤3) and large batch processing
@@ -160,18 +140,35 @@ async function handleExtractPost(request: NextRequest) {
     ).catch(() => false);
     if (useQuarantine) {
       const { QuarantineService } = await import('@/lib/file-quarantine');
-      const quarantineEntries = new Map<string, unknown>();
+      const quarantineEntries = new Map<
+        string,
+        import('@/types/file-quarantine.types').QuarantineEntry
+      >();
+      const quarantineBuffers = new Map<string, Buffer>();
       const quarantineSvc = new QuarantineService({
         storeQuarantine: async (id, buf) => {
-          quarantineEntries.set(id, buf);
+          quarantineBuffers.set(id, buf);
         },
-        readQuarantine: async (id) => quarantineEntries.get(id) as Buffer,
+        readQuarantine: async (id) => {
+          const buf = quarantineBuffers.get(id);
+          if (!buf) throw new Error('Quarantine file missing');
+          return buf;
+        },
         moveToProduction: async () => '',
-        deleteQuarantine: async () => {},
-        insertEntry: async () => {},
-        updateEntry: async () => {},
+        deleteQuarantine: async (id) => {
+          quarantineBuffers.delete(id);
+          quarantineEntries.delete(id);
+        },
+        insertEntry: async (entry) => {
+          quarantineEntries.set(entry.id, entry);
+        },
+        updateEntry: async (id, updates) => {
+          const entry = quarantineEntries.get(id);
+          if (!entry) throw new Error('Quarantine entry missing');
+          quarantineEntries.set(id, { ...entry, ...updates });
+        },
 
-        getEntry: async (id) => quarantineEntries.get(id) as any,
+        getEntry: async (id) => quarantineEntries.get(id) ?? null,
         getExpiredEntries: async () => [],
       });
       const entry = await quarantineSvc.quarantine(buffer, {
@@ -204,7 +201,12 @@ async function handleExtractPost(request: NextRequest) {
       fileName: file.name,
     });
 
-    // Detect invoice boundaries in PDF files
+    // Avoid a paid boundary-detection request for an account without credits.
+    const available = await creditsDbService.getUserCredits(userId);
+    if (available.availableCredits < 1) {
+      return NextResponse.json({ success: false, error: 'Insufficient credits' }, { status: 402 });
+    }
+    // The later atomic deduction remains authoritative under concurrency.
     const boundaryResult = await boundaryDetectionService.detect(buffer, file.type);
 
     // Compute file hash + idempotency key early (used by both single and multi paths)
@@ -260,7 +262,7 @@ async function handleExtractPost(request: NextRequest) {
           boundaryResult.totalInvoices
         );
 
-        await triggerBatchWorker(request);
+        await scheduleBatchWorker();
 
         return NextResponse.json(
           {
@@ -596,7 +598,7 @@ export async function GET(request: NextRequest) {
       const ageMs = Date.now() - new Date(status.createdAt).getTime();
       if (ageMs > 10_000) {
         logger.warn('Job stuck in pending, re-triggering worker', { jobId, ageMs });
-        await triggerBatchWorker(request);
+        await scheduleBatchWorker();
       }
     }
 

@@ -2,7 +2,7 @@
 -- 1. Replace auth.uid() with (select auth.uid()) for initplan optimization
 -- 2. Drop duplicate/overlapping policies and consolidate into one per action
 
-BEGIN;
+-- Transaction is managed by the migration runner.
 
 -- ============================================================
 -- TABLE: users
@@ -196,5 +196,3 @@ CREATE POLICY "credit_transactions_select" ON public.credit_transactions
     );
 
 -- webhook_events already uses service_role only — no changes needed
-
-COMMIT;

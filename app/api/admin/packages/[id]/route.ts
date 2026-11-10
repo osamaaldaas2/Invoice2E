@@ -186,7 +186,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
       },
     });
   } catch (error) {
-    const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
+    const extra = error instanceof z.ZodError ? { details: error.issues } : undefined;
     return handleApiError(error, 'Admin update package error', {
       includeSuccess: true,
       extra,

@@ -233,6 +233,10 @@ export class PaymentProcessor {
     // Get the checkout session ID for idempotency checks
     const sessionId = session.id as string;
 
+    if (!sessionId || session.payment_status !== 'paid') {
+      return { success: false, message: 'Checkout is not paid or has no session ID' };
+    }
+
     // IDEMPOTENCY FIX #1: Check if verify already processed this payment
     // Verify inserts `verify_{sessionId}` into webhook_events
     if (sessionId) {
@@ -292,7 +296,7 @@ export class PaymentProcessor {
       eventId,
       'stripe',
       event.type,
-      paymentIntent
+      sessionId
     );
 
     if (verifyResult.alreadyProcessed) {
@@ -324,7 +328,7 @@ export class PaymentProcessor {
       })
       .eq('user_id', userId)
       .eq('stripe_session_id', sessionId)
-      .eq('payment_status', 'pending')
+      .eq('payment_status', 'completed')
       .eq('payment_method', 'stripe');
 
     // Send confirmation email
@@ -406,8 +410,7 @@ export class PaymentProcessor {
     let credits = result.credits || 0;
     try {
       const purchaseUnits = event.resource.purchase_units as
-        | Array<{ custom_id?: string }>
-        | undefined;
+        Array<{ custom_id?: string }> | undefined;
       const customId = purchaseUnits?.[0]?.custom_id;
 
       // FIX-037: Better error reporting for custom_id parsing
@@ -517,7 +520,8 @@ export class PaymentProcessor {
         paypal_order_id: orderId,
       })
       .eq('user_id', userId)
-      .eq('payment_status', 'pending')
+      .eq('paypal_order_id', orderId)
+      .eq('payment_status', 'completed')
       .eq('payment_method', 'paypal');
 
     return { success: true, userId, credits };

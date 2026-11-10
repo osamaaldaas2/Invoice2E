@@ -311,9 +311,12 @@ export class KsefGenerator implements IFormatGenerator {
         w(`    <${field.tax}>${taxForRate.toFixed(2)}</${field.tax}>`);
       } else if (rate === 0) {
         w(`    <P_13_6_1>${roundedNet.toFixed(2)}</P_13_6_1>`);
+      } else if (rate > 0) {
+        // FIX (AUDIT-I5): Non-standard rates mapped to P_13_11/P_14_11 ("other rates" bucket)
+        // instead of being silently dropped, which would break P_15 balance.
+        w(`    <P_13_11>${roundedNet.toFixed(2)}</P_13_11>`);
+        w(`    <P_14_11>${taxForRate.toFixed(2)}</P_14_11>`);
       }
-      // Note: P_13_11 in FA(3) is for margin procedures, not "other rates".
-      // Non-standard rates are mapped to the closest standard bucket or flagged.
     }
 
     // P_15 — total gross amount
@@ -348,7 +351,10 @@ export class KsefGenerator implements IFormatGenerator {
       (inv.documentTypeCode === 381 || inv.documentTypeCode === 384)
     ) {
       w('    <DaneFaKorygowanej>');
-      w(`      <DataWystFaKorygowanej>${formatDateISO(inv.invoiceDate)}</DataWystFaKorygowanej>`);
+      // FIX (AUDIT-M5): Use preceding invoice date, not the correction invoice date.
+      // DataWystFaKorygowanej = date of issue of the ORIGINAL corrected invoice.
+      const precedingDate = inv.billingPeriodStart || inv.invoiceDate;
+      w(`      <DataWystFaKorygowanej>${formatDateISO(precedingDate)}</DataWystFaKorygowanej>`);
       w(`      <NrFaKorygowanej>${escapeXml(inv.precedingInvoiceReference)}</NrFaKorygowanej>`);
       w('    </DaneFaKorygowanej>');
     }

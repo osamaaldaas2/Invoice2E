@@ -24,14 +24,14 @@ export class OptimisticLockError extends AppError {
   constructor(
     public readonly tableName: string,
     public readonly rowId: string,
-    public readonly expectedVersion: number,
+    public readonly expectedVersion: number
   ) {
     super(
       'OPTIMISTIC_LOCK_CONFLICT',
       `Conflict: the ${tableName} row ${rowId} was modified by another request. ` +
         `Expected version ${expectedVersion}. Please reload and try again.`,
       409,
-      { tableName, rowId, expectedVersion },
+      { tableName, rowId, expectedVersion }
     );
     this.name = 'OptimisticLockError';
   }
@@ -92,13 +92,13 @@ export interface OptimisticLockParams<TData extends Record<string, unknown>> {
  * ```
  */
 export async function withOptimisticLock<TData extends Record<string, unknown>>(
-  params: OptimisticLockParams<TData>,
+  params: OptimisticLockParams<TData>
 ): Promise<Record<string, unknown>> {
   const { client, table, id, expectedVersion, data } = params;
 
   const { data: rows, error } = await client
     .from(table)
-    .update(data)
+    .update(data as Record<string, unknown>)
     .eq('id', id)
     .eq('row_version', expectedVersion)
     .select();

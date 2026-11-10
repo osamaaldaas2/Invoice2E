@@ -5,6 +5,8 @@ ALTER TABLE invoice_extractions
   ADD COLUMN IF NOT EXISTS output_format VARCHAR(50);
 
 -- Backfill from existing conversion records where available
+-- The timestamped output-format migration may not have run on a fresh database yet.
+ALTER TABLE invoice_conversions ADD COLUMN IF NOT EXISTS output_format VARCHAR(50);
 UPDATE invoice_extractions e
 SET output_format = c.output_format
 FROM invoice_conversions c

@@ -63,15 +63,7 @@ export class BatchProcessor {
   /**
    * Retry extraction with exponential backoff on 429/transient errors.
    *
-   * FIX: Re-audit #67 — Retry amplification warning.
-   * When `USE_CIRCUIT_BREAKER` is enabled, `resilientExtract()` already
-   * applies its own retry (2 retries) + provider fallback (3 providers).
-   * This outer loop compounds to up to 3 × 2 × 3 = 18 attempts in the worst case.
-   * This is acceptable today because the circuit breaker fast-fails open
-   * providers (ms, not seconds) and this loop only retries specific transient
-   * errors. When the flag goes live, consider reducing MAX_RETRIES to 0 here
-   * and letting the resilience layer handle all retry logic.
-   * See also: `lib/ai-resilience.ts` module docblock.
+   * The resilience layer owns retries when enabled; never nest retry budgets.
    */
   private async extractWithRetry(
     extractor: ReturnType<typeof ExtractorFactory.create>,
@@ -81,16 +73,14 @@ export class BatchProcessor {
   ) {
     let lastError: Error | null = null;
 
+    const useCB = await isFeatureEnabled(
+      createAdminClient(),
+      FEATURE_FLAGS.USE_CIRCUIT_BREAKER
+    ).catch(() => false);
+    if (useCB) return resilientExtract(fileContent, fileName, 'application/pdf');
+
     for (let attempt = 0; attempt <= BATCH_EXTRACTION.MAX_RETRIES; attempt++) {
       try {
-        // S3.3: Use circuit breaker when flag is enabled
-        const adminClient = createAdminClient();
-        const useCB = await isFeatureEnabled(adminClient, FEATURE_FLAGS.USE_CIRCUIT_BREAKER).catch(
-          () => false
-        );
-        if (useCB) {
-          return await resilientExtract(fileContent, fileName, 'application/pdf');
-        }
         return await extractor.extractFromFile(fileContent, fileName, 'application/pdf');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -160,6 +150,19 @@ export class BatchProcessor {
           filename: file.name,
           invoiceCount: boundaryResult.totalInvoices,
         });
+
+        // Reserve every additional segment before incurring extraction costs.
+        const additionalCredits = Math.max(0, splitBuffers.length - 1);
+        if (
+          additionalCredits > 0 &&
+          !(await creditsDbService.deductCredits(
+            userId,
+            additionalCredits,
+            `batch:expansion:${jobId}`,
+            `batch:expansion:${jobId}:file:${index}`
+          ))
+        )
+          throw new Error('Insufficient credits for multi-invoice expansion');
 
         // Process all segments — extra credits settled in bulk at batch level
         // IMPORTANT: Keep results[index] as 'pending' until ALL segments are done.
@@ -360,7 +363,7 @@ export class BatchProcessor {
       // Fetch batch job owner for credit deduction
       const { data: job, error: jobError } = await supabase
         .from('batch_jobs')
-        .select('user_id')
+        .select('user_id, results')
         .eq('id', jobId)
         .single();
 
@@ -387,10 +390,14 @@ export class BatchProcessor {
         });
       }
 
-      // Initialize all results as pending
+      const previousResults = (Array.isArray(job.results) ? job.results : []) as BatchResult[];
+      // Preserve successfully persisted work across worker recovery.
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (!file) {
+        const previous = previousResults[i];
+        if (previous && previous.status !== 'pending') {
+          results[i] = previous;
+        } else if (!file) {
           results[i] = {
             filename: `file_${i}`,
             status: 'failed' as const,
@@ -408,53 +415,31 @@ export class BatchProcessor {
         }
       }
 
+      results.push(...previousResults.slice(files.length));
       await supabase.from('batch_jobs').update({ results }).eq('id', jobId);
 
-      // Deduct credits upfront for all files (prevents extraction without payment)
-      // R-1/R-5 fix: Atomically claim deduction right to prevent double-deduction
-      // when recoverStuckJobs() resets a crashed job back to 'pending'
       const totalFiles = files.filter((f) => !!f).length;
-      const { data: deductionClaimed, error: claimErr } = await supabase
-        .from('batch_jobs')
-        .update({ credits_deducted: true })
-        .eq('id', jobId)
-        .eq('credits_deducted', false)
-        .select('id')
-        .single();
-
-      if (claimErr || !deductionClaimed) {
-        // Credits were already deducted in a previous run — skip deduction
-        logger.info('Credits already deducted for batch job (recovery re-run)', { jobId, userId });
-      } else {
-        const creditsDeducted = await creditsDbService.deductCredits(
-          userId,
-          totalFiles,
-          `batch:deduct:${jobId}`
-        );
-        if (!creditsDeducted) {
-          logger.warn('Insufficient credits for batch', { jobId, userId, totalFiles });
-          await supabase
-            .from('batch_jobs')
-            .update({
-              status: 'failed',
-              completed_at: new Date().toISOString(),
-              error_message: 'Insufficient credits',
-            })
-            .eq('id', jobId);
-          throw new Error('Insufficient credits for batch processing');
+      const { data: creditsDeducted, error: deductionError } = await supabase.rpc(
+        'deduct_batch_credits',
+        {
+          p_job_id: jobId,
+          p_user_id: userId,
+          p_amount: totalFiles,
         }
-      }
+      );
+      if (deductionError) throw new Error('Batch credit deduction failed');
+      if (!creditsDeducted) throw new Error('Insufficient credits for batch processing');
 
       // Process files concurrently with a pool of `concurrency` workers
       const validFiles = files
         .map((file, index) => ({ file, index }))
-        .filter(({ file }) => !!file) as {
+        .filter(({ file, index }) => !!file && results[index]?.status === 'pending') as {
         file: { name: string; content: Buffer };
         index: number;
       }[];
 
       // Chunk into groups of `concurrency` and process each group in parallel
-      for (let i = 0; i < validFiles.length; i += concurrency) {
+      for (let i = 0; i < Math.min(validFiles.length, concurrency); i += concurrency) {
         const chunk = validFiles.slice(i, i + concurrency);
 
         logger.info('Processing file chunk', {
@@ -471,34 +456,23 @@ export class BatchProcessor {
         );
       }
 
+      if (results.some((r) => r.status === 'pending')) {
+        const { error } = await supabase
+          .from('batch_jobs')
+          .update({
+            status: 'pending',
+            results,
+            processing_started_at: null,
+            completed_files: results.filter((r) => r.status === 'success').length,
+            failed_files: results.filter((r) => r.status === 'failed').length,
+          })
+          .eq('id', jobId);
+        if (error) throw new Error('Failed to checkpoint batch');
+        return results;
+      }
+
       const successCount = results.filter((r) => r.status === 'success').length;
       const failCount = results.filter((r) => r.status === 'failed').length;
-
-      // Deduct extra credits for multi-invoice expansion (1 record for entire batch)
-      // FIX: Re-audit #8 — atomic + idempotent expansion deduction (no racy select-then-deduct)
-      const extraInvoices = results.length - totalFiles;
-      if (extraInvoices > 0) {
-        const expansionIdempotencyKey = `batch-expansion:${jobId}:${extraInvoices}`;
-        const extraDeducted = await creditsDbService.deductCredits(
-          userId,
-          extraInvoices,
-          `batch:expansion:${jobId}`,
-          expansionIdempotencyKey
-        );
-        if (!extraDeducted) {
-          logger.warn('Insufficient credits for multi-invoice expansion', {
-            jobId,
-            userId,
-            extraInvoices,
-          });
-        } else {
-          logger.info('Deducted extra credits for multi-invoice expansion', {
-            jobId,
-            userId,
-            extraInvoices,
-          });
-        }
-      }
 
       // FIX: Re-audit #41 — use idempotent refund to prevent double-crediting on retry
       let refundSucceeded = false;

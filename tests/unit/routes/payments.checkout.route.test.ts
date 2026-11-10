@@ -129,7 +129,8 @@ describe('Payment Checkout API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid payment method');
+      // Zod returns detailed enum validation message
+      expect(data.error).toContain('Invalid option');
       expect(stripeAdapterMock.createCheckoutSession).not.toHaveBeenCalled();
       expect(paypalAdapterMock.createOrder).not.toHaveBeenCalled();
     });

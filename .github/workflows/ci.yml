@@ -8,7 +8,7 @@ on:
 
 env:
   # FIX: Re-audit #62 — upgrade to Node 20 LTS (matches .nvmrc 20.18.2)
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   lint:
@@ -50,6 +50,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
+      - name: Migration and security regression checks
+        run: npm run test:security-db
       - name: Run tests with coverage
         run: npm run test:coverage
         env:

@@ -4,7 +4,7 @@
  */
 
 import type { CanonicalInvoice } from '@/types/canonical-invoice';
-import { createError, type ValidationError } from './validation-result';
+import { createError, createWarning, type ValidationError } from './validation-result';
 import { validatePeppolRules } from './peppol-rules';
 
 /** Romanian CUI/CIF: optional "RO" prefix + 1-10 digits */
@@ -29,8 +29,11 @@ export function validateCIUSRORules(data: CanonicalInvoice): ValidationError[] {
         'CIUS-RO-CUI-FORMAT',
         'invoice.seller.taxNumber',
         `Romanian CUI/CIF must be optional "RO" prefix + up to 10 digits, got "${sellerTaxNum}"`,
-        { suggestion: 'Format: RO + up to 10 digits or just up to 10 digits (e.g. RO12345678 or 12345678)' },
-      ),
+        {
+          suggestion:
+            'Format: RO + up to 10 digits or just up to 10 digits (e.g. RO12345678 or 12345678)',
+        }
+      )
     );
   }
 
@@ -42,8 +45,8 @@ export function validateCIUSRORules(data: CanonicalInvoice): ValidationError[] {
         'CIUS-RO-VAT-FORMAT',
         'invoice.seller.vatId',
         `Romanian VAT ID must be RO + 2–10 digits, got "${sellerVat}"`,
-        { suggestion: 'Format: RO + 2 to 10 digits (e.g. RO12345678)' },
-      ),
+        { suggestion: 'Format: RO + 2 to 10 digits (e.g. RO12345678)' }
+      )
     );
   }
 
@@ -55,8 +58,8 @@ export function validateCIUSRORules(data: CanonicalInvoice): ValidationError[] {
         'CIUS-RO-CUI-FORMAT',
         'invoice.buyer.taxNumber',
         `Romanian CUI/CIF must be optional "RO" prefix + up to 10 digits, got "${buyerTaxNum}"`,
-        { suggestion: 'Format: RO + up to 10 digits or just up to 10 digits' },
-      ),
+        { suggestion: 'Format: RO + up to 10 digits or just up to 10 digits' }
+      )
     );
   }
 
@@ -68,15 +71,25 @@ export function validateCIUSRORules(data: CanonicalInvoice): ValidationError[] {
         'CIUS-RO-VAT-FORMAT',
         'invoice.buyer.vatId',
         `Romanian VAT ID must be RO + 2–10 digits, got "${buyerVat}"`,
-        { suggestion: 'Format: RO + 2 to 10 digits (e.g. RO12345678)' },
-      ),
+        { suggestion: 'Format: RO + 2 to 10 digits (e.g. RO12345678)' }
+      )
     );
   }
 
-  // Seller country should be RO (warning-level, not blocking)
+  // FIX (AUDIT-M2/M6): Seller country should be RO — warn if not
   const sellerCountry = data.seller?.countryCode?.trim();
   if (sellerCountry && sellerCountry !== 'RO') {
-    // Not an error per se, but noteworthy for CIUS-RO
+    errors.push(
+      createWarning(
+        'CIUS-RO-COUNTRY',
+        'invoice.seller.countryCode',
+        `CIUS-RO is the Romanian CIUS — seller country is "${sellerCountry}", not "RO". Verify correct format selection.`,
+        {
+          actual: sellerCountry,
+          suggestion: 'CIUS-RO is intended for invoices involving Romanian parties',
+        }
+      )
+    );
   }
 
   return errors;

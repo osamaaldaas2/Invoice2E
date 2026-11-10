@@ -7,10 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QuarantineService } from '@/lib/file-quarantine';
-import type {
-  QuarantineEntry,
-  QuarantineServiceDeps,
-} from '@/types/file-quarantine.types';
+import type { QuarantineEntry, QuarantineServiceDeps } from '@/types/file-quarantine.types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,7 +22,9 @@ function makePdfBuffer(size = 1024): Buffer {
 function makePngBuffer(size = 1024): Buffer {
   const buf = Buffer.alloc(size);
   const pngHeader = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  pngHeader.forEach((b, i) => { buf[i] = b; });
+  pngHeader.forEach((b, i) => {
+    buf[i] = b;
+  });
   return buf;
 }
 
@@ -70,7 +69,7 @@ function createMockDeps(overrides: Partial<QuarantineServiceDeps> = {}): Quarant
 const VALID_METADATA = {
   originalName: 'invoice.pdf',
   mimeType: 'application/pdf',
-  uploadedBy: '00000000-0000-0000-0000-000000000001',
+  uploadedBy: '00000000-0000-4000-8000-000000000001',
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -100,7 +99,7 @@ describe('QuarantineService', () => {
     it('should reject invalid metadata', async () => {
       const buffer = makePdfBuffer();
       await expect(
-        service.quarantine(buffer, { originalName: '', mimeType: '', uploadedBy: 'bad' }),
+        service.quarantine(buffer, { originalName: '', mimeType: '', uploadedBy: 'bad' })
       ).rejects.toThrow();
     });
   });
@@ -121,7 +120,7 @@ describe('QuarantineService', () => {
       const entry = await service.quarantine(buffer, {
         originalName: 'receipt.png',
         mimeType: 'image/png',
-        uploadedBy: '00000000-0000-0000-0000-000000000001',
+        uploadedBy: '00000000-0000-4000-8000-000000000001',
       });
       const result = await service.scan(entry.id);
 
@@ -133,7 +132,7 @@ describe('QuarantineService', () => {
       const entry = await service.quarantine(buffer, {
         originalName: 'photo.jpg',
         mimeType: 'image/jpeg',
-        uploadedBy: '00000000-0000-0000-0000-000000000001',
+        uploadedBy: '00000000-0000-4000-8000-000000000001',
       });
       const result = await service.scan(entry.id);
 
@@ -226,10 +225,13 @@ describe('QuarantineService', () => {
       const entry = await service.quarantine(buffer, VALID_METADATA);
       await service.reject(entry.id, 'Manual review: suspicious content');
 
-      expect(deps.updateEntry).toHaveBeenCalledWith(entry.id, expect.objectContaining({
-        status: 'rejected',
-        rejectionReason: 'Manual review: suspicious content',
-      }));
+      expect(deps.updateEntry).toHaveBeenCalledWith(
+        entry.id,
+        expect.objectContaining({
+          status: 'rejected',
+          rejectionReason: 'Manual review: suspicious content',
+        })
+      );
     });
 
     it('should throw when rejecting promoted file', async () => {
@@ -256,7 +258,7 @@ describe('QuarantineService', () => {
         size: 100,
         status: 'quarantined',
         scanResult: null,
-        uploadedBy: '00000000-0000-0000-0000-000000000001',
+        uploadedBy: '00000000-0000-4000-8000-000000000001',
         createdAt: new Date(Date.now() - 86400000).toISOString(),
         promotedAt: null,
         rejectedAt: null,

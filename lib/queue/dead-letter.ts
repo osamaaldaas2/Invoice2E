@@ -26,7 +26,7 @@ export function handleDeadLetter(job: Job, queueName: QueueName, error: Error): 
     failedReason: error.message,
     attemptsMade: job.attemptsMade,
     failedAt: new Date().toISOString(),
-    stackTrace: job.stacktrace,
+    stackTrace: job.stacktrace ?? undefined,
   };
 
   logger.error('Job moved to dead letter queue', {

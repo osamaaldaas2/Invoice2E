@@ -218,7 +218,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true, data: { voucher: newVoucher } }, { status: 201 });
   } catch (error) {
-    const extra = error instanceof z.ZodError ? { details: error.errors } : undefined;
+    const extra = error instanceof z.ZodError ? { details: error.issues } : undefined;
     const isUserError = error instanceof z.ZodError || error instanceof UserInputError;
 
     return handleApiError(error, 'Admin create voucher error', {

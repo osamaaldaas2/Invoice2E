@@ -9,25 +9,22 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
-    test: {
-        include: ['tests/integration/**/*.integration.test.ts'],
-        environment: 'node',
-        globals: true,
-        testTimeout: 60_000,
-        hookTimeout: 120_000,
-        pool: 'forks',
-        poolOptions: {
-            forks: {
-                singleFork: true,
-            },
-        },
-        sequence: {
-            concurrent: false,
-        },
+  test: {
+    include: ['tests/integration/**/*.integration.test.ts'],
+    environment: 'node',
+    globals: true,
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
+    pool: 'forks',
+    maxWorkers: 1,
+    fileParallelism: false,
+    sequence: {
+      concurrent: false,
     },
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, '../../'),
-        },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '../../'),
     },
+  },
 });

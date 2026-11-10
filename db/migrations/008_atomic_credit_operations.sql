@@ -108,5 +108,5 @@ GRANT EXECUTE ON FUNCTION add_credits(UUID, INTEGER, VARCHAR, VARCHAR) TO servic
 GRANT EXECUTE ON FUNCTION safe_deduct_credits(UUID, INTEGER, VARCHAR) TO service_role;
 
 -- Add comments
-COMMENT ON FUNCTION add_credits IS 'Atomically adds credits to a user account. Race-condition safe.';
-COMMENT ON FUNCTION safe_deduct_credits IS 'Atomically deducts credits with balance check. Returns false if insufficient.';
+COMMENT ON FUNCTION add_credits(UUID, INTEGER, VARCHAR, VARCHAR) IS 'Atomically adds credits to a user account. Race-condition safe.';
+COMMENT ON FUNCTION safe_deduct_credits(UUID, INTEGER, VARCHAR) IS 'Atomically deducts credits with balance check. Returns false if insufficient.';

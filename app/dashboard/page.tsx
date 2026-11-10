@@ -1,9 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import {
+  BarChart3,
+  CheckCircle2,
+  CreditCard,
+  FileText,
+  Files,
+  Layers,
+  ArrowUpRight,
+} from 'lucide-react';
 import FileUploadForm from '@/components/forms/FileUploadForm';
 import { useFormatSelection } from '@/components/dashboard/FormatSelector';
 import FormatRing from '@/components/dashboard/FormatRing';
@@ -127,17 +136,18 @@ export default function DashboardPage() {
       <DashboardLayout>
         {/* Error alert */}
         {error && (
-          <div className="mb-6 rounded-2xl border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-3 text-sm">
+          <div className="mb-6 rounded-lg border border-rose-400/30 bg-rose-500/10 text-rose-200 px-4 py-3 text-sm">
             {error}
           </div>
         )}
 
         {/* Welcome */}
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-white font-display">
+          <p className="workspace-kicker">Invoice2E / {t('pageTitle')}</p>
+          <h1 className="workspace-title text-white font-display">
             {t('welcomeBack')}, {user.firstName}
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">
+          <p className="text-[#a7b9a9] mt-1 text-sm">
             {t('welcomeMessage', { name: user.firstName })}
           </p>
         </div>
@@ -145,12 +155,12 @@ export default function DashboardPage() {
         {/* ── Bento Grid ── */}
         <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
           {/* Stat: Conversions */}
-          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+          <div className="dashboard-stat md:row-start-1 md:col-start-1 col-span-1 md:col-span-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500 font-medium">{t('totalConversions')}</span>
-              <span className="text-lg">📊</span>
+              <span className="text-xs text-[#a7b9a9] font-medium">{t('totalConversions')}</span>
+              <BarChart3 size={18} className="text-lime-200/70" />
             </div>
-            <p className="text-3xl font-extrabold text-sky-300 tracking-tight">
+            <p className="text-3xl font-extrabold text-lime-200 tracking-tight">
               {statsLoading ? (
                 <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
               ) : (
@@ -160,10 +170,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Stat: Success Rate */}
-          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+          <div className="dashboard-stat md:row-start-1 md:col-start-4 col-span-1 md:col-span-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500 font-medium">{t('successRate')}</span>
-              <span className="text-lg">✅</span>
+              <span className="text-xs text-[#a7b9a9] font-medium">{t('successRate')}</span>
+              <CheckCircle2 size={18} className="text-lime-200/70" />
             </div>
             <p className="text-3xl font-extrabold text-emerald-300 tracking-tight">
               {statsLoading ? (
@@ -175,10 +185,10 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Upload Hero Card — center, spans 2 rows ── */}
-          <div className="col-span-2 md:col-span-6 md:row-span-2 rounded-2xl border border-sky-400/10 bg-[radial-gradient(ellipse_at_50%_40%,rgba(56,189,248,0.04)_0%,rgba(255,255,255,0.02)_70%)] p-6 md:p-8 flex flex-col items-center justify-center order-first md:order-none">
+          <div className="col-span-2 md:col-span-7 md:row-start-2 md:col-start-1 md:row-span-2 rounded-lg border border-sky-400/10 bg-[radial-gradient(ellipse_at_50%_40%,rgba(56,189,248,0.04)_0%,rgba(255,255,255,0.02)_70%)] p-6 md:p-8 flex flex-col items-center justify-center order-first md:order-none">
             {!showUpload ? (
               <>
-                <div onClick={() => selectedFormat && setShowUpload(true)}>
+                <div className="w-full">
                   <FormatRing
                     selectedFormat={selectedFormat}
                     onSelect={(f) => {
@@ -186,14 +196,14 @@ export default function DashboardPage() {
                     }}
                   />
                 </div>
-                <p className="text-xs text-slate-600 mt-2 text-center">
+                <p className="text-xs text-[#9aac9c] mt-2 text-center">
                   {selectedFormat ? (
                     <>
-                      <span className="text-sky-400 font-semibold">{formatDisplayName}</span>
+                      <span className="text-lime-200 font-semibold">{formatDisplayName}</span>
                       {' — '}
                       <button
                         onClick={() => setShowUpload(true)}
-                        className="text-sky-400 hover:text-sky-300 underline underline-offset-2"
+                        className="text-lime-200 hover:text-lime-200 underline underline-offset-2"
                       >
                         {t('uploadInvoice')}
                       </button>
@@ -207,7 +217,7 @@ export default function DashboardPage() {
               <div className="w-full upload-form-compact">
                 <button
                   onClick={() => setShowUpload(false)}
-                  className="text-xs text-slate-500 hover:text-slate-300 mb-4 flex items-center gap-1"
+                  className="text-xs text-[#a7b9a9] hover:text-slate-300 mb-4 flex items-center gap-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -219,8 +229,9 @@ export default function DashboardPage() {
                   </svg>
                   {t('selectTargetFormat')}
                 </button>
-                <p className="text-xs text-slate-500 mb-3">
-                  <span className="text-sky-400 font-semibold">{formatDisplayName}</span> ausgewählt
+                <p className="text-xs text-[#a7b9a9] mb-3">
+                  <span className="text-lime-200 font-semibold">{formatDisplayName}</span>{' '}
+                  ausgewählt
                 </p>
                 {statsLoading ? (
                   <div className="h-32 rounded-xl bg-white/5 animate-pulse" />
@@ -239,12 +250,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Stat: Credits */}
-          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+          <div className="dashboard-stat md:row-start-1 md:col-start-7 col-span-1 md:col-span-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500 font-medium">{t('creditsRemaining')}</span>
-              <span className="text-lg">💳</span>
+              <span className="text-xs text-[#a7b9a9] font-medium">{t('creditsRemaining')}</span>
+              <CreditCard size={18} className="text-lime-200/70" />
             </div>
-            <p className="text-3xl font-extrabold text-violet-300 tracking-tight">
+            <p className="text-3xl font-extrabold text-lime-100 tracking-tight">
               {statsLoading ? (
                 <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
               ) : (
@@ -254,12 +265,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Stat: Avg Processing */}
-          <div className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
+          <div className="dashboard-stat md:row-start-1 md:col-start-10 col-span-1 md:col-span-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500 font-medium">Ø Verarbeitung</span>
-              <span className="text-lg">⚡</span>
+              <span className="text-xs text-[#a7b9a9] font-medium">Ø Verarbeitung</span>
+              <FileText size={18} className="text-lime-200/70" />
             </div>
-            <p className="text-3xl font-extrabold text-amber-200 tracking-tight">
+            <p className="text-3xl font-extrabold text-stone-100 tracking-tight">
               {statsLoading ? (
                 <span className="inline-block w-12 h-8 rounded-lg bg-white/5 animate-pulse" />
               ) : (
@@ -269,14 +280,14 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Recent Conversions ── */}
-          <div className="col-span-2 md:col-span-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+          <div className="col-span-2 md:col-span-5 md:col-start-8 md:row-start-2 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                📋 {t('recentConversions')}
+                <Files size={16} /> {t('recentConversions')}
               </h3>
               <Link
                 href="/dashboard/history?status=completed"
-                className="text-[11px] text-sky-400 hover:underline"
+                className="text-[11px] text-lime-200 hover:underline"
               >
                 {t('viewAllArrow')}
               </Link>
@@ -288,8 +299,8 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : conversions.length === 0 ? (
-              <div className="text-center py-10 text-slate-600">
-                <p className="text-3xl mb-2">📭</p>
+              <div className="text-center py-10 text-[#9aac9c]">
+                <Files className="mx-auto mb-3" size={27} strokeWidth={1.2} />
                 <p className="text-sm">{t('noConversions')}</p>
                 <p className="text-xs mt-1">{t('noConversionsHint')}</p>
               </div>
@@ -305,7 +316,7 @@ export default function DashboardPage() {
                       <p className="text-[13px] font-semibold text-slate-200">
                         {c.invoice_number || t('invoiceFallback')}
                       </p>
-                      <p className="text-[11px] text-slate-700">
+                      <p className="text-[11px] text-[#8ca190]">
                         {new Date(c.created_at).toLocaleDateString('de-DE', {
                           day: '2-digit',
                           month: '2-digit',
@@ -322,14 +333,14 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Drafts ── */}
-          <div className="col-span-2 md:col-span-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+          <div className="col-span-2 md:col-span-5 md:col-start-8 md:row-start-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                ⏳ {t('draftsInProgress')}
+                <FileText size={16} /> {t('draftsInProgress')}
               </h3>
               <Link
                 href="/dashboard/history?status=draft"
-                className="text-[11px] text-sky-400 hover:underline"
+                className="text-[11px] text-lime-200 hover:underline"
               >
                 {t('viewAllArrow')}
               </Link>
@@ -341,8 +352,8 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : drafts.filter((d) => d.status === 'draft').length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
-                <p className="text-2xl mb-2">📄</p>
+              <div className="text-center py-8 text-[#9aac9c]">
+                <FileText className="mx-auto mb-3" size={27} strokeWidth={1.2} />
                 <p className="text-sm">{t('noDrafts')}</p>
                 <p className="text-xs mt-1">{t('noDraftsHint')}</p>
               </div>
@@ -359,7 +370,7 @@ export default function DashboardPage() {
                         <p className="text-[13px] font-semibold text-slate-200">
                           {d.invoice_number || t('draftFallback')}
                         </p>
-                        <p className="text-[11px] text-slate-700">
+                        <p className="text-[11px] text-[#8ca190]">
                           {new Date(d.created_at).toLocaleDateString('de-DE', {
                             day: '2-digit',
                             month: '2-digit',
@@ -382,23 +393,28 @@ export default function DashboardPage() {
           {/* ── Quick Action Cards ── */}
           <ActionCard
             href="/dashboard/analytics"
-            icon="📊"
+            icon={<BarChart3 size={18} />}
             title="Analytics"
             desc="Trends & Statistiken"
           />
           <ActionCard
             href="/dashboard/templates"
-            icon="📝"
+            icon={<FileText size={18} />}
             title="Vorlagen"
             desc="Wiederkehrende Daten"
           />
           <ActionCard
             href="/invoices/bulk-upload"
-            icon="📦"
+            icon={<Layers size={18} />}
             title="Massenupload"
             desc="Batch-Konvertierung"
           />
-          <ActionCard href="/pricing" icon="✨" title="Credits" desc="Guthaben aufladen" />
+          <ActionCard
+            href="/pricing"
+            icon={<CreditCard size={18} />}
+            title="Credits"
+            desc="Guthaben aufladen"
+          />
         </div>
       </DashboardLayout>
     </ErrorBoundary>
@@ -421,8 +437,8 @@ function StatusBadge({
     draft: 'bg-amber-500/10 text-amber-300 border-amber-400/15',
     failed: 'bg-rose-500/10 text-rose-300 border-rose-400/15',
     failed_refunded: 'bg-rose-500/10 text-rose-300 border-rose-400/15',
-    processing: 'bg-sky-500/10 text-sky-300 border-sky-400/15',
-    pending: 'bg-sky-500/10 text-sky-300 border-sky-400/15',
+    processing: 'bg-sky-500/10 text-lime-200 border-sky-400/15',
+    pending: 'bg-sky-500/10 text-lime-200 border-sky-400/15',
   };
 
   const labels: Record<string, string> = {
@@ -450,22 +466,22 @@ function ActionCard({
   desc,
 }: {
   href: string;
-  icon: string;
+  icon: ReactNode;
   title: string;
   desc: string;
 }) {
   return (
     <Link
       href={href}
-      className="col-span-1 md:col-span-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5 group relative"
+      className="col-span-1 md:col-span-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 transition-all hover:bg-white/[0.05] hover:border-white/[0.12] hover:-translate-y-0.5 group relative"
     >
       <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-lg mb-3">
         {icon}
       </div>
       <p className="text-sm font-semibold text-white">{title}</p>
-      <p className="text-xs text-slate-600 mt-0.5">{desc}</p>
-      <span className="absolute bottom-4 right-4 text-sm text-slate-800 group-hover:text-sky-400 group-hover:translate-x-0.5 transition-all">
-        →
+      <p className="text-xs text-[#9aac9c] mt-0.5">{desc}</p>
+      <span className="absolute bottom-4 right-4 text-sm text-[#9aac9c] group-hover:text-lime-200 group-hover:translate-x-0.5 transition-all">
+        <ArrowUpRight size={17} />
       </span>
     </Link>
   );

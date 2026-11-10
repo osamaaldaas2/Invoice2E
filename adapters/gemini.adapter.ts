@@ -71,9 +71,6 @@ export class GeminiAdapter implements IGeminiAdapter {
       throw new ValidationError('Empty file buffer');
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
     try {
       logger.info('Gemini extraction started', { mimeType, bufferSize: fileBuffer.length });
 
@@ -102,7 +99,6 @@ export class GeminiAdapter implements IGeminiAdapter {
         clearTimeout(raceTimerId!);
       }
 
-      clearTimeout(timeoutId);
       const textContent = result.response.text();
       const extractedData = this.parseResponse(textContent);
 
@@ -126,7 +122,6 @@ export class GeminiAdapter implements IGeminiAdapter {
         rawResponse: result.response,
       };
     } catch (error) {
-      clearTimeout(timeoutId);
       const responseTime = Date.now() - startTime;
 
       if (error instanceof Error && error.message.includes('timeout')) {
